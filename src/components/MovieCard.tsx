@@ -75,7 +75,8 @@ export default function MovieCard({ movie }: MovieCardProps) {
             }
           });
 
-          if (hasSeasons) {
+          const isActuallySeries = movie.collection_type === 'series';
+          if (isActuallySeries) {
             const uniqueSeasons = Array.from(new Set(parsedData.map((e: any) => e.season).filter(Boolean)));
             setCollectionCount(uniqueSeasons.length);
           } else {

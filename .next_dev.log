@@ -15510,3 +15510,49 @@ SERVER: Updating content 263a7bb7-948f-492c-b2b8-03c6888cd680 {
  GET /?category=all 200 in 104ms (next.js: 7ms, application-code: 98ms)
  POST /?category=movies 200 in 448ms (next.js: 11ms, application-code: 437ms)
   └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 424ms src/app/actions.ts
+ POST /?category=movies 200 in 246ms (next.js: 12ms, application-code: 234ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 215ms src/app/actions.ts
+ GET /?category=movies 200 in 868ms (next.js: 12ms, application-code: 856ms)
+ POST /?category=movies 200 in 266ms (next.js: 20ms, application-code: 246ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 230ms src/app/actions.ts
+ POST /?category=movies 200 in 160ms (next.js: 2.0ms, application-code: 158ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 150ms src/app/actions.ts
+ POST /?category=movies 200 in 109ms (next.js: 2ms, application-code: 107ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 94ms src/app/actions.ts
+ POST /?category=movies 200 in 168ms (next.js: 1.9ms, application-code: 166ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 160ms src/app/actions.ts
+ POST /?category=movies 200 in 86ms (next.js: 2ms, application-code: 84ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 78ms src/app/actions.ts
+ GET /?category=movies 200 in 1462ms (next.js: 11ms, application-code: 1450ms)
+ POST /?category=movies 200 in 169ms (next.js: 39ms, application-code: 130ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 118ms src/app/actions.ts
+ POST /?category=movies 200 in 184ms (next.js: 3ms, application-code: 181ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 176ms src/app/actions.ts
+ POST /?category=movies 200 in 187ms (next.js: 3ms, application-code: 184ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 178ms src/app/actions.ts
+ POST /?category=movies 200 in 151ms (next.js: 1.9ms, application-code: 149ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 144ms src/app/actions.ts
+ POST /?category=movies 200 in 265ms (next.js: 2ms, application-code: 263ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 256ms src/app/actions.ts
+✓ Compiled in 137ms
+ GET / 200 in 120ms (next.js: 5ms, application-code: 114ms)
+ GET /?category=movies 200 in 123ms (next.js: 22ms, application-code: 101ms)
+ GET /?category=all 200 in 36ms (next.js: 10ms, application-code: 26ms)
+ POST /?category=movies 200 in 376ms (next.js: 4ms, application-code: 372ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 358ms src/app/actions.ts
+ POST /?category=movies 200 in 82ms (next.js: 1.7ms, application-code: 80ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 73ms src/app/actions.ts
+✓ Compiled in 41ms
+ GET / 200 in 135ms (next.js: 7ms, application-code: 128ms)
+ GET /?category=movies 200 in 52ms (next.js: 9ms, application-code: 43ms)
+ GET /?category=all 200 in 23ms (next.js: 4ms, application-code: 19ms)
+ POST /?category=movies 200 in 629ms (next.js: 2.0ms, application-code: 627ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 621ms src/app/actions.ts
+ POST /?category=movies 200 in 199ms (next.js: 2ms, application-code: 196ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 190ms src/app/admin/add-content/actions.ts
+ POST /?category=movies 200 in 95ms (next.js: 1.6ms, application-code: 93ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 88ms src/app/actions.ts
+ POST /?category=movies 200 in 114ms (next.js: 5ms, application-code: 109ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 103ms src/app/admin/add-content/actions.ts
+ POST /?category=movies 200 in 699ms (next.js: 2ms, application-code: 697ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 691ms src/app/admin/add-content/actions.ts

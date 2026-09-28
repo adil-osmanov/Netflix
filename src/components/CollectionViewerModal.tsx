@@ -46,7 +46,8 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
 
           setEpisodes(parsedData);
           
-          if (hasSeasons) {
+          const isActuallySeries = movie.collection_type === 'series';
+          if (isActuallySeries) {
             setIsSeries(true);
             const uniqueSeasons = Array.from(new Set(parsedData.map((e: any) => e.season).filter(Boolean))) as number[];
             uniqueSeasons.sort((a, b) => a - b);
