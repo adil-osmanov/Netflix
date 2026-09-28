@@ -56,9 +56,13 @@ export default function MovieCard({ movie }: MovieCardProps) {
   // Calculate collection length
   const [collectionCount, setCollectionCount] = useState<number>(0);
   const [mounted, setMounted] = useState(false);
+  const [hideAdmin, setHideAdmin] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    const checkSettings = () => setHideAdmin(localStorage.getItem('netflix_hide_add_buttons') === 'true');
+    checkSettings();
+    window.addEventListener('storage', checkSettings);
     if (movie.is_collection) {
       getEpisodesAction(movie.id).then((result) => {
         if (result.success && result.data) {
@@ -85,6 +89,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
         }
       });
     }
+    return () => window.removeEventListener('storage', checkSettings);
   }, [editOpen, movie.id, movie.is_collection]);
 
   const handlePlay = (e?: React.MouseEvent) => {
@@ -188,7 +193,8 @@ export default function MovieCard({ movie }: MovieCardProps) {
           <div className={`absolute inset-0 transition-opacity duration-300 bg-gradient-to-t from-black/95 via-black/30 to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
           
           {/* Top Right: Edit & Delete */}
-          <div className={`absolute top-2 right-2 md:top-3 md:right-3 flex gap-2 transition-all duration-300 ${isHovered ? 'opacity-100 translate-y-0' : 'opacity-100 md:opacity-0 md:-translate-y-2'}`}>
+          {!hideAdmin && (
+            <div className={`absolute top-2 right-2 md:top-3 md:right-3 hidden md:flex gap-2 transition-all duration-300 ${isHovered ? 'opacity-100 translate-y-0' : 'opacity-100 md:opacity-0 md:-translate-y-2'}`}>
             <button 
               onClick={(e) => { e.stopPropagation(); setEditOpen(true); }}
               className="w-8 h-8 bg-black/60 backdrop-blur-sm border border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white hover:text-black transition-all"
@@ -204,6 +210,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
+          )}
 
           {/* Bottom Left: Play, Title, Collection Info */}
           <div className={`absolute bottom-2 md:bottom-3 left-2 right-2 md:left-4 md:right-4 flex flex-col justify-end transition-all duration-300 ${isHovered ? 'opacity-100 translate-y-0' : 'opacity-100 md:opacity-0 md:translate-y-2'}`}>

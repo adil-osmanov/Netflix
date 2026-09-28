@@ -71,16 +71,16 @@ export default function Hero({ movie }: { movie?: any }) {
 
   return (
     <div 
-      className="relative w-full min-h-[60vh] md:min-h-[75vh] flex flex-col justify-end pb-8 md:pb-16 z-10 bg-[#141414]"
+      className="relative w-full min-h-[55vh] md:min-h-[75vh] flex flex-col justify-end pb-8 md:pb-16 z-10 bg-[#141414]"
 
       style={{
         backgroundImage: `url(${displayMovie.cover_url})`,
         backgroundSize: 'cover',
-        backgroundPosition: 'center'
+        backgroundPosition: 'top center'
       }}
     >
-      <div className="absolute inset-0 bg-gradient-to-r from-[#141414] via-[#141414]/50 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-[#141414]/20 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#141414]/80 md:from-[#141414] md:via-[#141414]/50 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-[#141414]/60 md:via-[#141414]/20 to-transparent" />
 
       <div className="relative z-20 px-4 md:px-12 lg:px-16 max-w-3xl">
         {displayMovie.is_collection && (

@@ -27,7 +27,7 @@ export default function AdminControls() {
       <div>
         <h2 className="text-xl font-semibold text-white">Минимализм на сайте</h2>
         <p className="text-zinc-400 text-sm mt-1">
-          Скрыть кнопки "Добавить в категорию" в каруселях на сайте, чтобы интерфейс выглядел чисто.
+          Скрыть кнопки "Добавить", "Редактировать" и "Удалить" на всем сайте, чтобы интерфейс выглядел чисто.
         </p>
       </div>
       
