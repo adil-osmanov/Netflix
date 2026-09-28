@@ -15164,3 +15164,22 @@ SERVER: Updating content 263a7bb7-948f-492c-b2b8-03c6888cd680 {
   └─ ƒ getEpisodesAction("56d2b13d-2741-45c4-827f-7d04634e0640") in 67ms src/app/actions.ts
  POST /?category=all 200 in 96ms (next.js: 2ms, application-code: 93ms)
   └─ ƒ getEpisodesAction("14a8698e-c3a4-40f5-a6a7-d61f909d9d32") in 88ms src/app/actions.ts
+ GET /admin 200 in 80ms (next.js: 58ms, application-code: 22ms)
+ GET /admin 200 in 76ms (next.js: 21ms, application-code: 55ms)
+✓ Compiled in 299ms
+✓ Compiled in 98ms
+ GET / 200 in 149ms (next.js: 36ms, application-code: 114ms)
+ GET /?category=all 200 in 60ms (next.js: 5ms, application-code: 55ms)
+ GET /admin 200 in 36ms (next.js: 6ms, application-code: 30ms)
+✓ Compiled in 334ms
+ GET / 200 in 48ms (next.js: 17ms, application-code: 31ms)
+ GET /admin 200 in 176ms (next.js: 5ms, application-code: 171ms)
+ GET /?category=all 200 in 54ms (next.js: 6ms, application-code: 48ms)
+✓ Compiled in 92ms
+ GET / 200 in 255ms (next.js: 32ms, application-code: 223ms)
+ GET /admin 200 in 174ms (next.js: 18ms, application-code: 156ms)
+ GET /?category=all 200 in 175ms (next.js: 113ms, application-code: 62ms)
+✓ Compiled in 58ms
+ GET / 200 in 159ms (next.js: 54ms, application-code: 104ms)
+ GET /?category=all 200 in 54ms (next.js: 3ms, application-code: 51ms)
+ GET /admin 200 in 52ms (next.js: 21ms, application-code: 31ms)

@@ -1,6 +1,6 @@
 "use client";
 
-import { Play, X } from "lucide-react";
+import { Play, X, ChevronDown } from "lucide-react";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { getEpisodesAction } from "@/app/actions";
@@ -20,6 +20,7 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
   const [isSeries, setIsSeries] = useState(false);
   const [seasons, setSeasons] = useState<number[]>([]);
   const [activeSeason, setActiveSeason] = useState<number>(1);
+  const [isSeasonDropdownOpen, setIsSeasonDropdownOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -80,7 +81,7 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
     : episodes;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto custom-scrollbar animate-in fade-in duration-300" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto no-scrollbar animate-in fade-in duration-300" onClick={onClose}>
       <div 
         onClick={(e) => e.stopPropagation()} 
         className="w-full max-w-[950px] bg-[#181818] rounded-xl shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden relative h-fit max-h-[90vh] flex flex-col my-auto animate-in fade-in zoom-in-[0.98] duration-300 ease-out"
@@ -92,7 +93,7 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
           <X className="w-5 h-5" />
         </button>
 
-        <div className="overflow-y-auto custom-scrollbar w-full">
+        <div className="overflow-y-auto no-scrollbar w-full">
           {/* Top Banner (16:9) */}
           <div className="w-full aspect-video relative flex-shrink-0">
             <img src={movie.cover_url} alt={movie.title} className="w-full h-full object-cover" />
@@ -118,15 +119,32 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
                 {isSeries && seasons.length > 0 && (
                   <div className="mb-8 flex items-center justify-between">
                     <h3 className="text-2xl font-bold text-white">Эпизоды</h3>
-                    <select 
-                      value={activeSeason}
-                      onChange={(e) => setActiveSeason(Number(e.target.value))}
-                      className="bg-[#242424] border border-zinc-700 text-white text-lg font-bold px-4 py-2 rounded-md outline-none focus:ring-2 focus:ring-white cursor-pointer"
-                    >
-                      {seasons.map(s => (
-                        <option key={s} value={s}>Сезон {s}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <button 
+                        onClick={() => setIsSeasonDropdownOpen(!isSeasonDropdownOpen)}
+                        className="flex items-center gap-3 bg-[#242424] hover:bg-[#2f2f2f] border border-zinc-700 hover:border-zinc-500 text-white text-lg font-semibold px-5 py-2.5 rounded-md transition-all"
+                      >
+                        <span>Сезон {activeSeason}</span>
+                        <ChevronDown className={`w-5 h-5 text-zinc-400 transition-transform duration-300 ${isSeasonDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      
+                      {isSeasonDropdownOpen && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setIsSeasonDropdownOpen(false)}></div>
+                          <div className="absolute right-0 top-full mt-2 w-48 bg-[#181818] border border-zinc-700 rounded-md shadow-2xl z-50 overflow-hidden py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                            {seasons.map(s => (
+                              <button
+                                key={s}
+                                onClick={() => { setActiveSeason(s); setIsSeasonDropdownOpen(false); }}
+                                className={`w-full text-left px-5 py-3 hover:bg-[#2f2f2f] transition-colors text-lg font-medium ${activeSeason === s ? 'text-white bg-[#2f2f2f] border-l-2 border-[#E50914]' : 'text-zinc-400 border-l-2 border-transparent'}`}
+                              >
+                                Сезон {s}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
                 {!isSeries && (

@@ -19,3 +19,12 @@ body {
   background-color: #141414; /* Netflix dark background */
   color: white;
 }
+
+/* Hide global scrollbar */
+body::-webkit-scrollbar {
+  display: none;
+}
+body {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
