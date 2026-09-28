@@ -107,7 +107,7 @@ export default function ClientCatalog({ allGenres, allMovies, allCategories }: C
           {!hideAddButtons && (
             <button 
               onClick={() => setAddModalOpen(true)}
-              className="bg-[#E50914] text-white px-4 py-2 rounded font-bold hover:bg-red-700 transition-colors flex items-center gap-2 w-fit"
+              className="hidden md:flex bg-[#E50914] text-white px-4 py-2 rounded font-bold hover:bg-red-700 transition-colors items-center gap-2 w-fit"
             >
               <Plus className="w-5 h-5" />
               Добавить контент

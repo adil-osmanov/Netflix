@@ -1,6 +1,7 @@
 "use server";
 
 import { supabase } from "@/utils/supabase";
+import { revalidatePath } from "next/cache";
 
 export async function getCategories() {
   const { data, error } = await supabase.from('categories').select('*');
@@ -30,6 +31,7 @@ export async function addGenre(name: string, category_id: string, order_index: n
   }]).select();
   
   if (error) return { success: false, error: error.message };
+  revalidatePath('/');
   return { success: true, data };
 }
 
@@ -45,6 +47,7 @@ export async function swapGenreOrder(genre1: { id: string, order_index: number }
 export async function deleteGenreAction(genreId: string) {
   const { error } = await supabase.from('genres').delete().eq('id', genreId);
   if (error) return { success: false, error: error.message };
+  revalidatePath('/');
   return { success: true };
 }
 
@@ -59,6 +62,7 @@ export async function updateGenreAction(genreId: string, newName: string) {
       console.error("Error updating genre:", error);
       return { success: false, error: error.message };
     }
+    revalidatePath('/');
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -78,6 +82,7 @@ export async function reorderGenresAction(orderedIds: string[]) {
         return { success: false, error: error.message };
       }
     }
+    revalidatePath('/');
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
