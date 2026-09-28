@@ -3,7 +3,7 @@
 import { Play, X, ChevronDown } from "lucide-react";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { getEpisodesAction } from "@/app/actions";
+import { getEpisodesAction, setLastWatchedAction } from "@/app/actions";
 import { Movie } from "./MovieCard";
 
 interface CollectionViewerModalProps {
@@ -68,6 +68,15 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
 
   if (!isOpen || !mounted) return null;
 
+
+  const getEpisodeLink = (ep: any) => {
+    let link = ep.telegram_link || movie.telegram_url;
+    if (link && !link.includes('http')) {
+      const channelId = process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_ID?.replace("-100", "") || "3905550666";
+      link = `https://t.me/c/${channelId}/${link}`;
+    }
+    return link || '#';
+  };
   const playEpisode = (ep: any) => {
     let link = ep.telegram_link || movie.telegram_url;
     if (link && !link.includes('http')) {
@@ -156,9 +165,16 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
 
                 <div className="space-y-4">
                   {displayedEpisodes.map((ep, idx) => (
-                    <div 
+                    <a 
                       key={ep.id}
-                      onClick={() => playEpisode(ep)}
+                      href={getEpisodeLink(ep)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const categoryType = urlParams.get('category') || 'all';
+                        setLastWatchedAction(categoryType, movie);
+                      }}
                       className="flex items-center gap-6 p-4 border-b border-zinc-800 group hover:bg-[#2f2f2f] transition-colors cursor-pointer rounded-lg"
                     >
                       <div className="text-2xl text-zinc-500 font-medium w-8 text-center group-hover:hidden">
@@ -171,7 +187,7 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
                       <div className="flex flex-col flex-1">
                         <span className="text-white font-bold text-lg">{ep.parsedTitle}</span>
                       </div>
-                    </div>
+                    </a>
                   ))}
                 </div>
               </div>
