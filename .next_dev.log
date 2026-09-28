@@ -15766,3 +15766,8 @@ SERVER: Updating content 020ec09a-d3a6-4b2b-9c8e-d70c8f6a435c {
  GET /?category=all 200 in 137ms (next.js: 8ms, application-code: 129ms)
  POST /?category=all 200 in 98ms (next.js: 10ms, application-code: 88ms)
   └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 73ms src/app/actions.ts
+✓ Compiled in 189ms
+ GET / 200 in 159ms (next.js: 32ms, application-code: 127ms)
+ GET /?category=series 200 in 71ms (next.js: 36ms, application-code: 35ms)
+ POST /?category=series 200 in 665ms (next.js: 2ms, application-code: 663ms)
+  └─ ƒ getLastWatchedAction("series") in 656ms src/app/actions.ts
