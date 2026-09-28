@@ -15941,3 +15941,14 @@ SERVER: Updating content 020ec09a-d3a6-4b2b-9c8e-d70c8f6a435c {
 ✓ Compiled in 59ms
 ✓ Compiled in 281ms
  GET / 200 in 76ms (next.js: 38ms, application-code: 38ms)
+ GET / 200 in 1381ms (next.js: 19ms, application-code: 1362ms)
+ POST / 200 in 140ms (next.js: 2ms, application-code: 137ms)
+  └─ ƒ getWatchedHistoryAction() in 132ms src/app/watched_actions.ts
+ POST / 200 in 252ms (next.js: 2ms, application-code: 249ms)
+  └─ ƒ getWatchedHistoryAction() in 243ms src/app/watched_actions.ts
+ POST / 200 in 242ms (next.js: 2ms, application-code: 240ms)
+  └─ ƒ getEpisodesAction("7a5e282a-80f2-46d1-b3cf-a8258afadf43") in 228ms src/app/actions.ts
+ POST / 200 in 252ms (next.js: 6ms, application-code: 246ms)
+  └─ ƒ getEpisodesAction("3ded46f5-7c42-4735-a3fb-2868b34818d3") in 238ms src/app/actions.ts
+✓ Compiled in 134ms
+ GET / 200 in 69ms (next.js: 25ms, application-code: 44ms)
