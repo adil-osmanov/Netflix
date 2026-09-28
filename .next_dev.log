@@ -15316,3 +15316,84 @@ SERVER: Updating content 263a7bb7-948f-492c-b2b8-03c6888cd680 {
 > 6 | export const supabase = createClient(supabaseUrl, supabaseKey);
     |                                     ^
   7 |
+ GET /?category=all 200 in 602ms (next.js: 159ms, application-code: 443ms)
+[browser] Uncaught Error: supabaseKey is required.
+    at <unknown> (src/utils/supabase.ts:6:37)
+    at <unknown> (src/components/Hero.tsx:6:1)
+    at <unknown> (src/components/ClientCatalog.tsx:6:1)
+  4 | const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  5 |
+> 6 | export const supabase = createClient(supabaseUrl, supabaseKey);
+    |                                     ^
+  7 |
+ GET /?category=all 200 in 191ms (next.js: 4ms, application-code: 187ms)
+[browser] Uncaught Error: supabaseKey is required.
+    at <unknown> (src/utils/supabase.ts:6:37)
+    at <unknown> (src/components/Hero.tsx:6:1)
+    at <unknown> (src/components/ClientCatalog.tsx:6:1)
+    at reportError ([native code])
+  4 | const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  5 |
+> 6 | export const supabase = createClient(supabaseUrl, supabaseKey);
+    |                                     ^
+  7 |
+ GET /?category=all 200 in 189ms (next.js: 4ms, application-code: 185ms)
+[browser] Uncaught Error: supabaseKey is required.
+    at <unknown> (src/utils/supabase.ts:6:37)
+    at <unknown> (src/components/Hero.tsx:6:1)
+    at <unknown> (src/components/ClientCatalog.tsx:6:1)
+    at reportError ([native code])
+  4 | const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  5 |
+> 6 | export const supabase = createClient(supabaseUrl, supabaseKey);
+    |                                     ^
+  7 |
+ GET /? 200 in 406ms (next.js: 11ms, application-code: 395ms)
+[browser] Uncaught Error: supabaseKey is required.
+    at <unknown> (src/utils/supabase.ts:6:37)
+    at <unknown> (src/components/Hero.tsx:6:1)
+    at <unknown> (src/components/ClientCatalog.tsx:6:1)
+  4 | const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  5 |
+> 6 | export const supabase = createClient(supabaseUrl, supabaseKey);
+    |                                     ^
+  7 |
+✓ Compiled in 443ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload when ./src/components/ClientCatalog.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload when ./src/components/ClientCatalog.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /?category=all 200 in 88ms (next.js: 2ms, application-code: 86ms)
+ GET / 200 in 387ms (next.js: 29ms, application-code: 359ms)
+ GET / 200 in 636ms (next.js: 3ms, application-code: 633ms)
+[browser] Uncaught Error: supabaseKey is required.
+    at module evaluation (src/utils/supabase.ts:6:37)
+    at module evaluation (src/components/Hero.tsx:6:1)
+    at module evaluation (src/components/ClientCatalog.tsx:6:1)
+    at Home (src/app/page.tsx:97:7)
+  4 | const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  5 |
+> 6 | export const supabase = createClient(supabaseUrl, supabaseKey);
+    |                                     ^
+  7 |
+[browser] Uncaught Error: supabaseKey is required.
+    at <unknown> (src/utils/supabase.ts:6:37)
+    at <unknown> (src/components/Hero.tsx:6:1)
+    at <unknown> (src/components/ClientCatalog.tsx:6:1)
+  4 | const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  5 |
+> 6 | export const supabase = createClient(supabaseUrl, supabaseKey);
+    |                                     ^
+  7 |
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload when ./src/components/Hero.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload when ./src/components/Hero.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 243ms
+ GET /?category=all 200 in 58ms (next.js: 31ms, application-code: 27ms)
+ GET / 200 in 418ms (next.js: 44ms, application-code: 373ms)
+ GET / 200 in 316ms (next.js: 1.7ms, application-code: 315ms)

@@ -149,3 +149,26 @@ export async function searchAllContentAction() {
     return { success: false, data: [] };
   }
 }
+
+export async function getCollectionPartsInfoAction(contentId: string, collectionType: string) {
+  try {
+    const { data } = await supabase
+      .from('content_items')
+      .select('season_number')
+      .eq('content_id', contentId);
+      
+    if (data && data.length > 0) {
+      if (collectionType === 'series') {
+        const seasons = new Set(data.map(item => item.season_number));
+        return `${seasons.size} ${seasons.size === 1 ? 'сезон' : (seasons.size < 5 ? 'сезона' : 'сезонов')}`;
+      } else {
+        const count = data.length;
+        return `${count} ${count === 1 ? 'часть' : (count < 5 ? 'части' : 'частей')}`;
+      }
+    }
+    return null;
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
+}

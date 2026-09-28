@@ -3,7 +3,7 @@
 import { Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { supabase } from "@/utils/supabase";
+import { getCollectionPartsInfoAction } from "@/app/actions";
 import CollectionViewerModal from "./CollectionViewerModal";
 
 export default function Hero({ movie }: { movie?: any }) {
@@ -21,22 +21,8 @@ export default function Hero({ movie }: { movie?: any }) {
         return;
       }
       
-      const { data } = await supabase
-        .from('content_items')
-        .select('season_number')
-        .eq('content_id', displayMovie.id);
-        
-      if (data && data.length > 0) {
-        if (displayMovie.collection_type === 'series') {
-          const seasons = new Set(data.map(item => item.season_number));
-          setPartsInfo(`${seasons.size} ${seasons.size === 1 ? 'сезон' : (seasons.size < 5 ? 'сезона' : 'сезонов')}`);
-        } else {
-          const count = data.length;
-          setPartsInfo(`${count} ${count === 1 ? 'часть' : (count < 5 ? 'части' : 'частей')}`);
-        }
-      } else {
-        setPartsInfo(null);
-      }
+      const info = await getCollectionPartsInfoAction(displayMovie.id, displayMovie.collection_type);
+      setPartsInfo(info);
     }
     if (displayMovie) {
       fetchPartsInfo();
