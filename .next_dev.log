@@ -15829,3 +15829,103 @@ SERVER: Updating content 020ec09a-d3a6-4b2b-9c8e-d70c8f6a435c {
  GET / 200 in 202ms (next.js: 148ms, application-code: 54ms)
 ✓ Compiled in 63ms
  GET / 200 in 111ms (next.js: 32ms, application-code: 79ms)
+✓ Compiled in 1254ms
+ GET / 200 in 52ms (next.js: 14ms, application-code: 38ms)
+ POST / 200 in 449ms (next.js: 3ms, application-code: 446ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 435ms src/app/actions.ts
+ POST / 200 in 236ms (next.js: 2ms, application-code: 234ms)
+  └─ ƒ getWatchedHistoryAction() in 228ms src/app/watched_actions.ts
+ POST / 200 in 162ms (next.js: 1.8ms, application-code: 160ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 154ms src/app/actions.ts
+ POST / 200 in 116ms (next.js: 3ms, application-code: 114ms)
+  └─ ƒ getWatchedHistoryAction() in 109ms src/app/watched_actions.ts
+✓ Compiled in 351ms
+ GET / 200 in 44ms (next.js: 8ms, application-code: 36ms)
+✓ Compiled in 143ms
+[browser] Uncaught ReferenceError: isWatched is not defined
+    at MovieCard (src/components/MovieCard.tsx:101:97)
+    at Set.forEach (<anonymous>)
+    at eval (src/components/AddContentModal.tsx:86:17)
+    at Array.map (<anonymous>)
+    at ClientCatalog (src/components/AddContentModal.tsx:85:26)
+    at Home (src/app/page.tsx:31:9)
+   99 |
+  100 |
+> 101 |   const progress = movie.is_collection ? getCollectionProgress(movie.id, totalEpisodesCount) : (isWatched(movie.id, null) ? 100 : 0);
+      |                                                                                                 ^
+  102 |   const getPlayLink = () => {
+  103 |     if (movie.is_collection) return undefined;
+  104 |     let url = movie.telegram_url;
+⨯ ReferenceError: isWatched is not defined
+    at MovieCard (src/components/MovieCard.tsx:101:42)
+   99 |
+  100 |
+> 101 |   const progress = movie.is_collection ? getCollectionProgress(movie.id, totalEpisodesCount) : (isWatched(movie.id, null) ? 100 : 0);
+      |                                          ^
+  102 |   const getPlayLink = () => {
+  103 |     if (movie.is_collection) return undefined;
+  104 |     let url = movie.telegram_url; {
+  digest: '3918861353'
+}
+ GET / 200 in 775ms (next.js: 12ms, application-code: 763ms)
+ POST / 200 in 181ms (next.js: 5ms, application-code: 175ms)
+  └─ ƒ getWatchedHistoryAction() in 138ms src/app/watched_actions.ts
+ POST / 200 in 122ms (next.js: 2ms, application-code: 119ms)
+  └─ ƒ getWatchedHistoryAction() in 112ms src/app/watched_actions.ts
+[browser] Uncaught ReferenceError: isWatched is not defined
+    at MovieCard (src/components/MovieCard.tsx:101:42)
+    at <unknown> (src/components/ClientCatalog.tsx:142:15)
+    at Array.map (<anonymous>)
+    at ClientCatalog (src/components/ClientCatalog.tsx:140:26)
+    at Home (src/app/page.tsx:31:9)
+   99 |
+  100 |
+> 101 |   const progress = movie.is_collection ? getCollectionProgress(movie.id, totalEpisodesCount) : (isWatched(movie.id, null) ? 100 : 0);
+      |                                          ^
+  102 |   const getPlayLink = () => {
+  103 |     if (movie.is_collection) return undefined;
+  104 |     let url = movie.telegram_url;
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 52ms
+⨯ ReferenceError: isWatched is not defined
+    at MovieCard (src/components/MovieCard.tsx:101:42)
+   99 |
+  100 |
+> 101 |   const progress = movie.is_collection ? getCollectionProgress(movie.id, totalEpisodesCount) : (isWatched(movie.id, null) ? 100 : 0);
+      |                                          ^
+  102 |   const getPlayLink = () => {
+  103 |     if (movie.is_collection) return undefined;
+  104 |     let url = movie.telegram_url; {
+  digest: '3918861353'
+}
+ GET / 200 in 1479ms (next.js: 5ms, application-code: 1474ms)
+ POST / 200 in 121ms (next.js: 18ms, application-code: 102ms)
+  └─ ƒ getWatchedHistoryAction() in 90ms src/app/watched_actions.ts
+ POST / 200 in 141ms (next.js: 4ms, application-code: 137ms)
+  └─ ƒ getWatchedHistoryAction() in 129ms src/app/watched_actions.ts
+[browser] Uncaught ReferenceError: isWatched is not defined
+    at MovieCard (src/components/MovieCard.tsx:101:42)
+    at <unknown> (src/components/ClientCatalog.tsx:142:15)
+    at Array.map (<anonymous>)
+    at ClientCatalog (src/components/ClientCatalog.tsx:140:26)
+    at Home (src/app/page.tsx:31:9)
+   99 |
+  100 |
+> 101 |   const progress = movie.is_collection ? getCollectionProgress(movie.id, totalEpisodesCount) : (isWatched(movie.id, null) ? 100 : 0);
+      |                                          ^
+  102 |   const getPlayLink = () => {
+  103 |     if (movie.is_collection) return undefined;
+  104 |     let url = movie.telegram_url;
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 156ms
+ GET / 200 in 860ms (next.js: 9ms, application-code: 851ms)
+ POST / 200 in 126ms (next.js: 3ms, application-code: 123ms)
+  └─ ƒ getWatchedHistoryAction() in 117ms src/app/watched_actions.ts
+ POST / 200 in 150ms (next.js: 2ms, application-code: 148ms)
+  └─ ƒ getWatchedHistoryAction() in 143ms src/app/watched_actions.ts
+ POST / 200 in 121ms (next.js: 2ms, application-code: 119ms)
+  └─ ƒ getEpisodesAction("3ded46f5-7c42-4735-a3fb-2868b34818d3") in 113ms src/app/actions.ts
+ POST / 200 in 127ms (next.js: 2ms, application-code: 125ms)
+  └─ ƒ getEpisodesAction("3ded46f5-7c42-4735-a3fb-2868b34818d3") in 118ms src/app/actions.ts
+✓ Compiled in 121ms
+ GET / 200 in 47ms (next.js: 12ms, application-code: 36ms)

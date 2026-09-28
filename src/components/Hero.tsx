@@ -1,6 +1,7 @@
 "use client";
 
-import { Play } from "lucide-react";
+import { Play, CheckCircle2 } from "lucide-react";
+import { useWatched } from "@/context/WatchedContext";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getCollectionPartsInfoAction, getLastWatchedAction, setLastWatchedAction } from "@/app/actions";
@@ -10,6 +11,7 @@ export default function Hero({ movie }: { movie?: any }) {
   const [mounted, setMounted] = useState(false);
   const [displayMovie, setDisplayMovie] = useState(movie);
   const searchParams = useSearchParams();
+  const { isWatched, toggleWatched } = useWatched();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [partsInfo, setPartsInfo] = useState<string | null>(null);
@@ -130,19 +132,28 @@ export default function Hero({ movie }: { movie?: any }) {
               Смотреть
             </button>
           ) : (
-            <a 
-              href={getPlayLink()!}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => {
-                const category = searchParams.get('category') || 'all';
-                setLastWatchedAction(category, displayMovie);
-              }}
-              className="bg-white text-black font-bold text-xs md:text-lg px-3 md:px-8 py-1.5 md:py-3 rounded-md flex items-center gap-1.5 md:gap-2 hover:bg-white/80 transition-colors cursor-pointer shadow-lg drop-shadow-md"
-            >
-              <Play className="w-4 h-4 md:w-7 md:h-7" fill="currentColor" />
-              Смотреть
-            </a>
+            <div className="flex items-center gap-2 md:gap-4">
+              <a 
+                href={getPlayLink()!}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  const category = searchParams.get('category') || 'all';
+                  setLastWatchedAction(category, displayMovie);
+                }}
+                className="bg-white text-black font-bold text-xs md:text-lg px-3 md:px-8 py-1.5 md:py-3 rounded-md flex items-center gap-1.5 md:gap-2 hover:bg-white/80 transition-colors cursor-pointer shadow-lg drop-shadow-md"
+              >
+                <Play className="w-4 h-4 md:w-7 md:h-7" fill="currentColor" />
+                Смотреть
+              </a>
+              <button 
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWatched(displayMovie.id, null); }}
+                className="bg-zinc-800/80 backdrop-blur-md text-white px-3 md:px-6 py-1.5 md:py-3 rounded-md flex items-center gap-2 hover:bg-zinc-700/80 transition-colors border border-zinc-600 shadow-lg drop-shadow-md font-bold text-xs md:text-lg cursor-pointer"
+              >
+                <CheckCircle2 className={`w-4 h-4 md:w-6 md:h-6 ${isWatched(displayMovie.id, null) ? 'text-green-500' : 'text-white'}`} />
+                {isWatched(displayMovie.id, null) ? "Просмотрено" : "Просмотрено"}
+              </button>
+            </div>
           )}
         </div>
       </div>

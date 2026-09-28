@@ -1,6 +1,7 @@
 "use client";
 
-import { Play, Pencil, Trash2 } from "lucide-react";
+import { Play, Pencil, Trash2, CheckCircle2 } from "lucide-react";
+import { useWatched } from "@/context/WatchedContext";
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import CollectionViewerModal from "./CollectionViewerModal";
@@ -56,6 +57,8 @@ export default function MovieCard({ movie }: MovieCardProps) {
 
   // Calculate collection length
   const [collectionCount, setCollectionCount] = useState<number>(0);
+  const [totalEpisodesCount, setTotalEpisodesCount] = useState(0);
+  const { isWatched, toggleWatched, getCollectionProgress } = useWatched();
   const [mounted, setMounted] = useState(false);
   const [hideAdmin, setHideAdmin] = useState(false);
 
@@ -84,8 +87,10 @@ export default function MovieCard({ movie }: MovieCardProps) {
           if (isActuallySeries) {
             const uniqueSeasons = Array.from(new Set(parsedData.map((e: any) => e.season).filter(Boolean)));
             setCollectionCount(uniqueSeasons.length);
+            setTotalEpisodesCount(result.data.length);
           } else {
             setCollectionCount(result.data.length);
+            setTotalEpisodesCount(result.data.length);
           }
         }
       });
@@ -94,6 +99,8 @@ export default function MovieCard({ movie }: MovieCardProps) {
   }, [editOpen, movie.id, movie.is_collection]);
 
 
+
+  const progress = movie.is_collection ? getCollectionProgress(movie.id, totalEpisodesCount) : (isWatched(movie.id, null) ? 100 : 0);
   const getPlayLink = () => {
     if (movie.is_collection) return undefined;
     let url = movie.telegram_url;
@@ -174,6 +181,12 @@ export default function MovieCard({ movie }: MovieCardProps) {
           >
             {isDeleting ? "Удаление..." : "Удалить"}
           </button>
+
+          {progress > 0 && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 md:h-1.5 bg-zinc-800/80 z-40 overflow-hidden">
+              <div className="h-full bg-[#E50914] transition-all duration-500" style={{ width: `${progress}%` }} />
+            </div>
+          )}
         </div>
       </div>
     </div>,
@@ -264,6 +277,15 @@ export default function MovieCard({ movie }: MovieCardProps) {
                   <span className="px-1 py-0.5 border border-zinc-400 text-zinc-300 text-[9px] md:text-[10px] rounded-[3px] font-bold tracking-wider leading-none shadow-sm flex items-center justify-center">
                     CC
                   </span>
+                )}
+                {!movie.is_collection && (
+                  <button 
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWatched(movie.id, null); }}
+                    className="ml-auto w-6 h-6 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors z-30 relative"
+                    title={isWatched(movie.id, null) ? "Отметить как непросмотренное" : "Отметить как просмотренное"}
+                  >
+                    <CheckCircle2 className={`w-4 h-4 ${isWatched(movie.id, null) ? 'text-green-500' : 'text-zinc-600'}`} />
+                  </button>
                 )}
               </div>
             )}

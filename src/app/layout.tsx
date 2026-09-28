@@ -18,6 +18,7 @@ export const metadata: Metadata = {
 };
 
 import { SearchProvider } from "@/components/SearchContext";
+import { WatchedProvider } from "@/context/WatchedContext";
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -26,7 +27,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[#141414] text-white">
-        <SearchProvider>{children}</SearchProvider>
+        <WatchedProvider>
+          <SearchProvider>{children}</SearchProvider>
+        </WatchedProvider>
       </body>
     </html>
   );

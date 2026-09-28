@@ -1,6 +1,7 @@
 "use client";
 
-import { Play, X, ChevronDown } from "lucide-react";
+import { Play, X, ChevronDown, CheckCircle2 } from "lucide-react";
+import { useWatched } from "@/context/WatchedContext";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { getEpisodesAction, setLastWatchedAction } from "@/app/actions";
@@ -13,6 +14,7 @@ interface CollectionViewerModalProps {
 }
 
 export default function CollectionViewerModal({ movie, isOpen, onClose }: CollectionViewerModalProps) {
+  const { isWatched, toggleWatched } = useWatched();
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   
@@ -97,6 +99,9 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
   const displayedEpisodes = isSeries 
     ? episodes.filter(e => e.season === activeSeason) 
     : episodes;
+
+  const seasonWatchedCount = displayedEpisodes.filter(ep => isWatched(movie.id, ep.id)).length;
+  const seasonProgress = displayedEpisodes.length > 0 ? (seasonWatchedCount / displayedEpisodes.length) * 100 : 0;
 
   const modalContent = (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto no-scrollbar animate-in fade-in duration-300" onClick={onClose}>
@@ -195,6 +200,13 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
                       <div className="flex flex-col flex-1">
                         <span className="text-white font-bold text-lg">{getDisplayName(ep.parsedTitle, idx)}</span>
                       </div>
+                      <button 
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWatched(movie.id, ep.id); }}
+                        className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
+                        title={isWatched(movie.id, ep.id) ? "Отметить как непросмотренное" : "Отметить как просмотренное"}
+                      >
+                        <CheckCircle2 className={`w-6 h-6 ${isWatched(movie.id, ep.id) ? 'text-green-500' : 'text-zinc-600'}`} />
+                      </button>
                     </a>
                   ))}
                 </div>
