@@ -68,8 +68,17 @@ export default function Hero({ movie }: { movie?: any }) {
         <h1 className="text-6xl lg:text-7xl font-black tracking-tight text-white mb-6 drop-shadow-2xl">
           {displayMovie.title}
         </h1>
-        <p className="text-lg text-gray-200 mb-10 line-clamp-3 md:line-clamp-4 max-w-2xl leading-relaxed drop-shadow-md">
-          {displayMovie.description || "Готовы к просмотру? Нажмите Play, чтобы открыть видео прямо в Telegram без задержек и рекламы."}
+        
+        {/* Netflix Top 10 Badge */}
+        <div className="flex items-center gap-3 mb-5 drop-shadow-lg">
+          <div className="bg-[#E50914] text-white font-black text-[10px] px-1.5 py-0.5 rounded-sm text-center leading-tight tracking-tighter">
+            ТОП<br/>10
+          </div>
+          <span className="text-white font-bold text-xl drop-shadow-xl">№1 в рейтинге сегодня</span>
+        </div>
+
+        <p className="text-lg text-zinc-200 mb-10 line-clamp-3 md:line-clamp-4 max-w-2xl leading-snug drop-shadow-lg font-medium">
+          {displayMovie.description || "Один из самых обсуждаемых релизов этого сезона. Погрузитесь в захватывающую историю, которая держит в напряжении от первой до последней минуты."}
         </p>
 
         <div className="flex items-center gap-4">

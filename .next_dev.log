@@ -15183,3 +15183,52 @@ SERVER: Updating content 263a7bb7-948f-492c-b2b8-03c6888cd680 {
  GET / 200 in 159ms (next.js: 54ms, application-code: 104ms)
  GET /?category=all 200 in 54ms (next.js: 3ms, application-code: 51ms)
  GET /admin 200 in 52ms (next.js: 21ms, application-code: 31ms)
+ GET /?category=all 200 in 627ms (next.js: 10ms, application-code: 618ms)
+ POST /?category=all 200 in 216ms (next.js: 4ms, application-code: 212ms)
+  └─ ƒ getEpisodesAction("56d2b13d-2741-45c4-827f-7d04634e0640") in 201ms src/app/actions.ts
+ POST /?category=all 200 in 107ms (next.js: 3ms, application-code: 104ms)
+  └─ ƒ getEpisodesAction("14a8698e-c3a4-40f5-a6a7-d61f909d9d32") in 93ms src/app/actions.ts
+ POST /?category=all 200 in 237ms (next.js: 1.9ms, application-code: 235ms)
+  └─ ƒ getEpisodesAction("56d2b13d-2741-45c4-827f-7d04634e0640") in 229ms src/app/actions.ts
+ POST /?category=all 200 in 178ms (next.js: 2.0ms, application-code: 176ms)
+  └─ ƒ getEpisodesAction("14a8698e-c3a4-40f5-a6a7-d61f909d9d32") in 169ms src/app/actions.ts
+ GET /?category=movies 200 in 575ms (next.js: 2ms, application-code: 572ms)
+ POST /?category=movies 200 in 199ms (next.js: 2ms, application-code: 197ms)
+  └─ ƒ getEpisodesAction("14a8698e-c3a4-40f5-a6a7-d61f909d9d32") in 188ms src/app/actions.ts
+ POST /?category=movies 200 in 86ms (next.js: 2ms, application-code: 84ms)
+  └─ ƒ getEpisodesAction("14a8698e-c3a4-40f5-a6a7-d61f909d9d32") in 76ms src/app/actions.ts
+ GET /?category=series 200 in 259ms (next.js: 3ms, application-code: 256ms)
+ POST /?category=series 200 in 98ms (next.js: 9ms, application-code: 89ms)
+  └─ ƒ getEpisodesAction("56d2b13d-2741-45c4-827f-7d04634e0640") in 81ms src/app/actions.ts
+ POST /?category=series 200 in 168ms (next.js: 4ms, application-code: 164ms)
+  └─ ƒ getEpisodesAction("56d2b13d-2741-45c4-827f-7d04634e0640") in 154ms src/app/actions.ts
+ GET /?category=cartoons 200 in 451ms (next.js: 3ms, application-code: 447ms)
+ GET /?category=all 200 in 105ms (next.js: 3ms, application-code: 101ms)
+ POST /?category=all 200 in 90ms (next.js: 5ms, application-code: 84ms)
+  └─ ƒ getEpisodesAction("56d2b13d-2741-45c4-827f-7d04634e0640") in 77ms src/app/actions.ts
+ POST /?category=all 200 in 83ms (next.js: 2ms, application-code: 80ms)
+  └─ ƒ getEpisodesAction("14a8698e-c3a4-40f5-a6a7-d61f909d9d32") in 72ms src/app/actions.ts
+ POST /?category=all 200 in 150ms (next.js: 2ms, application-code: 148ms)
+  └─ ƒ getEpisodesAction("56d2b13d-2741-45c4-827f-7d04634e0640") in 138ms src/app/actions.ts
+ POST /?category=all 200 in 90ms (next.js: 2ms, application-code: 87ms)
+  └─ ƒ getEpisodesAction("14a8698e-c3a4-40f5-a6a7-d61f909d9d32") in 79ms src/app/actions.ts
+ GET /?category=movies 200 in 866ms (next.js: 4ms, application-code: 862ms)
+ POST /?category=movies 200 in 126ms (next.js: 5ms, application-code: 121ms)
+  └─ ƒ getEpisodesAction("14a8698e-c3a4-40f5-a6a7-d61f909d9d32") in 110ms src/app/actions.ts
+ POST /?category=movies 200 in 172ms (next.js: 2ms, application-code: 170ms)
+  └─ ƒ getEpisodesAction("14a8698e-c3a4-40f5-a6a7-d61f909d9d32") in 163ms src/app/actions.ts
+ GET /?category=all 200 in 110ms (next.js: 3ms, application-code: 106ms)
+ POST /?category=all 200 in 173ms (next.js: 8ms, application-code: 164ms)
+  └─ ƒ getEpisodesAction("56d2b13d-2741-45c4-827f-7d04634e0640") in 155ms src/app/actions.ts
+ POST /?category=all 200 in 182ms (next.js: 1.4ms, application-code: 180ms)
+  └─ ƒ getEpisodesAction("14a8698e-c3a4-40f5-a6a7-d61f909d9d32") in 173ms src/app/actions.ts
+ POST /?category=all 200 in 86ms (next.js: 2.0ms, application-code: 84ms)
+  └─ ƒ getEpisodesAction("56d2b13d-2741-45c4-827f-7d04634e0640") in 77ms src/app/actions.ts
+ POST /?category=all 200 in 152ms (next.js: 2ms, application-code: 150ms)
+  └─ ƒ getEpisodesAction("14a8698e-c3a4-40f5-a6a7-d61f909d9d32") in 145ms src/app/actions.ts
+ POST /?category=all 200 in 191ms (next.js: 2ms, application-code: 189ms)
+  └─ ƒ getEpisodesAction("56d2b13d-2741-45c4-827f-7d04634e0640") in 182ms src/app/actions.ts
+✓ Compiled in 93ms
+ GET / 200 in 135ms (next.js: 31ms, application-code: 104ms)
+ GET /?category=all 200 in 57ms (next.js: 6ms, application-code: 52ms)
+ GET /?category=all 200 in 64ms (next.js: 3ms, application-code: 60ms)
