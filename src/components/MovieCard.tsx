@@ -19,6 +19,7 @@ export interface Movie {
   is_collection?: boolean;
   genre_id?: string;
   collection_type?: string;
+  has_subtitles?: boolean;
 }
 
 interface MovieCardProps {

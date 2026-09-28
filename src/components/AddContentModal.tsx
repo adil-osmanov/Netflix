@@ -31,6 +31,7 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
     release_year: "",
     is_collection: false,
     telegram_link: "",
+    has_subtitles: false,
     seasons: [
       { seasonNumber: 1, episodes: [{ title: "", telegram_link: "" }] }
     ]
@@ -72,6 +73,7 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
           release_year: movieToEdit.release_year || "",
           is_collection: !!movieToEdit.is_collection,
           telegram_link: movieToEdit.telegram_url || "",
+          has_subtitles: !!movieToEdit.has_subtitles,
           seasons: [{ seasonNumber: 1, episodes: [{ title: "", telegram_link: "" }] }]
         });
         setPreviewUrl(movieToEdit.cover_url);
@@ -102,7 +104,7 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
           setFormData(prev => ({ ...prev, seasons: rebuiltSeasons.length > 0 ? rebuiltSeasons : prev.seasons }));
         }
       } else {
-        setFormData({ title: "", release_year: "", is_collection: false, telegram_link: "", seasons: [{ seasonNumber: 1, episodes: [{ title: "", telegram_link: "" }] }] });
+        setFormData({ title: "", release_year: "", is_collection: false, has_subtitles: false, telegram_link: "", seasons: [{ seasonNumber: 1, episodes: [{ title: "", telegram_link: "" }] }] });
         setPreviewUrl(null);
         setMessage(null);
       }
@@ -188,6 +190,7 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
     submission.append('is_collection', String(formData.is_collection));
     if (formData.release_year) submission.append('release_year', formData.release_year);
     submission.append('poster_url', previewUrl);
+    submission.append('has_subtitles', String(formData.has_subtitles));
     
     let finalCollectionType = null;
     if (formData.is_collection) {
@@ -225,7 +228,7 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
       setMessage({ text: movieToEdit ? "Успешно! Контент обновлен." : "Успешно! Контент добавлен.", type: "success" });
       setTimeout(() => {
         onClose();
-        setFormData({ title: "", release_year: "", is_collection: false, telegram_link: "", seasons: [{ seasonNumber: 1, episodes: [] }] });
+        setFormData({ title: "", release_year: "", is_collection: false, has_subtitles: false, telegram_link: "", seasons: [{ seasonNumber: 1, episodes: [] }] });
         setPreviewUrl(null);
         window.location.reload();
       }, 500);
@@ -328,6 +331,18 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
             />
             <label htmlFor="is_collection" className="text-white font-medium cursor-pointer select-none flex-1">
               {isSeries ? "Это сериал (несколько сезонов/серий)" : "Это коллекция (несколько частей франшизы)"}
+            </label>
+          </div>
+          <div className="flex items-center gap-3 p-4 bg-zinc-900/50 border border-zinc-800 rounded-md">
+            <input 
+              type="checkbox" 
+              id="has_subtitles"
+              checked={formData.has_subtitles}
+              onChange={(e) => setFormData({...formData, has_subtitles: e.target.checked})}
+              className="w-5 h-5 accent-[#E50914] rounded bg-zinc-800 border-zinc-700"
+            />
+            <label htmlFor="has_subtitles" className="text-white font-medium cursor-pointer select-none flex-1">
+              Есть субтитры [CC]
             </label>
           </div>
 

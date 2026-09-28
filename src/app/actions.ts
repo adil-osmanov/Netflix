@@ -142,7 +142,8 @@ export async function searchAllContentAction() {
         telegram_url: item.telegram_link,
         is_collection: item.is_collection,
         genre_id: item.genre_id,
-        collection_type: item.collection_type
+        collection_type: item.collection_type,
+      has_subtitles: item.has_subtitles
       })) || []
     };
   } catch (error: any) {

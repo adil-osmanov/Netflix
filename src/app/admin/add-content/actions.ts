@@ -23,6 +23,7 @@ export async function saveContentAction(formData: FormData, contentId?: string) 
     const poster_url = formData.get('poster_url') as string;
     const collection_type = formData.get('collection_type') as string || null;
     const release_year = formData.get('release_year') as string || null;
+    const has_subtitles = formData.get('has_subtitles') === 'true';
 
     if (!poster_url) throw new Error("Poster URL is required");
 
@@ -47,6 +48,7 @@ export async function saveContentAction(formData: FormData, contentId?: string) 
       collection_type,
       release_year,
       telegram_link: messageId ? String(messageId) : null,
+      has_subtitles,
     };
 
     let contentData;
