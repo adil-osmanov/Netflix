@@ -210,7 +210,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
           {movie.is_collection ? (
             <div onClick={handlePlay} className="absolute inset-0 z-0 cursor-pointer">
               <img src={movie.cover_url} alt={movie.title} className="w-full h-full object-cover transition-transform duration-300" />
-              <div className={`absolute inset-0 transition-opacity duration-300 bg-gradient-to-t from-black/95 via-black/30 to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
+              <div className={`absolute inset-0 transition-opacity duration-300 bg-gradient-to-t from-[#141414] from-15% via-[#141414]/80 via-45% to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
             </div>
           ) : (
             <a 
@@ -225,7 +225,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
               className="absolute inset-0 z-0 cursor-pointer block"
             >
               <img src={movie.cover_url} alt={movie.title} className="w-full h-full object-cover transition-transform duration-300" />
-              <div className={`absolute inset-0 transition-opacity duration-300 bg-gradient-to-t from-black/95 via-black/30 to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
+              <div className={`absolute inset-0 transition-opacity duration-300 bg-gradient-to-t from-[#141414] from-15% via-[#141414]/80 via-45% to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
             </a>
           )}
 
