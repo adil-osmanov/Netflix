@@ -136,7 +136,7 @@ export default function ClientCatalog({ allGenres, allMovies, allCategories }: C
   if (categoryParam === 'all') {
     return (
       <div className="pt-28 px-4 md:px-12 w-full z-10 relative pb-40">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-x-2 gap-y-4 md:gap-y-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-x-2 gap-y-2 md:gap-y-8">
           {displayMovies.map((movie) => (
             <div key={movie.id} className="w-full">
               <MovieCard movie={movie} />
@@ -150,7 +150,7 @@ export default function ClientCatalog({ allGenres, allMovies, allCategories }: C
   return (
     <>
       <Hero movie={heroMovie} />
-      <div className="pb-40 relative z-20 mt-4 space-y-8 md:space-y-12">
+      <div className="pb-40 relative z-20 mt-2 md:mt-4 space-y-4 md:space-y-12">
         {displayGenres.map(genre => (
           <MovieRow 
             key={genre.id} 

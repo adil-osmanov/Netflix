@@ -15718,3 +15718,9 @@ SERVER: Updating content 020ec09a-d3a6-4b2b-9c8e-d70c8f6a435c {
 ✓ Compiled in 1028ms
  GET / 200 in 238ms (next.js: 25ms, application-code: 213ms)
  GET /?category=series 200 in 119ms (next.js: 38ms, application-code: 81ms)
+✓ Compiled in 663ms
+ GET / 200 in 622ms (next.js: 224ms, application-code: 399ms)
+ GET /?category=series 200 in 92ms (next.js: 12ms, application-code: 80ms)
+✓ Compiled in 821ms
+ GET / 200 in 282ms (next.js: 27ms, application-code: 256ms)
+ GET /?category=series 200 in 183ms (next.js: 32ms, application-code: 151ms)
