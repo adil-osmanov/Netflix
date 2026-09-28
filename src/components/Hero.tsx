@@ -69,17 +69,24 @@ export default function Hero({ movie }: { movie?: any }) {
           {displayMovie.title}
         </h1>
         
-        {/* Netflix Top 10 Badge */}
-        <div className="flex items-center gap-3 mb-5 drop-shadow-lg">
-          <div className="bg-[#E50914] text-white font-black text-[10px] px-1.5 py-0.5 rounded-sm text-center leading-tight tracking-tighter">
-            ТОП<br/>10
-          </div>
-          <span className="text-white font-bold text-xl drop-shadow-xl">№1 в рейтинге сегодня</span>
+        {/* Netflix Style Metadata Row */}
+        <div className="flex items-center gap-3 md:gap-4 text-sm md:text-base font-semibold mb-6 drop-shadow-md">
+          <span className="text-[#46d369]">98% совпадение</span>
+          <span className="text-zinc-300">2024</span>
+          <span className="border border-zinc-500 text-zinc-300 px-1.5 py-0.5 rounded-sm text-xs md:text-sm">16+</span>
+          <span className="text-zinc-300">
+            {displayMovie.collection_type === 'series' ? 'Сериал' : 'Фильм'}
+          </span>
+          <span className="border border-zinc-500 text-zinc-300 px-1 py-0.5 rounded-sm text-[10px] md:text-xs font-bold tracking-wider">HD</span>
         </div>
 
-        <p className="text-lg text-zinc-200 mb-10 line-clamp-3 md:line-clamp-4 max-w-2xl leading-snug drop-shadow-lg font-medium">
-          {displayMovie.description || "Один из самых обсуждаемых релизов этого сезона. Погрузитесь в захватывающую историю, которая держит в напряжении от первой до последней минуты."}
-        </p>
+        {displayMovie.description && (
+          <p className="text-lg text-zinc-200 mb-10 line-clamp-3 md:line-clamp-4 max-w-2xl leading-snug drop-shadow-lg">
+            {displayMovie.description}
+          </p>
+        )}
+        
+        {!displayMovie.description && <div className="mb-10" />}
 
         <div className="flex items-center gap-4">
           <button 
