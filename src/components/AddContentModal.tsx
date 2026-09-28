@@ -203,10 +203,12 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
     if (formData.is_collection) {
       const flatEpisodes: any[] = [];
       formData.seasons.forEach((season) => {
-        season.episodes.forEach((ep) => {
-          if (ep.title && ep.telegram_link) {
+        season.episodes.forEach((ep, eIdx) => {
+          if (ep.telegram_link) {
+            const isActuallyFranchise = finalCollectionType === 'franchise';
+            const defaultTitle = isActuallyFranchise ? `Часть ${eIdx + 1}` : `Серия ${eIdx + 1}`;
             flatEpisodes.push({
-              title: JSON.stringify({ season: season.seasonNumber, title: ep.title }),
+              title: JSON.stringify({ season: season.seasonNumber, title: ep.title || defaultTitle }),
               telegram_link: ep.telegram_link
             });
           }
@@ -394,7 +396,7 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
                       <div key={eIdx} className="flex flex-col sm:flex-row gap-3">
                         <input 
                           type="text" 
-                          required
+                          
                           placeholder={isActuallyFranchise ? `Часть ${eIdx + 1}` : `Серия ${eIdx + 1}`}
                           value={ep.title}
                           onChange={(e) => updateEpisode(sIdx, eIdx, 'title', e.target.value)}

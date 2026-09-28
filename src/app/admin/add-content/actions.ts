@@ -91,9 +91,10 @@ export async function saveContentAction(formData: FormData, contentId?: string) 
             epMessageId = ep.telegram_link;
           }
 
+          const defaultTitle = collection_type === 'franchise' ? `Часть ${index + 1}` : `Серия ${index + 1}`;
           return {
             content_id: contentData.id,
-            title: ep.title || `Серия ${index + 1}`,
+            title: ep.title || defaultTitle,
             telegram_link: epMessageId ? String(epMessageId) : ep.telegram_link,
             order_index: index,
           };

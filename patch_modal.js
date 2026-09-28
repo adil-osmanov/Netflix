@@ -1,54 +1,52 @@
 const fs = require('fs');
 let content = fs.readFileSync('src/components/AddContentModal.tsx', 'utf8');
 
-// 1. Add release_year to formData state
-content = content.replace(
-  '    title: "",\n    is_collection: false,',
-  '    title: "",\n    release_year: "",\n    is_collection: false,'
-);
+// 1. Remove required from title input
+const oldInput = `                        <input 
+                          type="text" 
+                          required
+                          placeholder={isActuallyFranchise ? \`Часть \${eIdx + 1}\` : \`Серия \${eIdx + 1}\`}
+                          value={ep.title}
+                          onChange={(e) => updateEpisode(sIdx, eIdx, 'title', e.target.value)}`;
 
-// 2. Add release_year to edit effect
-content = content.replace(
-  '          title: movieToEdit.title,\n          is_collection: !!movieToEdit.is_collection,',
-  '          title: movieToEdit.title,\n          release_year: movieToEdit.release_year || "",\n          is_collection: !!movieToEdit.is_collection,'
-);
+const newInput = `                        <input 
+                          type="text" 
+                          
+                          placeholder={isActuallyFranchise ? \`Часть \${eIdx + 1}\` : \`Серия \${eIdx + 1}\`}
+                          value={ep.title}
+                          onChange={(e) => updateEpisode(sIdx, eIdx, 'title', e.target.value)}`;
 
-// 3. Add release_year to submission
-const subOld = "    submission.append('is_collection', String(formData.is_collection));";
-const subNew = "    submission.append('is_collection', String(formData.is_collection));\n    if (formData.release_year) submission.append('release_year', formData.release_year);";
-content = content.replace(subOld, subNew);
+content = content.replace(oldInput, newInput);
 
-// 4. Add release_year to reset after success
-content = content.replace(
-  'setFormData({ title: "", is_collection: false, telegram_link: "", seasons: [{ seasonNumber: 1, episodes: [] }] });',
-  'setFormData({ title: "", release_year: "", is_collection: false, telegram_link: "", seasons: [{ seasonNumber: 1, episodes: [] }] });'
-);
+// 2. Fix the submission filter logic
+const oldFilter = `    if (formData.is_collection) {
+      const flatEpisodes: any[] = [];
+      formData.seasons.forEach((season) => {
+        season.episodes.forEach((ep) => {
+          if (ep.title && ep.telegram_link) {
+            flatEpisodes.push({
+              title: JSON.stringify({ season: season.seasonNumber, title: ep.title }),
+              telegram_link: ep.telegram_link
+            });
+          }
+        });
+      });`;
 
-// 5. Add input field
-const titleInput = `          <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-300">Название контента</label>
-            <input 
-              type="text" 
-              required
-              value={formData.title}
-              onChange={(e) => setFormData({...formData, title: e.target.value})}
-              className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-md px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] transition-all"
-              placeholder="Например: Начало"
-            />
-          </div>`;
+const newFilter = `    if (formData.is_collection) {
+      const flatEpisodes: any[] = [];
+      formData.seasons.forEach((season) => {
+        season.episodes.forEach((ep, eIdx) => {
+          if (ep.telegram_link) {
+            const isActuallyFranchise = finalCollectionType === 'franchise';
+            const defaultTitle = isActuallyFranchise ? \`Часть \${eIdx + 1}\` : \`Серия \${eIdx + 1}\`;
+            flatEpisodes.push({
+              title: JSON.stringify({ season: season.seasonNumber, title: ep.title || defaultTitle }),
+              telegram_link: ep.telegram_link
+            });
+          }
+        });
+      });`;
 
-const releaseYearInput = `
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-300">Год выпуска (необязательно)</label>
-            <input 
-              type="text" 
-              value={formData.release_year}
-              onChange={(e) => setFormData({...formData, release_year: e.target.value})}
-              className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-md px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] transition-all"
-              placeholder="Например: 2010 или 2010 - 2013"
-            />
-          </div>`;
-
-content = content.replace(titleInput, titleInput + releaseYearInput);
+content = content.replace(oldFilter, newFilter);
 
 fs.writeFileSync('src/components/AddContentModal.tsx', content);
