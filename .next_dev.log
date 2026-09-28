@@ -15952,3 +15952,5 @@ SERVER: Updating content 020ec09a-d3a6-4b2b-9c8e-d70c8f6a435c {
   └─ ƒ getEpisodesAction("3ded46f5-7c42-4735-a3fb-2868b34818d3") in 238ms src/app/actions.ts
 ✓ Compiled in 134ms
  GET / 200 in 69ms (next.js: 25ms, application-code: 44ms)
+✓ Compiled in 151ms
+ GET / 200 in 74ms (next.js: 20ms, application-code: 55ms)
