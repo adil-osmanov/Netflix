@@ -15664,3 +15664,6 @@ SERVER: Updating content 020ec09a-d3a6-4b2b-9c8e-d70c8f6a435c {
   └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 346ms src/app/actions.ts
  POST / 200 in 78ms (next.js: 5ms, application-code: 73ms)
   └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 68ms src/app/actions.ts
+✓ Compiled in 116ms
+ GET / 200 in 149ms (next.js: 27ms, application-code: 121ms)
+ GET /?category=series 200 in 63ms (next.js: 12ms, application-code: 52ms)
