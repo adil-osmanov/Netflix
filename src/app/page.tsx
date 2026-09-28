@@ -1,69 +1,100 @@
-import Image from "next/image";
+import Navbar from "@/components/Navbar";
+import ClientCatalog from "@/components/ClientCatalog";
+import { supabase } from "@/utils/supabase";
 
-export default function Home() {
+import { unstable_noStore as noStore } from 'next/cache';
+
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  noStore();
+  
+  const resolvedSearchParams = await searchParams;
+  const categoryParam = (resolvedSearchParams.category as string) || 'all';
+
+  const categoryMap: Record<string, string> = {
+    movies: 'Фильмы',
+    series: 'Сериалы',
+    cartoons: 'Мультфильмы',
+    all: 'Главная'
+  };
+  const categoryName = categoryMap[categoryParam] || 'Главная';
+
+  let genres = [];
+  let contentData = [];
+
+  if (categoryParam === 'all') {
+    // Fetch ALL content for the global home feed
+    const { data: allContent } = await supabase
+      .from('content')
+      .select('*');
+      
+    // Reverse the array to simulate newest-first since there's no created_at
+    contentData = (allContent || []).reverse();
+    // Leave genres empty to signal ClientCatalog to render a flat grid
+    genres = [];
+  } else {
+    // 1. Find the category ID
+    const { data: categoryData } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('name', categoryName)
+      .single();
+
+    if (!categoryData) {
+      return (
+        <main className="min-h-screen bg-[#141414] flex flex-col items-center justify-center text-white w-full">
+          <Navbar />
+          <h1>Category "{categoryName}" not found in database.</h1>
+        </main>
+      );
+    }
+
+    // 2. Fetch genres for this category, ordered by order_index
+    const { data: catGenres } = await supabase
+      .from('genres')
+      .select('*')
+      .eq('category_id', categoryData.id)
+      .order('order_index');
+      
+    genres = catGenres || [];
+
+    // 3. Fetch content for these genres
+    const genreIds = genres.map(g => g.id) || [];
+    if (genreIds.length > 0) {
+      const { data: catContent } = await supabase
+        .from('content')
+        .select('*')
+        .in('genre_id', genreIds);
+      contentData = (catContent || []).reverse();
+    }
+  }
+
+  // Create a fast map to associate content category for dynamic tag logic
+  const allMovies = contentData.map(item => ({
+    id: item.id,
+    title: item.title,
+    description: "",
+    category: categoryParam === 'all' ? (item.collection_type === 'series' ? 'Сериалы' : 'Фильмы') : categoryName,
+    cover_url: item.poster_url,
+    telegram_url: item.telegram_link,
+    is_collection: item.is_collection,
+    genre_id: item.genre_id,
+    collection_type: item.collection_type
+  })) || [];
+
+  const heroMovie = allMovies.length > 0 ? allMovies[0] : undefined;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main className="min-h-screen bg-[#141414] overflow-x-hidden w-full relative">
+      <Navbar />
+      <ClientCatalog genres={genres} movies={allMovies} heroMovie={heroMovie} />
+    </main>
   );
 }
