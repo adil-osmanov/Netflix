@@ -1,4 +1,6 @@
-"use client";
+const fs = require('fs');
+
+const content = `"use client";
 
 import { useSearch } from "./SearchContext";
 import MovieRow from "./MovieRow";
@@ -74,8 +76,8 @@ export default function ClientCatalog({ allGenres, allMovies, allCategories }: C
   const categoryName = categoryMap[categoryParam] || 'Главная';
   const currentCategory = allCategories.find(c => c.name === categoryName);
 
-  let displayGenres: any[] = [];
-  let displayMovies: Movie[] = [];
+  let displayGenres = [];
+  let displayMovies = [];
   
   if (categoryParam === 'all') {
     displayGenres = []; // Flat grid for Home
@@ -139,7 +141,7 @@ export default function ClientCatalog({ allGenres, allMovies, allCategories }: C
         <Hero movie={heroMovie} />
       )}
       
-      <div className={`${categoryParam === 'all' ? 'pt-28 px-4 md:px-12' : '-mt-24 relative z-20 pb-40 px-4 md:px-12 w-full'}`}>
+      <div className={\`\${categoryParam === 'all' ? 'pt-28 px-4 md:px-12' : '-mt-24 relative z-20 pb-40 px-4 md:px-12 w-full'}\`}>
         {categoryParam === 'all' ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-x-2 gap-y-4 md:gap-y-8 pb-40">
             {displayMovies.map((movie) => (
@@ -152,8 +154,7 @@ export default function ClientCatalog({ allGenres, allMovies, allCategories }: C
           displayGenres.map(genre => (
             <MovieRow 
               key={genre.id} 
-              title={genre.name}
-              genreId={genre.id}
+              genre={genre} 
               movies={displayMovies.filter(m => m.genre_id === genre.id)} 
             />
           ))
@@ -162,3 +163,6 @@ export default function ClientCatalog({ allGenres, allMovies, allCategories }: C
     </>
   );
 }
+`;
+
+fs.writeFileSync('src/components/ClientCatalog.tsx', content);

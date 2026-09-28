@@ -1,6 +1,8 @@
-import Navbar from "@/components/Navbar";
+const fs = require('fs');
+let content = fs.readFileSync('src/app/page.tsx', 'utf8');
+
+const newLogic = `import Navbar from "@/components/Navbar";
 import ClientCatalog from "@/components/ClientCatalog";
-import { Suspense } from "react";
 import { supabase } from "@/utils/supabase";
 
 export const revalidate = 3600; // Cache for 1 hour, or until revalidatePath is called
@@ -26,13 +28,13 @@ export default async function Home() {
   return (
     <main className="min-h-screen bg-[#141414] overflow-x-hidden w-full relative">
       <Navbar />
-      <Suspense fallback={<div className="min-h-screen w-full bg-[#141414]" />}>
-        <ClientCatalog 
-          allGenres={genres || []} 
-          allMovies={allMovies} 
-          allCategories={categories || []} 
-        />
-      </Suspense>
+      <ClientCatalog 
+        allGenres={genres || []} 
+        allMovies={allMovies} 
+        allCategories={categories || []} 
+      />
     </main>
   );
-}
+}`;
+
+fs.writeFileSync('src/app/page.tsx', newLogic);

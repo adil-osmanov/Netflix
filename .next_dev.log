@@ -15619,3 +15619,48 @@ SERVER: Updating content 020ec09a-d3a6-4b2b-9c8e-d70c8f6a435c {
  GET / 200 in 139ms (next.js: 29ms, application-code: 110ms)
  GET /?category=series 200 in 69ms (next.js: 10ms, application-code: 59ms)
  GET /?category=all 200 in 61ms (next.js: 41ms, application-code: 20ms)
+ GET /?category=series 200 in 162ms (next.js: 57ms, application-code: 105ms)
+ GET /?category=all 200 in 186ms (next.js: 29ms, application-code: 157ms)
+ GET / 200 in 57ms (next.js: 9ms, application-code: 48ms)
+ GET / 200 in 64ms (next.js: 9ms, application-code: 55ms)
+ GET /?category=series 200 in 38ms (next.js: 13ms, application-code: 25ms)
+ GET /?category=all 200 in 39ms (next.js: 2ms, application-code: 37ms)
+ GET / 200 in 69ms (next.js: 5ms, application-code: 64ms)
+ GET /?category=series 200 in 46ms (next.js: 2ms, application-code: 44ms)
+ GET /?category=all 200 in 47ms (next.js: 24ms, application-code: 24ms)
+[browser] Uncaught TypeError: Cannot read properties of undefined (reading 'length')
+    at ClientCatalog (src/components/ClientCatalog.tsx:128:14)
+  126 |
+  127 |   // STANDARD CATEGORY MODE / HOME MODE
+> 128 |   if (genres.length === 0) {
+      |              ^
+  129 |     return (
+  130 |       <div className="pt-28 px-4 md:px-12 w-full z-10 relative pb-40">
+  131 |         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-x-2 gap-y-4 md:gap-y-8">
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 170ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /?category=all 200 in 1052ms (next.js: 1.9ms, application-code: 1050ms)
+ POST /?category=all 200 in 149ms (next.js: 5ms, application-code: 144ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 129ms src/app/actions.ts
+ GET /?category=series 200 in 1798ms (next.js: 1.2ms, application-code: 1797ms)
+ POST /?category=all 200 in 201ms (next.js: 1.8ms, application-code: 199ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 191ms src/app/actions.ts
+ GET / 200 in 17.5s (next.js: 32ms, application-code: 17.5s)
+ POST / 200 in 183ms (next.js: 1.8ms, application-code: 181ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 176ms src/app/actions.ts
+ POST / 200 in 76ms (next.js: 2ms, application-code: 74ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 67ms src/app/actions.ts
+ GET / 200 in 42ms (next.js: 6ms, application-code: 36ms)
+ GET /?category=series 200 in 19ms (next.js: 1.6ms, application-code: 17ms)
+✓ Compiled in 75ms
+ GET / 200 in 40ms (next.js: 5ms, application-code: 35ms)
+ GET /?category=series 200 in 18ms (next.js: 3ms, application-code: 15ms)
+ POST / 200 in 356ms (next.js: 1.7ms, application-code: 355ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 346ms src/app/actions.ts
+ POST / 200 in 78ms (next.js: 5ms, application-code: 73ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 68ms src/app/actions.ts
