@@ -101,7 +101,7 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
             <div className="absolute inset-0 bg-gradient-to-r from-[#181818] via-[#181818]/40 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/30 to-transparent" />
             
-            <div className="absolute bottom-0 left-0 p-8 md:p-12 w-full max-w-3xl">
+            <div className="absolute bottom-0 left-0 p-4 md:p-12 w-full max-w-3xl">
               <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-white mb-4 drop-shadow-2xl tracking-tight leading-tight">
                 {movie.title}
               </h2>
@@ -109,7 +109,7 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
           </div>
 
           {/* Content Section */}
-          <div className="w-full px-8 md:px-12 pb-12 flex flex-col relative z-10 bg-[#181818]">
+          <div className="w-full px-4 md:px-12 pb-8 md:pb-12 flex flex-col relative z-10 bg-[#181818]">
             {loading ? (
               <div className="flex-1 flex items-center justify-center text-zinc-500 font-medium py-12">Загрузка...</div>
             ) : episodes.length === 0 ? (

@@ -99,7 +99,7 @@ export default function MovieRow({ title, movies, genreId }: MovieRowProps) {
             onClick={openGenre}
             className="relative z-30 flex items-center gap-2 cursor-pointer group/title inline-flex mb-1 md:mb-2 ml-2"
           >
-            <p className="text-[#e5e5e5] text-[1.2vw] md:text-xl font-bold tracking-wide group-hover/title:text-white transition-colors">
+            <p className="text-[#e5e5e5] text-base md:text-xl lg:text-[1.2vw] font-bold tracking-wide group-hover/title:text-white transition-colors">
               {title}
             </p>
             <ChevronRight className="w-5 h-5 text-[#e5e5e5] opacity-0 -translate-x-2 group-hover/title:opacity-100 group-hover/title:translate-x-0 transition-all duration-300" />
@@ -111,7 +111,7 @@ export default function MovieRow({ title, movies, genreId }: MovieRowProps) {
           <div className="relative group/carousel">
             {/* Left Scroll Arrow - Always partially visible on Netflix when scrolling is possible */}
             <div 
-              className={`absolute top-12 bottom-12 left-0 z-[70] w-12 md:w-16 lg:w-[4vw] bg-black/50 flex items-center justify-center cursor-pointer transition-all duration-300 -ml-4 md:-ml-12 ${showLeftArrow ? (isHovered ? 'opacity-100 bg-black/70 hover:w-[5vw]' : 'opacity-0') : 'opacity-0 pointer-events-none'}`}
+              className={`absolute top-4 bottom-4 md:top-12 md:bottom-12 left-0 z-[70] w-12 md:w-16 lg:w-[4vw] bg-black/50 flex items-center justify-center cursor-pointer transition-all duration-300 -ml-4 md:-ml-12 ${showLeftArrow ? (isHovered ? 'opacity-100 bg-black/70 hover:w-[5vw]' : 'opacity-0') : 'opacity-0 pointer-events-none'} hidden md:flex`}
               onClick={(e) => { e.stopPropagation(); scroll('left'); }}
             >
               <ChevronLeft className="w-8 h-8 md:w-10 md:h-10 text-white transition-transform duration-300 group-hover/carousel:scale-125" />
@@ -121,7 +121,7 @@ export default function MovieRow({ title, movies, genreId }: MovieRowProps) {
             <div 
               ref={rowRef}
               onScroll={handleScroll}
-              className="flex overflow-x-auto overflow-y-hidden gap-2 py-12 -my-12 scroll-smooth snap-x relative -mx-4 px-4 md:-mx-12 md:px-12 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+              className="flex overflow-x-auto overflow-y-hidden gap-2 py-4 -my-4 md:py-12 md:-my-12 scroll-smooth snap-x relative -mx-4 px-4 md:-mx-12 md:px-12 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             >
               {/* Movie Cards (No z-10 wrapper so MovieCard can establish its own z-index!) */}
               {movies.map((movie) => (
@@ -144,7 +144,7 @@ export default function MovieRow({ title, movies, genreId }: MovieRowProps) {
 
             {/* Right Scroll Arrow */}
             <div 
-              className={`absolute top-12 bottom-12 right-0 z-[70] w-12 md:w-16 lg:w-[4vw] bg-black/50 flex items-center justify-center cursor-pointer transition-all duration-300 -mr-4 md:-mr-12 ${showRightArrow ? (isHovered ? 'opacity-100 bg-black/70 hover:w-[5vw]' : 'opacity-0') : 'opacity-0 pointer-events-none'}`}
+              className={`absolute top-4 bottom-4 md:top-12 md:bottom-12 right-0 z-[70] w-12 md:w-16 lg:w-[4vw] bg-black/50 flex items-center justify-center cursor-pointer transition-all duration-300 -mr-4 md:-mr-12 ${showRightArrow ? (isHovered ? 'opacity-100 bg-black/70 hover:w-[5vw]' : 'opacity-0') : 'opacity-0 pointer-events-none'} hidden md:flex`}
               onClick={(e) => { e.stopPropagation(); scroll('right'); }}
             >
               <ChevronRight className="w-8 h-8 md:w-10 md:h-10 text-white transition-transform duration-300 group-hover/carousel:scale-125" />

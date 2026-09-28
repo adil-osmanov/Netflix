@@ -15667,3 +15667,24 @@ SERVER: Updating content 020ec09a-d3a6-4b2b-9c8e-d70c8f6a435c {
 ✓ Compiled in 116ms
  GET / 200 in 149ms (next.js: 27ms, application-code: 121ms)
  GET /?category=series 200 in 63ms (next.js: 12ms, application-code: 52ms)
+ GET /apple-touch-icon-precomposed.png 404 in 303ms (next.js: 143ms, application-code: 159ms)
+ GET /apple-touch-icon.png 404 in 225ms (next.js: 124ms, application-code: 102ms)
+ GET / 200 in 1330ms (next.js: 44ms, application-code: 1286ms)
+✓ Compiled in 791ms
+ GET / 200 in 216ms (next.js: 99ms, application-code: 117ms)
+ GET /?category=series 200 in 70ms (next.js: 5ms, application-code: 65ms)
+✓ Compiled in 201ms
+ GET / 200 in 115ms (next.js: 21ms, application-code: 95ms)
+ GET /?category=series 200 in 56ms (next.js: 7ms, application-code: 49ms)
+ GET / 200 in 45ms (next.js: 4ms, application-code: 42ms)
+ GET /?category=series 200 in 23ms (next.js: 3ms, application-code: 20ms)
+✓ Compiled in 49ms
+ GET / 200 in 41ms (next.js: 4ms, application-code: 38ms)
+ GET /?category=series 200 in 20ms (next.js: 3ms, application-code: 17ms)
+✓ Compiled in 110ms
+✓ Compiled in 99ms
+ GET / 200 in 64ms (next.js: 16ms, application-code: 49ms)
+ GET /?category=series 200 in 20ms (next.js: 2ms, application-code: 18ms)
+ GET / 200 in 44ms (next.js: 6ms, application-code: 38ms)
+ GET /?category=series 200 in 20ms (next.js: 3ms, application-code: 16ms)
+✓ Compiled in 120ms

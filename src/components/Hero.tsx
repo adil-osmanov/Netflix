@@ -71,7 +71,7 @@ export default function Hero({ movie }: { movie?: any }) {
 
   return (
     <div 
-      className="relative w-full min-h-[75vh] flex flex-col justify-end pb-16 z-10 bg-[#141414]"
+      className="relative w-full min-h-[60vh] md:min-h-[75vh] flex flex-col justify-end pb-8 md:pb-16 z-10 bg-[#141414]"
 
       style={{
         backgroundImage: `url(${displayMovie.cover_url})`,
@@ -82,7 +82,7 @@ export default function Hero({ movie }: { movie?: any }) {
       <div className="absolute inset-0 bg-gradient-to-r from-[#141414] via-[#141414]/50 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-[#141414]/20 to-transparent" />
 
-      <div className="relative z-20 px-10 md:px-16 max-w-3xl">
+      <div className="relative z-20 px-4 md:px-12 lg:px-16 max-w-3xl">
         {displayMovie.is_collection && (
           <div className="flex items-center gap-2 mb-4 drop-shadow-lg">
             <span className="text-[#E50914] font-black text-sm tracking-widest uppercase">N</span>
@@ -90,33 +90,33 @@ export default function Hero({ movie }: { movie?: any }) {
           </div>
         )}
 
-        <h1 className="text-6xl lg:text-7xl font-black tracking-tight text-white mb-6 drop-shadow-2xl">
+        <h1 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight text-white mb-3 md:mb-6 drop-shadow-2xl">
           {displayTitle}
         </h1>
         
         {/* Real Netflix Style Metadata Row */}
         {(year || partsInfo) && (
-          <div className="flex items-center gap-3 md:gap-4 text-sm md:text-base font-semibold mb-6 drop-shadow-md">
+          <div className="flex items-center gap-3 md:gap-4 text-xs md:text-base font-semibold mb-4 md:mb-6 drop-shadow-md">
             {year && <span className="text-zinc-300">{year}</span>}
             {partsInfo && <span className="text-zinc-300">{partsInfo}</span>}
           </div>
         )}
 
         {displayMovie.description && (
-          <p className="text-lg text-zinc-200 mb-10 line-clamp-3 md:line-clamp-4 max-w-2xl leading-snug drop-shadow-lg">
+          <p className="text-sm md:text-lg text-zinc-200 mb-6 md:mb-10 line-clamp-3 md:line-clamp-4 max-w-2xl leading-snug drop-shadow-lg">
             {displayMovie.description}
           </p>
         )}
         
-        {!displayMovie.description && <div className="mb-10" />}
+        {!displayMovie.description && <div className="mb-6 md:mb-10" />}
 
 
         <div className="flex items-center gap-4">
           <button 
             onClick={handlePlay}
-            className="bg-white text-black font-bold text-lg px-8 py-3 rounded-md flex items-center gap-2 hover:bg-white/80 transition-colors cursor-pointer shadow-lg drop-shadow-md"
+            className="bg-white text-black font-bold text-sm md:text-lg px-4 md:px-8 py-2 md:py-3 rounded-md flex items-center gap-2 hover:bg-white/80 transition-colors cursor-pointer shadow-lg drop-shadow-md"
           >
-            <Play className="w-6 h-6 md:w-7 md:h-7" fill="currentColor" />
+            <Play className="w-5 h-5 md:w-7 md:h-7" fill="currentColor" />
             Смотреть
           </button>
         </div>

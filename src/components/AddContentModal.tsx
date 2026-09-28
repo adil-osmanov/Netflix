@@ -239,7 +239,7 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
 
   const modalContent = (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl bg-[#141414] rounded-xl shadow-2xl relative p-8 max-h-[85vh] overflow-y-auto no-scrollbar border border-zinc-800 animate-in fade-in zoom-in-95 duration-200">
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl bg-[#141414] rounded-xl shadow-2xl relative p-4 md:p-8 max-h-[90vh] md:max-h-[85vh] overflow-y-auto no-scrollbar border border-zinc-800 animate-in fade-in zoom-in-95 duration-200">
         
         <button 
           onClick={onClose}
