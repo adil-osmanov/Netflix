@@ -2,6 +2,7 @@
 
 import { Play, X, ChevronDown, CheckCircle2 } from "lucide-react";
 import { useWatched } from "@/context/WatchedContext";
+import { getTelegramDeepLink } from "@/utils/telegram";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { getEpisodesAction, setLastWatchedAction } from "@/app/actions";
@@ -80,20 +81,11 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
     return title;
   };
   const getEpisodeLink = (ep: any) => {
-    let link = ep.telegram_link || movie.telegram_url;
-    if (link && !link.includes('http')) {
-      const channelId = process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_ID?.replace("-100", "") || "3905550666";
-      link = `https://t.me/c/${channelId}/${link}`;
-    }
-    return link || '#';
+    return getTelegramDeepLink(ep.telegram_link || movie.telegram_url);
   };
   const playEpisode = (ep: any) => {
-    let link = ep.telegram_link || movie.telegram_url;
-    if (link && !link.includes('http')) {
-      const channelId = process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_ID?.replace("-100", "") || "3905550666";
-      link = `https://t.me/c/${channelId}/${link}`;
-    }
-    if (link) window.open(link, '_blank');
+    const link = getTelegramDeepLink(ep.telegram_link || movie.telegram_url);
+    if (link && link !== '#') window.open(link, '_blank');
   };
 
   const displayedEpisodes = isSeries 

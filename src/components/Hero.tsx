@@ -2,6 +2,7 @@
 
 import { Play, CheckCircle2 } from "lucide-react";
 import { useWatched } from "@/context/WatchedContext";
+import { getTelegramDeepLink } from "@/utils/telegram";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getCollectionPartsInfoAction, getLastWatchedAction, setLastWatchedAction } from "@/app/actions";
@@ -51,12 +52,7 @@ export default function Hero({ movie }: { movie?: any }) {
 
   const getPlayLink = () => {
     if (displayMovie?.is_collection) return null;
-    let url = displayMovie?.telegram_url;
-    if (url && !url.includes('http')) {
-      const channelId = process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_ID?.replace("-100", "") || "3905550666";
-      url = `https://t.me/c/${channelId}/${url}`;
-    }
-    return url || '#';
+    return getTelegramDeepLink(displayMovie?.telegram_url);
   };
   const handlePlay = () => {
     if (displayMovie?.telegram_url && !displayMovie?.is_collection) {

@@ -2,6 +2,7 @@
 
 import { Play, Pencil, Trash2, CheckCircle2 } from "lucide-react";
 import { useWatched } from "@/context/WatchedContext";
+import { getTelegramDeepLink } from "@/utils/telegram";
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import CollectionViewerModal from "./CollectionViewerModal";
@@ -103,12 +104,8 @@ export default function MovieCard({ movie }: MovieCardProps) {
   const progress = movie.is_collection ? getCollectionProgress(movie.id, totalEpisodesCount) : (isWatched(movie.id, null) ? 100 : 0);
   const getPlayLink = () => {
     if (movie.is_collection) return undefined;
-    let url = movie.telegram_url;
-    if (url && !url.includes('http')) {
-      const channelId = process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_ID?.replace("-100", "") || "3905550666";
-      url = `https://t.me/c/${channelId}/${url}`;
-    }
-    return url || undefined;
+    const link = getTelegramDeepLink(movie.telegram_url);
+    return link === '#' ? undefined : link;
   };
   const handlePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation();
