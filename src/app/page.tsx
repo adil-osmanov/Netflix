@@ -8,7 +8,7 @@ export const revalidate = 3600; // Cache for 1 hour, or until revalidatePath is 
 export default async function Home() {
   const { data: categories } = await supabase.from('categories').select('*');
   const { data: genres } = await supabase.from('genres').select('*').order('order_index');
-  const { data: content } = await supabase.from('content').select('*');
+  const { data: content } = await supabase.from('content').select('*').order('created_at', { ascending: false });
 
   const allMovies = (content || []).map(item => ({
     id: item.id,
@@ -22,7 +22,7 @@ export default async function Home() {
     genre_id: item.genre_id,
     collection_type: item.collection_type,
     has_subtitles: item.has_subtitles
-  })).reverse();
+  }));
 
   return (
     <main className="min-h-screen bg-[#141414] overflow-x-hidden w-full relative">
