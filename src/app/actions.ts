@@ -126,7 +126,8 @@ export async function searchAllContentAction() {
   try {
     const { data: contentData, error } = await supabase
       .from('content')
-      .select('*');
+      .select('*')
+      .order('created_at', { ascending: false });
       
     if (error) throw error;
     
