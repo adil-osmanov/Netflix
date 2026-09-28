@@ -135,6 +135,7 @@ export async function searchAllContentAction() {
       data: contentData?.map(item => ({
         id: item.id,
         title: item.title,
+        release_year: item.release_year,
         description: "",
         category: "",
         cover_url: item.poster_url,

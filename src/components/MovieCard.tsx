@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 export interface Movie {
   id: string;
   title: string;
+  release_year?: string;
   description?: string;
   category: string;
   cover_url: string;
@@ -216,10 +217,15 @@ export default function MovieCard({ movie }: MovieCardProps) {
               </h3>
             </div>
             
-            {movie.is_collection && collectionCount > 0 && (
-              <p className="text-[#46d369] text-xs font-bold drop-shadow-md mt-1">
-                {dynamicText}
-              </p>
+            {(movie.release_year || (movie.is_collection && collectionCount > 0)) && (
+              <div className="flex items-center gap-2 mt-1 drop-shadow-md">
+                {movie.release_year && <span className="text-zinc-300 text-xs font-semibold border border-zinc-500 px-1 rounded-sm leading-none py-0.5">{movie.release_year}</span>}
+                {movie.is_collection && collectionCount > 0 && (
+                  <span className="text-[#46d369] text-xs font-bold">
+                    {dynamicText}
+                  </span>
+                )}
+              </div>
             )}
           </div>
 

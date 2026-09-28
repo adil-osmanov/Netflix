@@ -80,6 +80,7 @@ export default async function Home({
   const allMovies = contentData.map(item => ({
     id: item.id,
     title: item.title,
+    release_year: item.release_year,
     description: "",
     category: categoryParam === 'all' ? (item.collection_type === 'series' ? 'Сериалы' : 'Фильмы') : categoryName,
     cover_url: item.poster_url,

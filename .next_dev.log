@@ -15397,3 +15397,116 @@ SERVER: Updating content 263a7bb7-948f-492c-b2b8-03c6888cd680 {
  GET /?category=all 200 in 58ms (next.js: 31ms, application-code: 27ms)
  GET / 200 in 418ms (next.js: 44ms, application-code: 373ms)
  GET / 200 in 316ms (next.js: 1.7ms, application-code: 315ms)
+ GET / 200 in 422ms (next.js: 150ms, application-code: 272ms)
+ GET / 200 in 212ms (next.js: 4ms, application-code: 208ms)
+ GET /?category=movies 200 in 564ms (next.js: 3ms, application-code: 561ms)
+ POST /?category=movies 200 in 99ms (next.js: 2ms, application-code: 97ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 85ms src/app/admin/add-content/actions.ts
+ POST /?category=movies 200 in 73ms (next.js: 1.9ms, application-code: 71ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 66ms src/app/admin/add-content/actions.ts
+SERVER: Updating content 263a7bb7-948f-492c-b2b8-03c6888cd680 {
+  title: 'Трансформеры (2002)',
+  genre_id: '9fdc85dd-b861-4c2d-bd97-3a2a03743e54',
+  poster_url: 'https://okbgslrjkuuiznbbuptl.supabase.co/storage/v1/object/public/posters/1790590688295-151878optimusprajmtransformerytransformeryepohaistrebleniyaavtobotdeseptikon1920x1080.jpg',
+  is_collection: false,
+  collection_type: null,
+  telegram_link: '3'
+}
+ POST /?category=movies 200 in 933ms (next.js: 3ms, application-code: 930ms)
+  └─ ƒ saveContentAction({}, "263a7bb7-948f-492c-b2b8-03c6888cd680") in 319ms src/app/admin/add-content/actions.ts
+ POST /?category=movies 200 in 247ms (next.js: 3ms, application-code: 244ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 215ms src/app/admin/add-content/actions.ts
+ GET /?category=movies 200 in 419ms (next.js: 2ms, application-code: 417ms)
+ GET /?category=movies 200 in 679ms (next.js: 3ms, application-code: 676ms)
+ GET /?category=movies 200 in 446ms (next.js: 3ms, application-code: 444ms)
+ GET /?genre=9fdc85dd-b861-4c2d-bd97-3a2a03743e54&genreName=%D0%91%D0%BE%D0%B5%D0%B2%D0%B8%D0%BA%D0%B8 200 in 142ms (next.js: 5ms, application-code: 137ms)
+ GET /?category=movies 200 in 431ms (next.js: 3ms, application-code: 428ms)
+ GET /?category=movies 200 in 358ms (next.js: 4ms, application-code: 354ms)
+ GET /?category=movies 200 in 702ms (next.js: 11ms, application-code: 690ms)
+ POST /?category=movies 200 in 95ms (next.js: 4ms, application-code: 92ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 76ms src/app/admin/add-content/actions.ts
+ POST /?category=movies 200 in 86ms (next.js: 2ms, application-code: 84ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 75ms src/app/admin/add-content/actions.ts
+ POST /?category=movies 200 in 389ms (next.js: 14ms, application-code: 375ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 359ms src/app/admin/add-content/actions.ts
+ POST /?category=movies 200 in 71ms (next.js: 3ms, application-code: 69ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 62ms src/app/admin/add-content/actions.ts
+✓ Compiled in 424ms
+ GET /?category=movies 200 in 259ms (next.js: 54ms, application-code: 205ms)
+ GET / 200 in 261ms (next.js: 155ms, application-code: 106ms)
+ GET /?category=all 200 in 43ms (next.js: 7ms, application-code: 36ms)
+ POST /?category=movies 200 in 345ms (next.js: 5ms, application-code: 340ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 325ms src/app/admin/add-content/actions.ts
+SERVER: Updating content 263a7bb7-948f-492c-b2b8-03c6888cd680 {
+  title: 'Трансформеры (2002)',
+  genre_id: '9fdc85dd-b861-4c2d-bd97-3a2a03743e54',
+  poster_url: 'https://okbgslrjkuuiznbbuptl.supabase.co/storage/v1/object/public/posters/1790590688295-151878optimusprajmtransformerytransformeryepohaistrebleniyaavtobotdeseptikon1920x1080.jpg',
+  is_collection: true,
+  collection_type: 'franchise',
+  telegram_link: null
+}
+ POST /?category=movies 200 in 1158ms (next.js: 3ms, application-code: 1154ms)
+  └─ ƒ saveContentAction({}, "263a7bb7-948f-492c-b2b8-03c6888cd680") in 620ms src/app/admin/add-content/actions.ts
+ POST /?category=movies 200 in 164ms (next.js: 3ms, application-code: 161ms)
+ GET /?category=movies 200 in 583ms (next.js: 1.7ms, application-code: 582ms)
+ POST /?category=movies 200 in 115ms (next.js: 2ms, application-code: 113ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 108ms src/app/actions.ts
+ POST /?category=movies 200 in 75ms (next.js: 2ms, application-code: 73ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 68ms src/app/actions.ts
+ POST /?category=movies 200 in 80ms (next.js: 1.7ms, application-code: 79ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 65ms src/app/actions.ts
+ GET / 200 in 43ms (next.js: 4ms, application-code: 39ms)
+ GET /?category=all 200 in 35ms (next.js: 1.4ms, application-code: 34ms)
+ POST /?category=movies 200 in 271ms (next.js: 93ms, application-code: 178ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 173ms src/app/actions.ts
+ GET /?category=movies 200 in 18ms (next.js: 2ms, application-code: 16ms)
+ POST /?category=movies 200 in 243ms (next.js: 3ms, application-code: 239ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 233ms src/app/actions.ts
+ POST /?category=movies 200 in 267ms (next.js: 3ms, application-code: 264ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 257ms src/app/actions.ts
+ POST /?category=movies 200 in 301ms (next.js: 3ms, application-code: 298ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 286ms src/app/actions.ts
+ GET /?category=movies 200 in 463ms (next.js: 2ms, application-code: 461ms)
+ POST /?category=movies 200 in 197ms (next.js: 3ms, application-code: 194ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 108ms src/app/actions.ts
+ POST /?category=movies 200 in 95ms (next.js: 3ms, application-code: 92ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 72ms src/app/actions.ts
+✓ Compiled in 151ms
+ POST /?category=movies 200 in 226ms (next.js: 107ms, application-code: 119ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 92ms src/app/actions.ts
+ GET / 200 in 97ms (next.js: 7ms, application-code: 90ms)
+ GET /?category=all 200 in 106ms (next.js: 19ms, application-code: 87ms)
+ POST /?category=movies 200 in 178ms (next.js: 4ms, application-code: 174ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 152ms src/app/actions.ts
+ POST /?category=movies 200 in 294ms (next.js: 8ms, application-code: 287ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 273ms src/app/actions.ts
+ GET /?category=movies 200 in 47ms (next.js: 4ms, application-code: 44ms)
+ POST /?category=movies 200 in 115ms (next.js: 4ms, application-code: 111ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 97ms src/app/actions.ts
+ POST /?category=movies 200 in 332ms (next.js: 2ms, application-code: 330ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 323ms src/app/actions.ts
+✓ Compiled in 117ms
+ GET / 200 in 98ms (next.js: 16ms, application-code: 82ms)
+ GET /?category=movies 200 in 97ms (next.js: 36ms, application-code: 61ms)
+ GET /?category=all 200 in 40ms (next.js: 7ms, application-code: 33ms)
+ POST /?category=movies 200 in 609ms (next.js: 5ms, application-code: 605ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 594ms src/app/actions.ts
+ GET / 200 in 65ms (next.js: 8ms, application-code: 57ms)
+ GET /?category=all 200 in 31ms (next.js: 6ms, application-code: 25ms)
+ POST /?category=movies 200 in 1469ms (next.js: 3ms, application-code: 1466ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 1460ms src/app/actions.ts
+ GET /?category=movies 200 in 22ms (next.js: 2ms, application-code: 20ms)
+ POST /?category=movies 200 in 222ms (next.js: 1.4ms, application-code: 221ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 217ms src/app/actions.ts
+✓ Compiled in 160ms
+ GET / 200 in 64ms (next.js: 9ms, application-code: 55ms)
+ GET /?category=movies 200 in 64ms (next.js: 32ms, application-code: 32ms)
+ GET /?category=all 200 in 58ms (next.js: 39ms, application-code: 18ms)
+ POST /?category=movies 200 in 311ms (next.js: 7ms, application-code: 304ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 292ms src/app/actions.ts
+✓ Compiled in 56ms
+ GET / 200 in 172ms (next.js: 22ms, application-code: 150ms)
+ GET /?category=movies 200 in 174ms (next.js: 68ms, application-code: 105ms)
+ GET /?category=all 200 in 104ms (next.js: 7ms, application-code: 98ms)
+ POST /?category=movies 200 in 448ms (next.js: 11ms, application-code: 437ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 424ms src/app/actions.ts

@@ -28,6 +28,7 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
 
   const [formData, setFormData] = useState({
     title: "",
+    release_year: "",
     is_collection: false,
     telegram_link: "",
     seasons: [
@@ -68,6 +69,7 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
       if (movieToEdit) {
         setFormData({
           title: movieToEdit.title,
+          release_year: movieToEdit.release_year || "",
           is_collection: !!movieToEdit.is_collection,
           telegram_link: movieToEdit.telegram_url || "",
           seasons: [{ seasonNumber: 1, episodes: [{ title: "", telegram_link: "" }] }]
@@ -184,6 +186,7 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
     submission.append('genre_id', movieToEdit?.genre_id || genreId);
     submission.append('title', formData.title);
     submission.append('is_collection', String(formData.is_collection));
+    if (formData.release_year) submission.append('release_year', formData.release_year);
     submission.append('poster_url', previewUrl);
     
     let finalCollectionType = null;
@@ -220,7 +223,7 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
       setMessage({ text: movieToEdit ? "Успешно! Контент обновлен." : "Успешно! Контент добавлен.", type: "success" });
       setTimeout(() => {
         onClose();
-        setFormData({ title: "", is_collection: false, telegram_link: "", seasons: [{ seasonNumber: 1, episodes: [] }] });
+        setFormData({ title: "", release_year: "", is_collection: false, telegram_link: "", seasons: [{ seasonNumber: 1, episodes: [] }] });
         setPreviewUrl(null);
         window.location.reload();
       }, 500);
@@ -261,6 +264,16 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
               onChange={(e) => setFormData({...formData, title: e.target.value})}
               className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-md px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] transition-all"
               placeholder="Например: Начало"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-zinc-300">Год выпуска (необязательно)</label>
+            <input 
+              type="text" 
+              value={formData.release_year}
+              onChange={(e) => setFormData({...formData, release_year: e.target.value})}
+              className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-md px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#E50914] transition-all"
+              placeholder="Например: 2010 или 2010 - 2013"
             />
           </div>
 

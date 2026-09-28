@@ -67,16 +67,7 @@ export default function Hero({ movie }: { movie?: any }) {
   if (!mounted || !displayMovie) return <div className="min-h-[75vh] w-full bg-[#141414] animate-pulse"></div>;
 
   let displayTitle = displayMovie.title;
-  let year = null;
-  const yearMatch = displayTitle.match(/\b(19\d{2}|20\d{2})\b/);
-  
-  if (yearMatch) {
-    const stripped = displayTitle.replace(/\s*[\(\[]?\b(19\d{2}|20\d{2})\b[\)\]]?\s*/, ' ').trim();
-    if (stripped.length > 0) {
-      year = yearMatch[0];
-      displayTitle = stripped;
-    }
-  }
+  let year = displayMovie.release_year;
 
   return (
     <div 
