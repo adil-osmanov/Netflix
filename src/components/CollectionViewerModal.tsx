@@ -69,6 +69,14 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
   if (!isOpen || !mounted) return null;
 
 
+
+  const getDisplayName = (title: string, idx: number) => {
+    const s = `Серия ${idx + 1}`;
+    const p = `Часть ${idx + 1}`;
+    if (title === s) return "Серия";
+    if (title === p) return "Часть";
+    return title;
+  };
   const getEpisodeLink = (ep: any) => {
     let link = ep.telegram_link || movie.telegram_url;
     if (link && !link.includes('http')) {
@@ -185,7 +193,7 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
                       </div>
                       
                       <div className="flex flex-col flex-1">
-                        <span className="text-white font-bold text-lg">{ep.parsedTitle}</span>
+                        <span className="text-white font-bold text-lg">{getDisplayName(ep.parsedTitle, idx)}</span>
                       </div>
                     </a>
                   ))}
