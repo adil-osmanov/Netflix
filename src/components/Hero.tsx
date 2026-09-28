@@ -80,7 +80,7 @@ export default function Hero({ movie }: { movie?: any }) {
 
   return (
     <div 
-      className="relative w-full aspect-[16/9] md:aspect-video flex flex-col justify-end pb-4 md:pb-16 z-10 bg-[#141414] bg-top md:bg-center bg-no-repeat bg-contain"
+      className="relative w-full aspect-[16/9] md:aspect-auto md:h-[75vh] md:max-h-[850px] flex flex-col justify-end pb-4 md:pb-16 z-10 bg-[#141414] bg-top bg-no-repeat bg-contain md:bg-cover"
       style={{ backgroundImage: `url(${displayMovie.cover_url})` }}
     >
       <div className="absolute inset-0 bg-gradient-to-r from-[#141414]/90 md:from-[#141414] md:via-[#141414]/50 to-transparent" />
