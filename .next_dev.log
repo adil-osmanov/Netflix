@@ -15724,3 +15724,45 @@ SERVER: Updating content 020ec09a-d3a6-4b2b-9c8e-d70c8f6a435c {
 ✓ Compiled in 821ms
  GET / 200 in 282ms (next.js: 27ms, application-code: 256ms)
  GET /?category=series 200 in 183ms (next.js: 32ms, application-code: 151ms)
+✓ Compiled in 1942ms
+ GET / 200 in 889ms (next.js: 222ms, application-code: 667ms)
+ GET /?category=series 200 in 83ms (next.js: 10ms, application-code: 73ms)
+✓ Compiled in 780ms
+ GET / 200 in 190ms (next.js: 35ms, application-code: 155ms)
+ GET /?category=series 200 in 175ms (next.js: 28ms, application-code: 147ms)
+ POST /?category=series 200 in 400ms (next.js: 20ms, application-code: 380ms)
+  └─ ƒ getLastWatchedAction("series") in 356ms src/app/actions.ts
+✓ Compiled in 1011ms
+ GET / 200 in 265ms (next.js: 54ms, application-code: 211ms)
+ GET /?category=series 200 in 90ms (next.js: 7ms, application-code: 83ms)
+ GET /?category=all 200 in 64ms (next.js: 5ms, application-code: 59ms)
+ GET /?category=all 200 in 95ms (next.js: 7ms, application-code: 88ms)
+ POST /?category=series 200 in 386ms (next.js: 11ms, application-code: 374ms)
+  └─ ƒ getLastWatchedAction("series") in 346ms src/app/actions.ts
+ GET /?category=all 200 in 75ms (next.js: 4ms, application-code: 72ms)
+ GET /?category=all 200 in 99ms (next.js: 23ms, application-code: 76ms)
+ GET /?category=all 200 in 86ms (next.js: 17ms, application-code: 69ms)
+ GET /?category=all 200 in 85ms (next.js: 11ms, application-code: 74ms)
+ GET /?category=all 200 in 64ms (next.js: 9ms, application-code: 56ms)
+ GET /?category=all 200 in 141ms (next.js: 13ms, application-code: 128ms)
+ GET /?category=all 200 in 65ms (next.js: 5ms, application-code: 61ms)
+ POST /?category=all 200 in 124ms (next.js: 7ms, application-code: 116ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 87ms src/app/actions.ts
+ GET /?category=all 200 in 95ms (next.js: 6ms, application-code: 89ms)
+ POST /?category=all 200 in 132ms (next.js: 4ms, application-code: 128ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 101ms src/app/actions.ts
+ GET /?category=all 200 in 785ms (next.js: 8ms, application-code: 777ms)
+ GET /?category=all 200 in 784ms (next.js: 86ms, application-code: 698ms)
+ GET /?category=all 200 in 663ms (next.js: 23ms, application-code: 640ms)
+ GET /?category=all 200 in 739ms (next.js: 84ms, application-code: 655ms)
+ GET /?category=all 200 in 779ms (next.js: 165ms, application-code: 613ms)
+ GET /?category=all 200 in 781ms (next.js: 360ms, application-code: 421ms)
+ GET /?category=all 200 in 516ms (next.js: 21ms, application-code: 495ms)
+ GET /?category=all 200 in 517ms (next.js: 91ms, application-code: 427ms)
+ GET /?category=all 200 in 374ms (next.js: 30ms, application-code: 344ms)
+ GET /?category=all 200 in 460ms (next.js: 102ms, application-code: 358ms)
+ GET /?category=all 200 in 454ms (next.js: 165ms, application-code: 289ms)
+ GET /?category=all 200 in 392ms (next.js: 154ms, application-code: 239ms)
+ GET /?category=all 200 in 137ms (next.js: 8ms, application-code: 129ms)
+ POST /?category=all 200 in 98ms (next.js: 10ms, application-code: 88ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 73ms src/app/actions.ts

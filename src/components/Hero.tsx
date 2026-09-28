@@ -3,7 +3,7 @@
 import { Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { getCollectionPartsInfoAction } from "@/app/actions";
+import { getCollectionPartsInfoAction, getLastWatchedAction, setLastWatchedAction } from "@/app/actions";
 import CollectionViewerModal from "./CollectionViewerModal";
 
 export default function Hero({ movie }: { movie?: any }) {
@@ -31,26 +31,25 @@ export default function Hero({ movie }: { movie?: any }) {
 
 
   useEffect(() => {
-    const category = searchParams.get('category') || 'movies';
-    const lastWatched = localStorage.getItem(`lastWatched_${category}`);
-    if (lastWatched) {
-      try {
-        const parsed = JSON.parse(lastWatched);
-        setDisplayMovie(parsed);
-      } catch (e) {
-        console.error("Failed to parse lastWatched", e);
+    const category = searchParams.get('category') || 'all';
+    
+    async function loadLastWatched() {
+      const dbWatched = await getLastWatchedAction(category);
+      if (dbWatched) {
+        setDisplayMovie(dbWatched);
+      } else {
         setDisplayMovie(movie);
       }
-    } else {
-      setDisplayMovie(movie);
+      setMounted(true);
     }
-    setMounted(true);
+    
+    loadLastWatched();
   }, [searchParams, movie]);
 
   const handlePlay = () => {
     if (displayMovie?.telegram_url && !displayMovie?.is_collection) {
-      const category = searchParams.get('category') || 'movies';
-      localStorage.setItem(`lastWatched_${category}`, JSON.stringify(displayMovie));
+      const category = searchParams.get('category') || 'all';
+      setLastWatchedAction(category, displayMovie);
       
       let url = displayMovie.telegram_url;
       if (url && !url.includes('http')) {

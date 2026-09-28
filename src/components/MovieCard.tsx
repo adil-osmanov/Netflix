@@ -5,7 +5,7 @@ import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import CollectionViewerModal from "./CollectionViewerModal";
 import AddContentModal from "./AddContentModal";
-import { deleteContentAction, getEpisodesAction } from "@/app/actions";
+import { deleteContentAction, getEpisodesAction, setLastWatchedAction } from "@/app/actions";
 import { useRouter } from "next/navigation";
 
 export interface Movie {
@@ -95,10 +95,10 @@ export default function MovieCard({ movie }: MovieCardProps) {
   const handlePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     
-    const categoryType = window.location.search.includes('series') ? 'series' : 
-                         window.location.search.includes('cartoons') ? 'cartoons' : 'movies';
+    const urlParams = new URLSearchParams(window.location.search);
+    const categoryType = urlParams.get('category') || 'all';
     
-    localStorage.setItem(`lastWatched_${categoryType}`, JSON.stringify(movie));
+    setLastWatchedAction(categoryType, movie);
 
     if (movie.is_collection) {
       setModalOpen(true);
