@@ -15247,3 +15247,72 @@ SERVER: Updating content 263a7bb7-948f-492c-b2b8-03c6888cd680 {
  GET / 200 in 400ms (next.js: 15ms, application-code: 385ms)
  GET /?category=movies 200 in 346ms (next.js: 14ms, application-code: 333ms)
  GET /?category=all 200 in 337ms (next.js: 287ms, application-code: 51ms)
+ GET /?category=all 200 in 344ms (next.js: 6ms, application-code: 338ms)
+ GET /?category=movies 200 in 480ms (next.js: 3ms, application-code: 477ms)
+ GET /?category=series 200 in 294ms (next.js: 3ms, application-code: 291ms)
+ GET /?category=cartoons 200 in 291ms (next.js: 3ms, application-code: 288ms)
+ GET /?category=series 200 in 296ms (next.js: 4ms, application-code: 292ms)
+ GET /?category=movies 200 in 341ms (next.js: 3ms, application-code: 338ms)
+ GET /?category=movies 200 in 476ms (next.js: 7ms, application-code: 470ms)
+ GET /?category=series 200 in 737ms (next.js: 9ms, application-code: 728ms)
+ GET /?category=movies 200 in 365ms (next.js: 4ms, application-code: 362ms)
+ GET /?category=series 200 in 564ms (next.js: 14ms, application-code: 550ms)
+ GET /?category=movies 200 in 366ms (next.js: 7ms, application-code: 359ms)
+ GET /?category=series 200 in 251ms (next.js: 5ms, application-code: 247ms)
+ GET /?category=movies 200 in 361ms (next.js: 3ms, application-code: 359ms)
+ GET /?category=all 200 in 229ms (next.js: 3ms, application-code: 226ms)
+✓ Compiled in 531ms
+ GET /?category=all 200 in 137ms (next.js: 7ms, application-code: 130ms)
+[browser] Failed to fetch RSC payload for http://localhost:3000/?category=all. Falling back to browser navigation. TypeError: Load failed
+ GET / 200 in 429ms (next.js: 139ms, application-code: 290ms)
+ GET /?category=all 200 in 230ms (next.js: 44ms, application-code: 186ms)
+ GET / 200 in 854ms (next.js: 23ms, application-code: 830ms)
+ GET /?category=all 200 in 475ms (next.js: 20ms, application-code: 454ms)
+[browser] Uncaught Error: supabaseKey is required.
+    at <unknown> (src/utils/supabase.ts:6:37)
+    at <unknown> (src/components/Hero.tsx:6:1)
+    at <unknown> (src/components/ClientCatalog.tsx:6:1)
+    at reportError ([native code])
+  4 | const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  5 |
+> 6 | export const supabase = createClient(supabaseUrl, supabaseKey);
+    |                                     ^
+  7 |
+[browser] Uncaught Error: supabaseKey is required.
+    at module evaluation (src/utils/supabase.ts:6:37)
+    at module evaluation (src/components/Hero.tsx:6:1)
+    at module evaluation (src/components/ClientCatalog.tsx:6:1)
+  4 | const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  5 |
+> 6 | export const supabase = createClient(supabaseUrl, supabaseKey);
+    |                                     ^
+  7 |
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload when ./src/components/Hero.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload when ./src/components/Hero.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 57ms
+ GET /?category=all 200 in 32ms (next.js: 3ms, application-code: 29ms)
+ GET / 200 in 400ms (next.js: 28ms, application-code: 372ms)
+ GET /?category=all 200 in 457ms (next.js: 3ms, application-code: 454ms)
+[browser] Uncaught Error: supabaseKey is required.
+    at module evaluation (src/utils/supabase.ts:6:37)
+    at module evaluation (src/components/Hero.tsx:6:1)
+    at module evaluation (src/components/ClientCatalog.tsx:6:1)
+  4 | const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  5 |
+> 6 | export const supabase = createClient(supabaseUrl, supabaseKey);
+    |                                     ^
+  7 |
+[browser] Uncaught Error: supabaseKey is required.
+    at <unknown> (src/utils/supabase.ts:6:37)
+    at <unknown> (src/components/Hero.tsx:6:1)
+    at <unknown> (src/components/ClientCatalog.tsx:6:1)
+    at reportError ([native code])
+  4 | const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  5 |
+> 6 | export const supabase = createClient(supabaseUrl, supabaseKey);
+    |                                     ^
+  7 |
