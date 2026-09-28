@@ -102,7 +102,7 @@ export default function AddContentModal({ genreId, isOpen, onClose, movieToEdit,
           setFormData(prev => ({ ...prev, seasons: rebuiltSeasons.length > 0 ? rebuiltSeasons : prev.seasons }));
         }
       } else {
-        setFormData({ title: "", is_collection: false, telegram_link: "", seasons: [{ seasonNumber: 1, episodes: [{ title: "", telegram_link: "" }] }] });
+        setFormData({ title: "", release_year: "", is_collection: false, telegram_link: "", seasons: [{ seasonNumber: 1, episodes: [{ title: "", telegram_link: "" }] }] });
         setPreviewUrl(null);
         setMessage(null);
       }

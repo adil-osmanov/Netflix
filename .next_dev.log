@@ -15556,3 +15556,66 @@ SERVER: Updating content 263a7bb7-948f-492c-b2b8-03c6888cd680 {
   └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 103ms src/app/admin/add-content/actions.ts
  POST /?category=movies 200 in 699ms (next.js: 2ms, application-code: 697ms)
   └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 691ms src/app/admin/add-content/actions.ts
+SERVER: Updating content 263a7bb7-948f-492c-b2b8-03c6888cd680 {
+  title: 'Трансформеры',
+  genre_id: '9fdc85dd-b861-4c2d-bd97-3a2a03743e54',
+  poster_url: 'https://okbgslrjkuuiznbbuptl.supabase.co/storage/v1/object/public/posters/1790590688295-151878optimusprajmtransformerytransformeryepohaistrebleniyaavtobotdeseptikon1920x1080.jpg',
+  is_collection: true,
+  collection_type: 'franchise',
+  release_year: '2002 - 2014',
+  telegram_link: null
+}
+ POST /?category=movies 200 in 1903ms (next.js: 4ms, application-code: 1899ms)
+  └─ ƒ saveContentAction({}, "263a7bb7-948f-492c-b2b8-03c6888cd680") in 1499ms src/app/admin/add-content/actions.ts
+ POST /?category=movies 200 in 74ms (next.js: 3ms, application-code: 72ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 66ms src/app/admin/add-content/actions.ts
+ POST /?category=movies 200 in 119ms (next.js: 4ms, application-code: 115ms)
+ GET /?category=movies 200 in 352ms (next.js: 1.9ms, application-code: 350ms)
+ POST /?category=movies 200 in 73ms (next.js: 1.4ms, application-code: 72ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 67ms src/app/actions.ts
+ POST /?category=movies 200 in 74ms (next.js: 2ms, application-code: 72ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 67ms src/app/actions.ts
+ POST /?category=movies 200 in 83ms (next.js: 2ms, application-code: 81ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 75ms src/app/actions.ts
+ POST /?category=movies 200 in 143ms (next.js: 1.6ms, application-code: 141ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 136ms src/app/actions.ts
+ POST /?category=movies 200 in 73ms (next.js: 1.9ms, application-code: 71ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 66ms src/app/actions.ts
+ POST /?category=movies 200 in 487ms (next.js: 1.9ms, application-code: 485ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 477ms src/app/admin/add-content/actions.ts
+ POST /?category=movies 200 in 74ms (next.js: 2ms, application-code: 72ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 67ms src/app/admin/add-content/actions.ts
+SERVER: Updating content 020ec09a-d3a6-4b2b-9c8e-d70c8f6a435c {
+  title: 'Пила',
+  genre_id: '9fdc85dd-b861-4c2d-bd97-3a2a03743e54',
+  poster_url: 'https://okbgslrjkuuiznbbuptl.supabase.co/storage/v1/object/public/posters/1790562084094-151878optimusprajmtransformerytransformeryepohaistrebleniyaavtobotdeseptikon1920x1080.jpg',
+  is_collection: false,
+  collection_type: null,
+  release_year: '2010',
+  telegram_link: '1'
+}
+ POST /?category=movies 200 in 733ms (next.js: 2ms, application-code: 730ms)
+  └─ ƒ saveContentAction({}, "020ec09a-d3a6-4b2b-9c8e-d70c8f6a435c") in 222ms src/app/admin/add-content/actions.ts
+ POST /?category=movies 200 in 154ms (next.js: 2.0ms, application-code: 152ms)
+  └─ ƒ getGenreById("9fdc85dd-b861-4c2d-bd97-3a2a03743e54") in 147ms src/app/admin/add-content/actions.ts
+ POST /?category=movies 200 in 170ms (next.js: 1.6ms, application-code: 169ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 164ms src/app/actions.ts
+ GET /?category=movies 200 in 372ms (next.js: 2ms, application-code: 370ms)
+ POST /?category=movies 200 in 236ms (next.js: 3ms, application-code: 233ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 217ms src/app/actions.ts
+ POST /?category=movies 200 in 129ms (next.js: 1.6ms, application-code: 127ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 122ms src/app/actions.ts
+ POST /?category=movies 200 in 109ms (next.js: 2ms, application-code: 107ms)
+  └─ ƒ getCollectionPartsInfoAction("263a7bb7-948f-492c-b2b8-03c6888cd680", "franchise") in 102ms src/app/actions.ts
+ GET /?category=movies 200 in 604ms (next.js: 3ms, application-code: 601ms)
+ POST /?category=movies 200 in 228ms (next.js: 3ms, application-code: 225ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 219ms src/app/actions.ts
+ POST /?category=movies 200 in 82ms (next.js: 2ms, application-code: 80ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 74ms src/app/actions.ts
+ POST /?category=movies 200 in 224ms (next.js: 4ms, application-code: 219ms)
+  └─ ƒ getEpisodesAction("263a7bb7-948f-492c-b2b8-03c6888cd680") in 211ms src/app/actions.ts
+ GET /?category=series 200 in 582ms (next.js: 3ms, application-code: 579ms)
+✓ Compiled in 108ms
+ GET / 200 in 139ms (next.js: 29ms, application-code: 110ms)
+ GET /?category=series 200 in 69ms (next.js: 10ms, application-code: 59ms)
+ GET /?category=all 200 in 61ms (next.js: 41ms, application-code: 20ms)
