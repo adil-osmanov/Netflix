@@ -46,6 +46,16 @@ export default function Hero({ movie }: { movie?: any }) {
     loadLastWatched();
   }, [searchParams, movie]);
 
+
+  const getPlayLink = () => {
+    if (displayMovie?.is_collection) return null;
+    let url = displayMovie?.telegram_url;
+    if (url && !url.includes('http')) {
+      const channelId = process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_ID?.replace("-100", "") || "3905550666";
+      url = `https://t.me/c/${channelId}/${url}`;
+    }
+    return url || '#';
+  };
   const handlePlay = () => {
     if (displayMovie?.telegram_url && !displayMovie?.is_collection) {
       const category = searchParams.get('category') || 'all';
@@ -70,7 +80,7 @@ export default function Hero({ movie }: { movie?: any }) {
 
   return (
     <div 
-      className="relative w-full aspect-[16/9] sm:aspect-video md:aspect-auto md:min-h-[75vh] flex flex-col justify-end pb-4 md:pb-16 z-10 bg-[#141414] bg-top md:bg-center bg-no-repeat bg-contain md:bg-cover"
+      className="relative w-full aspect-[16/9] md:aspect-video flex flex-col justify-end pb-4 md:pb-16 z-10 bg-[#141414] bg-top md:bg-center bg-no-repeat bg-contain"
       style={{ backgroundImage: `url(${displayMovie.cover_url})` }}
     >
       <div className="absolute inset-0 bg-gradient-to-r from-[#141414]/90 md:from-[#141414] md:via-[#141414]/50 to-transparent" />
@@ -111,13 +121,29 @@ export default function Hero({ movie }: { movie?: any }) {
 
 
         <div className="flex items-center gap-4">
-          <button 
-            onClick={handlePlay}
-            className="bg-white text-black font-bold text-xs md:text-lg px-3 md:px-8 py-1.5 md:py-3 rounded-md flex items-center gap-1.5 md:gap-2 hover:bg-white/80 transition-colors cursor-pointer shadow-lg drop-shadow-md"
-          >
-            <Play className="w-4 h-4 md:w-7 md:h-7" fill="currentColor" />
-            Смотреть
-          </button>
+          {displayMovie.is_collection ? (
+            <button 
+              onClick={() => setModalOpen(true)}
+              className="bg-white text-black font-bold text-xs md:text-lg px-3 md:px-8 py-1.5 md:py-3 rounded-md flex items-center gap-1.5 md:gap-2 hover:bg-white/80 transition-colors cursor-pointer shadow-lg drop-shadow-md"
+            >
+              <Play className="w-4 h-4 md:w-7 md:h-7" fill="currentColor" />
+              Смотреть
+            </button>
+          ) : (
+            <a 
+              href={getPlayLink()!}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => {
+                const category = searchParams.get('category') || 'all';
+                setLastWatchedAction(category, displayMovie);
+              }}
+              className="bg-white text-black font-bold text-xs md:text-lg px-3 md:px-8 py-1.5 md:py-3 rounded-md flex items-center gap-1.5 md:gap-2 hover:bg-white/80 transition-colors cursor-pointer shadow-lg drop-shadow-md"
+            >
+              <Play className="w-4 h-4 md:w-7 md:h-7" fill="currentColor" />
+              Смотреть
+            </a>
+          )}
         </div>
       </div>
 

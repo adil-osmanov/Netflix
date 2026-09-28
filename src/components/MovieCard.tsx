@@ -93,6 +93,16 @@ export default function MovieCard({ movie }: MovieCardProps) {
     return () => window.removeEventListener('storage', checkSettings);
   }, [editOpen, movie.id, movie.is_collection]);
 
+
+  const getPlayLink = () => {
+    if (movie.is_collection) return undefined;
+    let url = movie.telegram_url;
+    if (url && !url.includes('http')) {
+      const channelId = process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_ID?.replace("-100", "") || "3905550666";
+      url = `https://t.me/c/${channelId}/${url}`;
+    }
+    return url || undefined;
+  };
   const handlePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     
@@ -170,18 +180,10 @@ export default function MovieCard({ movie }: MovieCardProps) {
     document.body
   ) : null;
 
-  return (
+
+
+  const cardInner = (
     <>
-      <div 
-        draggable={true}
-        onDragStart={(e) => {
-          e.dataTransfer.setData('movieId', movie.id);
-        }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        className={`group relative w-full aspect-video flex-shrink-0 cursor-pointer transition-z duration-0 ${isHovered ? 'z-[70]' : isAnimatingOut ? 'z-[60]' : 'z-10'}`}
-        onClick={handlePlay}
-      >
         <div className={`absolute inset-0 transition-all duration-300 ease-out origin-center rounded-md overflow-hidden bg-[#141414] ${isHovered ? 'md:scale-[1.25] md:shadow-[0_0_30px_rgba(0,0,0,0.9)]' : 'scale-100'}`}>
           
           <img
@@ -239,7 +241,45 @@ export default function MovieCard({ movie }: MovieCardProps) {
           </div>
 
         </div>
-      </div>
+    </>
+  );
+
+  return (
+    <>
+      {movie.is_collection ? (
+        <div 
+          draggable={true}
+          onDragStart={(e) => {
+            e.dataTransfer.setData('movieId', movie.id);
+          }}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          className={`group relative w-full aspect-video flex-shrink-0 cursor-pointer transition-z duration-0 ${isHovered ? 'z-[70]' : isAnimatingOut ? 'z-[60]' : 'z-10'}`}
+          onClick={handlePlay}
+        >
+          {cardInner}
+        </div>
+      ) : (
+        <a 
+          draggable={true}
+          onDragStart={(e) => {
+            e.dataTransfer.setData('movieId', movie.id);
+          }}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          className={`group relative w-full block aspect-video flex-shrink-0 cursor-pointer transition-z duration-0 ${isHovered ? 'z-[70]' : isAnimatingOut ? 'z-[60]' : 'z-10'}`}
+          onClick={(e) => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const categoryType = urlParams.get('category') || 'all';
+            setLastWatchedAction(categoryType, movie);
+          }}
+          href={getPlayLink()}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {cardInner}
+        </a>
+      )}
 
       <CollectionViewerModal 
         movie={movie} 
