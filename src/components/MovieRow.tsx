@@ -16,6 +16,14 @@ interface MovieRowProps {
 export default function MovieRow({ title, movies, genreId }: MovieRowProps) {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [hideAdmin, setHideAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkSettings = () => setHideAdmin(localStorage.getItem('netflix_hide_add_buttons') === 'true');
+    checkSettings();
+    window.addEventListener('storage', checkSettings);
+    return () => window.removeEventListener('storage', checkSettings);
+  }, []);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
@@ -36,6 +44,7 @@ export default function MovieRow({ title, movies, genreId }: MovieRowProps) {
   }, [movies.length]);
 
   const handleDragOver = (e: React.DragEvent) => {
+    if (hideAdmin) return;
     e.preventDefault();
     if (genreId) {
       setIsDragOver(true);
@@ -47,6 +56,7 @@ export default function MovieRow({ title, movies, genreId }: MovieRowProps) {
   };
 
   const handleDrop = async (e: React.DragEvent) => {
+    if (hideAdmin) return;
     e.preventDefault();
     setIsDragOver(false);
     

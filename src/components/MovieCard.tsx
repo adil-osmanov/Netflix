@@ -196,7 +196,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
   return (
     <>
       <div 
-        draggable={true}
+        draggable={!hideAdmin}
         onDragStart={(e) => {
           e.dataTransfer.setData('movieId', movie.id);
         }}
