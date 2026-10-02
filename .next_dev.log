@@ -15974,3 +15974,4 @@ SERVER: Updating content 020ec09a-d3a6-4b2b-9c8e-d70c8f6a435c {
  GET / 200 in 271ms (next.js: 111ms, application-code: 159ms)
 ✓ Compiled in 152ms
  GET / 200 in 242ms (next.js: 33ms, application-code: 209ms)
+[?25h

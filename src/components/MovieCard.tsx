@@ -22,6 +22,8 @@ export interface Movie {
   genre_id?: string;
   collection_type?: string;
   has_subtitles?: boolean;
+  collectionCount?: number;
+  totalEpisodesCount?: number;
 }
 
 interface MovieCardProps {
@@ -57,8 +59,8 @@ export default function MovieCard({ movie }: MovieCardProps) {
   };
 
   // Calculate collection length
-  const [collectionCount, setCollectionCount] = useState<number>(0);
-  const [totalEpisodesCount, setTotalEpisodesCount] = useState(0);
+  const [collectionCount, setCollectionCount] = useState<number>(movie.collectionCount || 0);
+  const [totalEpisodesCount, setTotalEpisodesCount] = useState(movie.totalEpisodesCount || 0);
   const { isWatched, toggleWatched, getCollectionProgress } = useWatched();
   const [mounted, setMounted] = useState(false);
   const [hideAdmin, setHideAdmin] = useState(false);
@@ -68,35 +70,17 @@ export default function MovieCard({ movie }: MovieCardProps) {
     const checkSettings = () => setHideAdmin(localStorage.getItem('netflix_hide_add_buttons') === 'true');
     checkSettings();
     window.addEventListener('storage', checkSettings);
-    if (movie.is_collection) {
+    return () => window.removeEventListener('storage', checkSettings);
+  }, []);
+
+  useEffect(() => {
+    if (editOpen && movie.is_collection) {
       getEpisodesAction(movie.id).then((result) => {
         if (result.success && result.data) {
-          if (editOpen) setEpisodesToEdit(result.data);
-          
-          let hasSeasons = false;
-          const parsedData = result.data.map((ep: any) => {
-            try {
-              const parsed = JSON.parse(ep.title);
-              if (parsed.season) hasSeasons = true;
-              return { ...ep, season: parsed.season || 1 };
-            } catch (e) {
-              return { ...ep, season: null };
-            }
-          });
-
-          const isActuallySeries = movie.collection_type === 'series';
-          if (isActuallySeries) {
-            const uniqueSeasons = Array.from(new Set(parsedData.map((e: any) => e.season).filter(Boolean)));
-            setCollectionCount(uniqueSeasons.length);
-            setTotalEpisodesCount(result.data.length);
-          } else {
-            setCollectionCount(result.data.length);
-            setTotalEpisodesCount(result.data.length);
-          }
+          setEpisodesToEdit(result.data);
         }
       });
     }
-    return () => window.removeEventListener('storage', checkSettings);
   }, [editOpen, movie.id, movie.is_collection]);
 
 

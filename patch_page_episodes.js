@@ -1,15 +1,7 @@
-import Navbar from "@/components/Navbar";
-import ClientCatalog from "@/components/ClientCatalog";
-import { Suspense } from "react";
-import { supabase } from "@/utils/supabase";
+const fs = require('fs');
+let content = fs.readFileSync('src/app/page.tsx', 'utf8');
 
-export const revalidate = 3600; // Cache for 1 hour, or until revalidatePath is called
-
-// Triggering Vercel rebuild for cache invalidation
-export default async function Home() {
-  const { data: categories } = await supabase.from('categories').select('*');
-  const { data: genres } = await supabase.from('genres').select('*').order('order_index');
-  const { data: content } = await supabase.from('content').select('*').order('created_at', { ascending: false });
+const newCode = `  const { data: content } = await supabase.from('content').select('*').order('created_at', { ascending: false });
   const { data: allEpisodes } = await supabase.from('episodes').select('content_id, title');
 
   // Pre-calculate collection counts
@@ -59,18 +51,11 @@ export default async function Home() {
       collectionCount: item.collection_type === 'series' ? counts.uniqueSeasons : counts.total,
       totalEpisodesCount: counts.total
     };
-  });
+  });`;
 
-  return (
-    <main className="min-h-screen bg-[#141414] overflow-x-hidden w-full relative">
-      <Navbar />
-      <Suspense fallback={<div className="min-h-screen w-full bg-[#141414]" />}>
-        <ClientCatalog 
-          allGenres={genres || []} 
-          allMovies={allMovies} 
-          allCategories={categories || []} 
-        />
-      </Suspense>
-    </main>
-  );
-}
+content = content.replace(
+  "  const { data: content } = await supabase.from('content').select('*').order('created_at', { ascending: false });\n\n  const allMovies = (content || []).map(item => ({\n    id: item.id,\n    title: item.title,\n    release_year: item.release_year,\n    description: \"\",\n    category: categories?.find(c => c.id === genres?.find(g => g.id === item.genre_id)?.category_id)?.name || \"\",\n    cover_url: item.poster_url,\n    telegram_url: item.telegram_link,\n    is_collection: item.is_collection,\n    genre_id: item.genre_id,\n    collection_type: item.collection_type,\n    has_subtitles: item.has_subtitles\n  }));",
+  newCode
+);
+
+fs.writeFileSync('src/app/page.tsx', content);
