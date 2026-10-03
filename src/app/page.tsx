@@ -5,7 +5,7 @@ import { supabase } from "@/utils/supabase";
 
 export const revalidate = 3600; // Cache for 1 hour, or until revalidatePath is called
 
-// Triggering Vercel rebuild for cache invalidation
+// Triggering Vercel rebuild for cache invalidation 2
 export default async function Home() {
   const { data: categories } = await supabase.from('categories').select('*');
   const { data: genres } = await supabase.from('genres').select('*').order('order_index');

@@ -189,12 +189,14 @@ export default function MovieCard({ movie }: MovieCardProps) {
         onMouseLeave={handleMouseLeave}
         className={`group relative w-full aspect-video flex-shrink-0 transition-z duration-0 ${isHovered ? 'z-[70]' : isAnimatingOut ? 'z-[60]' : 'z-10'}`}
       >
-        <div className={`absolute inset-0 transition-all duration-300 ease-out origin-center rounded-md overflow-hidden bg-[#141414] ring-1 ring-[#141414] ${isHovered ? 'md:scale-[1.25] md:shadow-[0_0_30px_rgba(0,0,0,0.9)]' : 'scale-100'}`} style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}>
+        <div className={`absolute inset-0 transition-all duration-300 ease-out origin-center rounded-md overflow-hidden bg-[#141414] ${isHovered ? 'md:scale-[1.25] md:shadow-[0_0_30px_rgba(0,0,0,0.9)]' : 'scale-100'}`} style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)', transform: 'translateZ(0)' }}>
           
           {/* Background and Clickable Area */}
           {movie.is_collection ? (
             <div onClick={handlePlay} className="absolute inset-0 z-0 cursor-pointer overflow-hidden rounded-md">
               <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw" className="object-cover rounded-md transition-transform duration-300" />
+              {/* Massive inset shadow to guarantee the bottom edge is pure black from the inside */}
+              <div className="absolute inset-0 pointer-events-none rounded-md shadow-[inset_0_-4px_0_0_#141414] z-10" />
               {/* Solid bottom portion to guarantee text readability and hide image bottom */}
               <div className={`absolute -bottom-[2px] left-0 right-0 h-[35%] bg-[#141414] transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
               {/* Fade portion above it */}
@@ -213,6 +215,8 @@ export default function MovieCard({ movie }: MovieCardProps) {
               className="absolute inset-0 z-0 cursor-pointer block overflow-hidden rounded-md"
             >
               <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw" className="object-cover rounded-md transition-transform duration-300" />
+              {/* Massive inset shadow to guarantee the bottom edge is pure black from the inside */}
+              <div className="absolute inset-0 pointer-events-none rounded-md shadow-[inset_0_-4px_0_0_#141414] z-10" />
               {/* Solid bottom portion to guarantee text readability and hide image bottom */}
               <div className={`absolute -bottom-[2px] left-0 right-0 h-[35%] bg-[#141414] transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
               {/* Fade portion above it */}
