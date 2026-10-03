@@ -193,14 +193,16 @@ export default function MovieCard({ movie }: MovieCardProps) {
           
           {/* Background and Clickable Area */}
           {movie.is_collection ? (
-            <div onClick={handlePlay} className="absolute inset-0 z-0 cursor-pointer overflow-hidden rounded-md">
+            <div onClick={handlePlay} className="absolute inset-0 z-0 cursor-pointer">
               <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw" className="object-cover rounded-md transition-transform duration-300" />
-              {/* Massive inset shadow to guarantee the bottom edge is pure black from the inside */}
-              <div className="absolute inset-0 pointer-events-none rounded-md shadow-[inset_0_-4px_0_0_#141414] z-10" />
-              {/* Solid bottom portion to guarantee text readability and hide image bottom */}
-              <div className={`absolute -bottom-[2px] left-0 right-0 h-[35%] bg-[#141414] transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
-              {/* Fade portion above it */}
-              <div className={`absolute bottom-[calc(35%-2px)] left-0 right-0 h-[50%] transition-opacity duration-300 bg-gradient-to-t from-[#141414] to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
+              
+              <div 
+                className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`}
+                style={{
+                  background: 'linear-gradient(to top, #141414 0%, #141414 25%, rgba(20,20,20,0.8) 50%, transparent 100%)',
+                  boxShadow: 'inset 0 -2px 0 0 #141414'
+                }}
+              />
             </div>
           ) : (
             <a 
@@ -212,15 +214,17 @@ export default function MovieCard({ movie }: MovieCardProps) {
                 const categoryType = urlParams.get('category') || 'all';
                 setLastWatchedAction(categoryType, movie);
               }}
-              className="absolute inset-0 z-0 cursor-pointer block overflow-hidden rounded-md"
+              className="absolute inset-0 z-0 cursor-pointer block"
             >
               <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw" className="object-cover rounded-md transition-transform duration-300" />
-              {/* Massive inset shadow to guarantee the bottom edge is pure black from the inside */}
-              <div className="absolute inset-0 pointer-events-none rounded-md shadow-[inset_0_-4px_0_0_#141414] z-10" />
-              {/* Solid bottom portion to guarantee text readability and hide image bottom */}
-              <div className={`absolute -bottom-[2px] left-0 right-0 h-[35%] bg-[#141414] transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
-              {/* Fade portion above it */}
-              <div className={`absolute bottom-[calc(35%-2px)] left-0 right-0 h-[50%] transition-opacity duration-300 bg-gradient-to-t from-[#141414] to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
+              
+              <div 
+                className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`}
+                style={{
+                  background: 'linear-gradient(to top, #141414 0%, #141414 25%, rgba(20,20,20,0.8) 50%, transparent 100%)',
+                  boxShadow: 'inset 0 -2px 0 0 #141414'
+                }}
+              />
             </a>
           )}
 
