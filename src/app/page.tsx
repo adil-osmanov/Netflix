@@ -74,4 +74,4 @@ export default async function Home() {
     </main>
   );
 }
-// Triggering Vercel rebuild for cache invalidation final revert
+// Triggering Vercel rebuild for cache invalidation safari fix
