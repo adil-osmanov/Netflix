@@ -1,6 +1,7 @@
 "use client";
 
 import { Play, Pencil, Trash2, CheckCircle2 } from "lucide-react";
+import Image from "next/image";
 import { useWatched } from "@/context/WatchedContext";
 import { getTelegramDeepLink } from "@/utils/telegram";
 import { useEffect, useState, useRef } from "react";
@@ -193,7 +194,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
           {/* Background and Clickable Area */}
           {movie.is_collection ? (
             <div onClick={handlePlay} className="absolute inset-0 z-0 cursor-pointer">
-              <img src={movie.cover_url} alt={movie.title} className="w-full h-full object-cover transition-transform duration-300" />
+              <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw" className="object-cover transition-transform duration-300" />
               <div className={`absolute -inset-1 transition-opacity duration-300 bg-gradient-to-t from-[#141414] from-15% via-[#141414]/80 via-45% to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
             </div>
           ) : (
@@ -208,7 +209,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
               }}
               className="absolute inset-0 z-0 cursor-pointer block"
             >
-              <img src={movie.cover_url} alt={movie.title} className="w-full h-full object-cover transition-transform duration-300" />
+              <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw" className="object-cover transition-transform duration-300" />
               <div className={`absolute -inset-1 transition-opacity duration-300 bg-gradient-to-t from-[#141414] from-15% via-[#141414]/80 via-45% to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
             </a>
           )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Play, X, ChevronDown, CheckCircle2 } from "lucide-react";
+import Image from "next/image";
 import { useWatched } from "@/context/WatchedContext";
 import { getTelegramDeepLink } from "@/utils/telegram";
 import { useState, useEffect } from "react";
@@ -111,7 +112,7 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
         <div className="overflow-y-auto no-scrollbar w-full">
           {/* Top Banner (16:9) */}
           <div className="w-full aspect-video relative flex-shrink-0">
-            <img src={movie.cover_url} alt={movie.title} className="w-full h-full object-cover" />
+            <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 1024px) 100vw, 950px" className="object-cover" />
             <div className="absolute inset-0 bg-gradient-to-r from-[#181818] via-[#181818]/40 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/30 to-transparent" />
             
