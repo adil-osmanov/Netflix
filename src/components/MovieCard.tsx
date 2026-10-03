@@ -189,7 +189,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
         onMouseLeave={handleMouseLeave}
         className={`group relative w-full aspect-video flex-shrink-0 transition-z duration-0 bg-[#141414] rounded-md ${isHovered ? 'z-[70]' : isAnimatingOut ? 'z-[60]' : 'z-10'}`}
       >
-        <div className={`absolute inset-0 transition-all duration-300 ease-out origin-center rounded-md overflow-hidden bg-[#141414] ${isHovered ? 'md:scale-[1.25] md:shadow-[0_0_30px_rgba(0,0,0,0.9)]' : 'scale-100'}`} style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}>
+        <div className={`absolute inset-0 transition-all duration-300 ease-out origin-center rounded-md overflow-hidden bg-[#141414] after:absolute after:inset-0 after:border-[1px] after:border-[#141414] after:pointer-events-none after:rounded-md ${isHovered ? 'md:scale-[1.25] md:shadow-[0_0_30px_rgba(0,0,0,0.9)]' : 'scale-100'}`} style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}>
           
           {/* Background and Clickable Area */}
           {movie.is_collection ? (
