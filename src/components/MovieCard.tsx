@@ -189,20 +189,13 @@ export default function MovieCard({ movie }: MovieCardProps) {
         onMouseLeave={handleMouseLeave}
         className={`group relative w-full aspect-video flex-shrink-0 transition-z duration-0 ${isHovered ? 'z-[70]' : isAnimatingOut ? 'z-[60]' : 'z-10'}`}
       >
-        <div className={`absolute inset-0 transition-all duration-300 ease-out origin-center rounded-md overflow-hidden bg-[#141414] ${isHovered ? 'md:scale-[1.25] md:shadow-[0_0_30px_rgba(0,0,0,0.9)]' : 'scale-100'}`} style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)', transform: 'translateZ(0)' }}>
+        <div className={`absolute inset-0 transition-all duration-300 ease-out origin-center rounded-md overflow-hidden bg-[#141414] ${isHovered ? 'md:scale-[1.25] md:shadow-[0_0_30px_rgba(0,0,0,0.9)]' : 'scale-100'}`} style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}>
           
           {/* Background and Clickable Area */}
           {movie.is_collection ? (
             <div onClick={handlePlay} className="absolute inset-0 z-0 cursor-pointer">
-              <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw" className="object-cover rounded-md transition-transform duration-300" />
-              
-              <div 
-                className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`}
-                style={{
-                  background: 'linear-gradient(to top, #141414 0%, #141414 25%, rgba(20,20,20,0.8) 50%, transparent 100%)',
-                  boxShadow: 'inset 0 -2px 0 0 #141414'
-                }}
-              />
+              <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw" className="object-cover transition-transform duration-300" />
+              <div className={`absolute -inset-1 transition-opacity duration-300 bg-gradient-to-t from-[#141414] from-15% via-[#141414]/80 via-45% to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
             </div>
           ) : (
             <a 
@@ -216,15 +209,8 @@ export default function MovieCard({ movie }: MovieCardProps) {
               }}
               className="absolute inset-0 z-0 cursor-pointer block"
             >
-              <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw" className="object-cover rounded-md transition-transform duration-300" />
-              
-              <div 
-                className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`}
-                style={{
-                  background: 'linear-gradient(to top, #141414 0%, #141414 25%, rgba(20,20,20,0.8) 50%, transparent 100%)',
-                  boxShadow: 'inset 0 -2px 0 0 #141414'
-                }}
-              />
+              <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw" className="object-cover transition-transform duration-300" />
+              <div className={`absolute -inset-1 transition-opacity duration-300 bg-gradient-to-t from-[#141414] from-15% via-[#141414]/80 via-45% to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
             </a>
           )}
 
