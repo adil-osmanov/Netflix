@@ -13,7 +13,7 @@ export default async function YouTubeVideoPage({ params }: PageProps) {
   const videoMeta = RECOMMENDED_YOUTUBE_VIDEOS.find((v) => v.id === id);
 
   return (
-    <div className="min-h-screen bg-[#141414] text-white pt-20 pb-16">
+    <div className="min-h-screen bg-[#141414] text-white pt-6 pb-16">
       <div className="max-w-6xl mx-auto px-4 md:px-6 mb-2">
         <Link
           href="/youtube"

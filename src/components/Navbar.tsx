@@ -63,9 +63,14 @@ function NavbarContent() {
             <Link href="/?category=movies" onClick={() => setSearchTerm('')} className={getLinkClass('movies')}>Фильмы</Link>
             <Link href="/?category=series" onClick={() => setSearchTerm('')} className={getLinkClass('series')}>Сериалы</Link>
             <Link href="/?category=cartoons" onClick={() => setSearchTerm('')} className={getLinkClass('cartoons')}>Мультфильмы</Link>
-            <Link href="/youtube" onClick={() => setSearchTerm('')} className={getYouTubeLinkClass()}>
-              <span>YouTube</span>
-              <span className="text-[10px] px-1.5 py-0.2 bg-[#E50914] text-white rounded font-bold uppercase tracking-wider">DE</span>
+            <Link 
+              href="/youtube" 
+              onClick={() => setSearchTerm('')} 
+              className="group relative flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-red-950/40 via-black to-red-950/40 border border-red-600/40 hover:border-red-500 shadow-[0_0_12px_rgba(229,9,20,0.2)] hover:shadow-[0_0_20px_rgba(229,9,20,0.5)] transition-all duration-300"
+            >
+              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+              <span className="text-xs font-semibold tracking-wide text-white group-hover:text-red-200">YouTube</span>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-red-600 text-white">DE</span>
             </Link>
           </div>
         </div>
@@ -110,9 +115,16 @@ function NavbarContent() {
           <Link href="/?category=movies" onClick={() => { setSearchTerm(''); setMobileMenuOpen(false); }} className={getLinkClass('movies')}>Фильмы</Link>
           <Link href="/?category=series" onClick={() => { setSearchTerm(''); setMobileMenuOpen(false); }} className={getLinkClass('series')}>Сериалы</Link>
           <Link href="/?category=cartoons" onClick={() => { setSearchTerm(''); setMobileMenuOpen(false); }} className={getLinkClass('cartoons')}>Мультфильмы</Link>
-          <Link href="/youtube" onClick={() => { setSearchTerm(''); setMobileMenuOpen(false); }} className={getYouTubeLinkClass()}>
-            <span>YouTube</span>
-            <span className="text-[10px] px-1.5 py-0.2 bg-[#E50914] text-white rounded font-bold uppercase tracking-wider">DE</span>
+          <Link 
+            href="/youtube" 
+            onClick={() => { setSearchTerm(''); setMobileMenuOpen(false); }} 
+            className="group relative flex items-center justify-between px-3.5 py-2 rounded-xl bg-gradient-to-r from-red-950/40 via-black to-red-950/40 border border-red-600/40 hover:border-red-500 transition-all duration-300"
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+              <span className="text-xs font-semibold tracking-wide text-white group-hover:text-red-200">YouTube Learning</span>
+            </div>
+            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-red-600 text-white">DE</span>
           </Link>
         </div>
       </div>
