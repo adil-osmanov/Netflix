@@ -13,6 +13,7 @@ export interface YouTubeRecommendedVideo {
   thumbnailUrl: string;
   description: string;
   durationText?: string;
+  published?: string;
 }
 
 export interface UserWord {

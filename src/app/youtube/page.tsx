@@ -22,9 +22,9 @@ import ManageChannelsModal, { SubscribedChannel } from "@/components/youtube/Man
 
 const DEFAULT_SUBSCRIPTIONS: SubscribedChannel[] = [
   { id: "UCbxb2fqe9oNgglAoYqsYOtQ", name: "Easy German" },
-  { id: "UCUuab1dctZzN5ZmRmQnTzkg", name: "WDR Doku" },
   { id: "UCxUWIEL-USsiPak0Qy6_vVg", name: "DW Deutsch lernen" },
   { id: "UCZHpIFMfoJJ_1QxNGLJTzyA", name: "MrWissen2go" },
+  { id: "UCUuab1dctZzN5ZmRmQnTzkg", name: "WDR Doku" },
 ];
 
 /**
@@ -88,20 +88,31 @@ export default function YouTubeCatalogPage() {
   // Tabs: 'recommendations' | 'subscriptions'
   const [activeTab, setActiveTab] = useState<"recommendations" | "subscriptions">("recommendations");
 
-  // Subscriptions & Dynamic Feed
-  const [subscriptions, setSubscriptions] = useState<SubscribedChannel[]>(DEFAULT_SUBSCRIPTIONS);
-  const [subVideos, setSubVideos] = useState<YouTubeRecommendedVideo[]>([]);
-  const [isLoadingSubs, setIsLoadingSubs] = useState<boolean>(false);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-
   // Manage Channels Modal
   const [isManageModalOpen, setIsManageModalOpen] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
-  // Infinite Scroll Pagination
-  const [visibleCount, setVisibleCount] = useState<number>(16);
-  const observerTargetRef = useRef<HTMLDivElement>(null);
+  // Infinite Scroll Trigger Ref
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
 
-  // Load subscriptions from localStorage
+  // Subscriptions state
+  const [subscriptions, setSubscriptions] = useState<SubscribedChannel[]>(DEFAULT_SUBSCRIPTIONS);
+  const [subVideos, setSubVideos] = useState<YouTubeRecommendedVideo[]>([]);
+  const [subPage, setSubPage] = useState<number>(1);
+  const [hasMoreSub, setHasMoreSub] = useState<boolean>(true);
+  const [isLoadingSubs, setIsLoadingSubs] = useState<boolean>(false);
+  const [isLoadingMoreSub, setIsLoadingMoreSub] = useState<boolean>(false);
+
+  // Recommendations state
+  const [recommendations, setRecommendations] = useState<YouTubeRecommendedVideo[]>(() => {
+    return [...RECOMMENDED_YOUTUBE_VIDEOS].sort(() => Math.random() - 0.5);
+  });
+  const [recPage, setRecPage] = useState<number>(1);
+  const [hasMoreRec, setHasMoreRec] = useState<boolean>(true);
+  const [isLoadingRec, setIsLoadingRec] = useState<boolean>(false);
+  const [isLoadingMoreRec, setIsLoadingMoreRec] = useState<boolean>(false);
+
+  // Load subscriptions from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -120,68 +131,147 @@ export default function YouTubeCatalogPage() {
     } catch {}
   };
 
-  // Re-fetch subscription feeds via RSS route without full page reload
-  const loadSubFeeds = useCallback(async (currentSubs: SubscribedChannel[]) => {
+  // 1. Fetch Recommendations from API
+  const loadRecommendations = useCallback(async (page: number, isReset: boolean = false) => {
+    if (isReset) {
+      setIsLoadingRec(true);
+    } else {
+      setIsLoadingMoreRec(true);
+    }
+
+    try {
+      const resp = await fetch(`/api/youtube/recommendations?page=${page}&limit=16`);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.videos && Array.isArray(data.videos)) {
+          if (isReset) {
+            setRecommendations(data.videos);
+            setRecPage(1);
+          } else {
+            setRecommendations((prev) => {
+              const existingIds = new Set(prev.map((v) => v.id));
+              const fresh = data.videos.filter((v: YouTubeRecommendedVideo) => !existingIds.has(v.id));
+              return [...prev, ...fresh];
+            });
+            setRecPage(page);
+          }
+          setHasMoreRec(data.hasMore !== false);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load recommendations:", err);
+    } finally {
+      setIsLoadingRec(false);
+      setIsLoadingMoreRec(false);
+    }
+  }, []);
+
+  // 2. Fetch Subscriptions from API
+  const loadSubscriptions = useCallback(async (currentSubs: SubscribedChannel[], page: number, isReset: boolean = false) => {
     if (currentSubs.length === 0) {
       setSubVideos([]);
+      setHasMoreSub(false);
       return;
     }
 
-    setIsLoadingSubs(true);
-    const allVideos: YouTubeRecommendedVideo[] = [];
-
-    await Promise.all(
-      currentSubs.map(async (sub) => {
-        try {
-          const resp = await fetch(`/api/youtube/channel?channelId=${encodeURIComponent(sub.id)}`);
-          if (resp.ok) {
-            const data = await resp.json();
-            if (data.videos && Array.isArray(data.videos)) {
-              allVideos.push(...data.videos);
-            }
-          }
-        } catch (err) {
-          console.warn("Feed error for", sub.name, err);
-        }
-      })
-    );
-
-    // Filter out shorts and deduplicate by videoId
-    const seenIds = new Set<string>();
-    const nonShorts: YouTubeRecommendedVideo[] = [];
-
-    for (const v of allVideos) {
-      if (seenIds.has(v.id)) continue;
-      if (isYouTubeShort(v)) continue;
-      seenIds.add(v.id);
-      nonShorts.push(v);
+    if (isReset) {
+      setIsLoadingSubs(true);
+    } else {
+      setIsLoadingMoreSub(true);
     }
 
-    setSubVideos(nonShorts);
-    setIsLoadingSubs(false);
+    try {
+      const channelIds = currentSubs.map((s) => s.id).join(",");
+      const resp = await fetch(
+        `/api/youtube/subscriptions?channelIds=${encodeURIComponent(channelIds)}&page=${page}&limit=16`
+      );
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.videos && Array.isArray(data.videos)) {
+          if (isReset) {
+            setSubVideos(data.videos);
+            setSubPage(1);
+          } else {
+            setSubVideos((prev) => {
+              const existingIds = new Set(prev.map((v) => v.id));
+              const fresh = data.videos.filter((v: YouTubeRecommendedVideo) => !existingIds.has(v.id));
+              return [...prev, ...fresh];
+            });
+            setSubPage(page);
+          }
+          setHasMoreSub(data.hasMore === true);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load subscriptions:", err);
+    } finally {
+      setIsLoadingSubs(false);
+      setIsLoadingMoreSub(false);
+    }
   }, []);
 
-  // Fetch feeds on mount & when subscriptions change
+  // Initial loads
   useEffect(() => {
-    loadSubFeeds(subscriptions);
-  }, [subscriptions, loadSubFeeds]);
+    loadRecommendations(1, true);
+  }, [loadRecommendations]);
 
-  // Recommendations state with verified B1-B2 pool
-  const [recommendations, setRecommendations] = useState<YouTubeRecommendedVideo[]>(() => {
-    return [...RECOMMENDED_YOUTUBE_VIDEOS].sort(() => Math.random() - 0.5);
-  });
+  useEffect(() => {
+    loadSubscriptions(subscriptions, 1, true);
+  }, [subscriptions, loadSubscriptions]);
 
-  // Handle Refresh feed button (smoothly updates state without full page reload)
+  // Infinite Scroll Observer for both tabs
+  useEffect(() => {
+    const target = loadMoreTriggerRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          if (activeTab === "recommendations") {
+            if (!isLoadingMoreRec && !isLoadingRec && hasMoreRec) {
+              loadRecommendations(recPage + 1, false);
+            }
+          } else {
+            if (!isLoadingMoreSub && !isLoadingSubs && hasMoreSub) {
+              loadSubscriptions(subscriptions, subPage + 1, false);
+            }
+          }
+        }
+      },
+      {
+        root: null,
+        rootMargin: "400px",
+        threshold: 0.1,
+      }
+    );
+
+    observer.observe(target);
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    activeTab,
+    recPage,
+    hasMoreRec,
+    isLoadingMoreRec,
+    isLoadingRec,
+    loadRecommendations,
+    subPage,
+    hasMoreSub,
+    isLoadingMoreSub,
+    isLoadingSubs,
+    loadSubscriptions,
+    subscriptions,
+  ]);
+
+  // Handle Refresh feed button
   const handleRefreshFeed = async () => {
-    setVisibleCount(16);
     setIsRefreshing(true);
     if (activeTab === "subscriptions") {
-      setSubVideos([]);
-      await loadSubFeeds(subscriptions);
+      await loadSubscriptions(subscriptions, 1, true);
     } else {
-      // Pick a fresh randomized selection from verified B1-B2 channel pool
-      await new Promise((resolve) => setTimeout(resolve, 350));
-      setRecommendations([...RECOMMENDED_YOUTUBE_VIDEOS].sort(() => Math.random() - 0.5));
+      await loadRecommendations(1, true);
     }
     setIsRefreshing(false);
   };
@@ -194,7 +284,6 @@ export default function YouTubeCatalogPage() {
     const trimmed = searchInput.trim();
     if (!trimmed) return;
 
-    // Direct YouTube link or 11-char ID
     const directId = extractYouTubeId(trimmed);
     if (directId) {
       setActiveVideo({
@@ -247,37 +336,18 @@ export default function YouTubeCatalogPage() {
   const currentVideos =
     activeTab === "recommendations" ? filteredRecommendations : filteredSubVideos;
 
-  const displayedVideos = currentVideos.slice(0, visibleCount);
-
-  // Infinite Scroll Observer for both tabs
-  useEffect(() => {
-    const target = observerTargetRef.current;
-    if (!target) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting) {
-          setVisibleCount((prev) => {
-            if (prev < currentVideos.length) {
-              return prev + 16;
-            }
-            return prev;
-          });
-        }
-      },
-      {
-        root: null,
-        rootMargin: "350px",
-        threshold: 0.1,
-      }
-    );
-
-    observer.observe(target);
-    return () => {
-      observer.disconnect();
-    };
-  }, [currentVideos.length]);
+  // Handle Next Video callback for player
+  const handleNextVideo = () => {
+    if (!activeVideo || currentVideos.length === 0) return;
+    const currentIndex = currentVideos.findIndex((v) => v.id === activeVideo.id);
+    if (currentIndex >= 0 && currentIndex < currentVideos.length - 1) {
+      const next = currentVideos[currentIndex + 1];
+      setActiveVideo({ id: next.id, title: next.title, channel: next.channel });
+    } else {
+      const next = currentVideos[0];
+      setActiveVideo({ id: next.id, title: next.title, channel: next.channel });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#141414] text-white pb-24 px-4 md:px-12 pt-4">
@@ -329,10 +399,7 @@ export default function YouTubeCatalogPage() {
           {/* Left: Tab Buttons + Refresh Icon */}
           <div className="flex items-center gap-2 sm:gap-3">
             <button
-              onClick={() => {
-                setActiveTab("recommendations");
-                setVisibleCount(16);
-              }}
+              onClick={() => setActiveTab("recommendations")}
               className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeTab === "recommendations"
                   ? "bg-[#E50914] text-white shadow-lg shadow-red-950/40"
@@ -343,10 +410,7 @@ export default function YouTubeCatalogPage() {
             </button>
 
             <button
-              onClick={() => {
-                setActiveTab("subscriptions");
-                setVisibleCount(16);
-              }}
+              onClick={() => setActiveTab("subscriptions")}
               className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "subscriptions"
                   ? "bg-[#E50914] text-white shadow-lg shadow-red-950/40"
@@ -368,15 +432,11 @@ export default function YouTubeCatalogPage() {
             {/* Refresh feed button */}
             <button
               onClick={handleRefreshFeed}
-              disabled={isLoadingSubs || isRefreshing}
-              className="p-2.5 rounded-full bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white transition-all cursor-pointer disabled:opacity-50"
-              title="Обновить ленту видео"
+              disabled={isRefreshing}
+              className="p-2 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors cursor-pointer ml-1"
+              title="Обновить ленту"
             >
-              <RotateCw
-                className={`w-3.5 h-3.5 ${
-                  isLoadingSubs || isRefreshing ? "animate-spin text-[#E50914]" : ""
-                }`}
-              />
+              <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#E50914]" : ""}`} />
             </button>
           </div>
 
@@ -406,13 +466,14 @@ export default function YouTubeCatalogPage() {
 
       {/* Main Video Feed Area */}
       <div className="max-w-7xl mx-auto">
-        {/* Loading State for Subscriptions */}
-        {activeTab === "subscriptions" && isLoadingSubs && subVideos.length === 0 ? (
+        {/* Loading State on initial fetch */}
+        {((activeTab === "subscriptions" && isLoadingSubs && subVideos.length === 0) ||
+          (activeTab === "recommendations" && isLoadingRec && recommendations.length === 0)) ? (
           <div className="py-24 flex flex-col items-center justify-center gap-3 text-zinc-400">
             <Loader2 className="w-8 h-8 animate-spin text-[#E50914]" />
             <span className="text-sm font-medium">Загрузка свежих видео из немецких каналов...</span>
           </div>
-        ) : displayedVideos.length === 0 ? (
+        ) : currentVideos.length === 0 ? (
           /* Empty State */
           <div className="py-20 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl text-center flex flex-col items-center justify-center p-8 gap-3 max-w-lg mx-auto">
             <Tv className="w-10 h-10 text-zinc-600" />
@@ -437,16 +498,20 @@ export default function YouTubeCatalogPage() {
           /* Video Grid (Strictly non-Shorts) */
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-              {displayedVideos.map((video) => (
+              {currentVideos.map((video) => (
                 <div
                   key={video.id}
                   onClick={() =>
-                    setActiveVideo({ id: video.id, title: video.title, channel: video.channel })
+                    setActiveVideo({
+                      id: video.id,
+                      title: video.title,
+                      channel: video.channel,
+                    })
                   }
-                  className="group relative bg-[#181818] rounded-xl overflow-hidden border border-zinc-800/80 hover:border-zinc-600 transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl hover:z-20 flex flex-col cursor-pointer"
+                  className="group bg-zinc-900/50 hover:bg-zinc-800/60 border border-zinc-800/80 hover:border-zinc-700/80 rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl flex flex-col"
                 >
-                  {/* Thumbnail */}
-                  <div className="relative w-full aspect-video bg-zinc-900 overflow-hidden">
+                  {/* Thumbnail Container */}
+                  <div className="relative aspect-video w-full bg-zinc-950 overflow-hidden">
                     <img
                       src={video.thumbnailUrl}
                       alt={video.title}
@@ -506,15 +571,18 @@ export default function YouTubeCatalogPage() {
               ))}
             </div>
 
-            {/* Invisible Infinite Scroll Trigger Target */}
-            {currentVideos.length > visibleCount && (
-              <div
-                ref={observerTargetRef}
-                className="h-20 w-full flex items-center justify-center pointer-events-none mt-4"
-              >
-                <Loader2 className="w-6 h-6 animate-spin text-zinc-600" />
-              </div>
-            )}
+            {/* Infinite Scroll Trigger Target */}
+            <div
+              ref={loadMoreTriggerRef}
+              className="h-20 w-full flex items-center justify-center mt-6 pointer-events-none"
+            >
+              {(isLoadingMoreRec || isLoadingMoreSub) && (
+                <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm">
+                  <Loader2 className="w-5 h-5 animate-spin text-[#E50914]" />
+                  <span>Загрузка новых видео...</span>
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -527,6 +595,7 @@ export default function YouTubeCatalogPage() {
             videoTitle={activeVideo.title}
             channelTitle={activeVideo.channel}
             onBackToCatalog={() => setActiveVideo(null)}
+            onNextVideo={handleNextVideo}
           />
         </div>
       )}

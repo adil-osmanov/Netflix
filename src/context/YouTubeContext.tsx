@@ -14,13 +14,13 @@ export const SUBTITLE_FONT_SIZE_CLASSES: Record<SubtitleFontSize, string> = {
 
 export interface SubtitleSettings {
   backdropOpacity: number; // 0 to 100
-  bottomOffset: "bottom-4" | "bottom-10" | "bottom-20";
+  bottomOffset: "bottom-4" | "bottom-10" | "bottom-14" | "bottom-16" | "bottom-20" | "bottom-28";
   fontSize: SubtitleFontSize;
 }
 
 const DEFAULT_SETTINGS: SubtitleSettings = {
   backdropOpacity: 85,
-  bottomOffset: "bottom-10",
+  bottomOffset: "bottom-20",
   fontSize: "md",
 };
 

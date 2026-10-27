@@ -23,7 +23,10 @@ import {
   Maximize,
   Minimize,
   Loader2,
-  ArrowLeft
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  ExternalLink
 } from "lucide-react";
 
 declare global {
@@ -38,6 +41,7 @@ interface InteractivePlayerProps {
   videoTitle?: string;
   channelTitle?: string;
   onBackToCatalog?: () => void;
+  onNextVideo?: () => void;
 }
 
 export default function InteractivePlayer({
@@ -45,6 +49,7 @@ export default function InteractivePlayer({
   videoTitle,
   channelTitle,
   onBackToCatalog,
+  onNextVideo,
 }: InteractivePlayerProps) {
   const { subtitleSettings, updateSubtitleSettings, refreshSavedWords } = useYouTube();
 
@@ -95,8 +100,44 @@ export default function InteractivePlayer({
     };
   }, [isFullscreen, resetControlsTimeout]);
 
-  // Settings popover
+  // 0. Body scroll lock when video player is open
+  useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, []);
+
+  // Settings popover & refs
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Embed error state (YouTube error codes 150/101/2/100)
+  const [embedError, setEmbedError] = useState<boolean>(false);
+
+  // Hidden controls bar toggle state
+  const [isControlsHidden, setIsControlsHidden] = useState<boolean>(false);
+
+  // Close settings popover on click outside
+  useEffect(() => {
+    if (!isSettingsOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        settingsRef.current &&
+        !settingsRef.current.contains(e.target as Node) &&
+        settingsButtonRef.current &&
+        !settingsButtonRef.current.contains(e.target as Node)
+      ) {
+        setIsSettingsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isSettingsOpen]);
 
   // Hover & Pinned Word state
   const [hoveredWord, setHoveredWord] = useState<{
@@ -200,6 +241,8 @@ export default function InteractivePlayer({
     function initPlayer() {
       if (!window.YT || !window.YT.Player) return;
 
+      setEmbedError(false);
+
       if (playerRef.current) {
         try {
           playerRef.current.destroy();
@@ -225,6 +268,13 @@ export default function InteractivePlayer({
           onStateChange: (event: any) => {
             // 1 = PLAYING, 2 = PAUSED, 0 = ENDED
             setIsPlaying(event.data === 1);
+          },
+          onError: (event: any) => {
+            // Codes 101/150: embedding blocked by copyright owner
+            // Codes 2/100: invalid video id or video removed
+            if (event.data === 150 || event.data === 101 || event.data === 2 || event.data === 100) {
+              setEmbedError(true);
+            }
           },
         },
       });
@@ -585,12 +635,15 @@ export default function InteractivePlayer({
           <div
             className={`relative w-full ${
               isFullscreen
-                ? "h-full flex-1 bg-black"
+                ? "h-full flex-1 bg-black overflow-hidden"
                 : "aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-zinc-800/80"
             } group`}
           >
-            {/* YouTube IFrame Container - pointer-events-none prevents YouTube native top/share/watermark overlays */}
-            <div id={`yt-player-${videoId}`} className="w-full h-full pointer-events-none select-none" />
+            {/* YouTube IFrame Container - scaled to push YouTube native headers outside bounds */}
+            <div
+              id={`yt-player-${videoId}`}
+              className="w-full h-full scale-[1.12] pointer-events-none select-none origin-center"
+            />
 
             {/* Transparent Interactive Shield: intercepts clicks to toggle play/pause & double-click for fullscreen */}
             <div
@@ -599,6 +652,41 @@ export default function InteractivePlayer({
               className="absolute inset-0 z-10 cursor-pointer bg-transparent"
               title={isPlaying ? "Пауза (клик) / На весь экран (двойной клик)" : "Воспроизвести (клик) / На весь экран (двойной клик)"}
             />
+
+            {/* Embed Error Overlay (Codes 150 / 101 / 2 / 100) */}
+            {embedError && (
+              <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-6 text-center bg-zinc-950/95 backdrop-blur-md rounded-2xl pointer-events-auto animate-in fade-in duration-200">
+                <div className="w-14 h-14 rounded-full bg-red-950/50 border border-red-500/40 flex items-center justify-center mb-3 shadow-lg shadow-red-950/40">
+                  <AlertCircle className="w-7 h-7 text-[#E50914]" />
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-white mb-2">
+                  Воспроизведение ограничено правообладателем
+                </h3>
+                <p className="text-zinc-400 text-xs sm:text-sm max-w-md mb-5 leading-relaxed">
+                  Правообладатель ограничил просмотр этого видео внутри сторонних сайтов. Попробуйте следующее видео или откройте его напрямую на YouTube.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  {(onNextVideo || onBackToCatalog) && (
+                    <button
+                      onClick={onNextVideo || onBackToCatalog}
+                      className="px-5 py-2.5 rounded-full bg-[#E50914] hover:bg-[#b80710] text-white text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer shadow-lg shadow-red-950/40"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>Включить следующее видео</span>
+                    </button>
+                  )}
+                  <a
+                    href={`https://www.youtube.com/watch?v=${videoId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-5 py-2.5 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white text-xs sm:text-sm font-semibold flex items-center gap-2 border border-zinc-700 transition"
+                  >
+                    <span>Смотреть на YouTube</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
+                  </a>
+                </div>
+              </div>
+            )}
 
             {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER - above shield at z-30 */}
             <div
@@ -653,7 +741,7 @@ export default function InteractivePlayer({
 
             {/* HOVER TOOLTIP (COMPACT CARD OVER WORD) */}
             {hoveredWord && !pinnedWord && (
-              <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-40 bg-[#181818]/95 backdrop-blur-md border border-zinc-700/80 rounded-xl px-4 py-2.5 shadow-2xl flex items-center gap-3 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto">
+              <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-40 bg-[#181818]/95 backdrop-blur-md border border-zinc-700/80 rounded-xl px-4 py-2.5 shadow-2xl flex items-center gap-3 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto">
                 <div>
                   {/* Lemma / Initial form */}
                   {hoveredWord.lemma && (
@@ -680,7 +768,7 @@ export default function InteractivePlayer({
 
             {/* PINNED WORD CARD */}
             {pinnedWord && (
-              <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 bg-[#181818] border border-zinc-700 rounded-2xl p-4 sm:p-5 shadow-2xl max-w-md w-[92%] sm:w-auto flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
+              <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-50 bg-[#181818] border border-zinc-700 rounded-2xl p-4 sm:p-5 shadow-2xl max-w-md w-[92%] sm:w-auto flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     {pinnedWord.lemma && (
@@ -762,13 +850,17 @@ export default function InteractivePlayer({
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Controls Bar (Speed, Seek, Subtitle Settings, Fullscreen) - COMPLETELY HIDDEN in Fullscreen */}
-          {!isFullscreen && (
-            <div className="w-full flex items-center justify-between bg-zinc-900/90 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-zinc-800 shadow-2xl text-sm">
-              {/* Play & Seek */}
-              <div className="flex items-center gap-3">
+            {/* BOTTOM CONTROLS BAR INSIDE VIDEO CONTAINER - z-40 */}
+            <div
+              className={`absolute bottom-3 left-3 right-3 sm:left-4 sm:right-4 z-40 flex items-center justify-between bg-zinc-950/85 backdrop-blur-md px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-zinc-800/80 shadow-2xl text-sm pointer-events-auto transition-all duration-300 ${
+                isControlsHidden
+                  ? "translate-y-20 opacity-0 pointer-events-none"
+                  : "translate-y-0 opacity-100"
+              }`}
+            >
+              {/* Play & Seek -10s / +10s */}
+              <div className="flex items-center gap-2 sm:gap-3">
                 <button
                   onClick={handleTogglePlay}
                   className="w-8 h-8 rounded-full bg-white hover:bg-zinc-200 text-black flex items-center justify-center transition-all cursor-pointer shadow-md"
@@ -782,32 +874,34 @@ export default function InteractivePlayer({
                 </button>
 
                 <button
-                  onClick={() => handleSeekRelative(-5)}
-                  className="p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors bg-zinc-800/40 hover:bg-zinc-800"
-                  title="Назад на 5 секунд"
+                  onClick={() => handleSeekRelative(-10)}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs text-zinc-300 hover:text-white rounded-lg transition-colors bg-zinc-800/60 hover:bg-zinc-800 cursor-pointer"
+                  title="Назад на 10 секунд"
                 >
-                  <RotateCcw className="w-4 h-4" />
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span className="text-[10px] font-mono font-bold">-10s</span>
                 </button>
 
                 <button
-                  onClick={() => handleSeekRelative(5)}
-                  className="p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors bg-zinc-800/40 hover:bg-zinc-800"
-                  title="Вперед на 5 секунд"
+                  onClick={() => handleSeekRelative(10)}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs text-zinc-300 hover:text-white rounded-lg transition-colors bg-zinc-800/60 hover:bg-zinc-800 cursor-pointer"
+                  title="Вперед на 10 секунд"
                 >
-                  <RotateCw className="w-4 h-4" />
+                  <RotateCw className="w-3.5 h-3.5" />
+                  <span className="text-[10px] font-mono font-bold">+10s</span>
                 </button>
               </div>
 
-              {/* Speed & Subtitle Settings & Fullscreen */}
-              <div className="flex items-center gap-2 sm:gap-3">
-                {/* Speed Pills */}
-                <div className="flex items-center gap-1 text-xs text-zinc-400 bg-zinc-950/60 p-1 rounded-xl border border-zinc-800/80">
-                  <Gauge className="w-3.5 h-3.5 text-zinc-500 ml-1 hidden sm:inline" />
+              {/* Speed & Subtitle Settings & Fullscreen & Hide Button */}
+              <div className="flex items-center gap-1.5 sm:gap-2.5">
+                {/* Speed Selector */}
+                <div className="flex items-center gap-0.5 sm:gap-1 text-xs text-zinc-400 bg-zinc-900/80 p-0.5 sm:p-1 rounded-xl border border-zinc-800/80">
+                  <Gauge className="w-3.5 h-3.5 text-zinc-500 ml-1 hidden md:inline" />
                   {[0.75, 1, 1.25].map((rate) => (
                     <button
                       key={rate}
                       onClick={() => handleSpeedChange(rate)}
-                      className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
+                      className={`px-1.5 sm:px-2 py-0.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
                         playbackRate === rate
                           ? "bg-[#E50914] text-white shadow"
                           : "text-zinc-400 hover:text-white hover:bg-zinc-800"
@@ -818,112 +912,118 @@ export default function InteractivePlayer({
                   ))}
                 </div>
 
-                {/* Subtitle Settings Popover Trigger */}
+                {/* Subtitle Settings Trigger & Anchored Popover */}
                 <div className="relative">
                   <button
-                    onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all border ${
+                    ref={settingsButtonRef}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsSettingsOpen((prev) => !prev);
+                    }}
+                    className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all border cursor-pointer ${
                       isSettingsOpen
-                        ? "bg-zinc-800 text-white border-zinc-600"
-                        : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700"
+                        ? "bg-zinc-800 text-white border-zinc-600 shadow"
+                        : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700/80"
                     }`}
-                    title="Настройки отображения субтитров"
+                    title="Параметры субтитров"
                   >
                     <Sliders className="w-3.5 h-3.5 text-[#E50914]" />
                     <span className="hidden sm:inline">Субтитры</span>
                   </button>
 
                   {isSettingsOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm pointer-events-auto animate-in fade-in duration-150">
-                      <div className="w-80 max-w-full bg-zinc-950/95 border border-zinc-800 rounded-2xl p-5 shadow-2xl z-50 pointer-events-auto flex flex-col gap-4">
-                        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                          <div className="flex items-center gap-2 text-white font-bold text-sm">
-                            <Sliders className="w-4 h-4 text-[#E50914]" />
-                            <span>Параметры субтитров</span>
-                          </div>
-                          <button
-                            onClick={() => setIsSettingsOpen(false)}
-                            className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
+                    <div
+                      ref={settingsRef}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute bottom-full mb-3 right-0 z-50 w-72 sm:w-80 p-4 sm:p-5 rounded-2xl bg-zinc-950/95 border border-zinc-800 shadow-[0_0_30px_rgba(0,0,0,0.8)] backdrop-blur-xl pointer-events-auto flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-150"
+                    >
+                      <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                        <div className="flex items-center gap-2 text-white font-bold text-xs sm:text-sm">
+                          <Sliders className="w-4 h-4 text-[#E50914]" />
+                          <span>Параметры субтитров</span>
                         </div>
+                        <button
+                          onClick={() => setIsSettingsOpen(false)}
+                          className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
 
-                        {/* 1. Backdrop Opacity */}
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex justify-between text-xs text-zinc-300 font-semibold">
-                            <span>Перекрытие хардсабов</span>
-                            <span className="text-[#E50914] font-bold">
-                              {subtitleSettings.backdropOpacity}%
-                            </span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            step="5"
-                            value={subtitleSettings.backdropOpacity}
-                            onChange={(e) =>
-                              updateSubtitleSettings({ backdropOpacity: Number(e.target.value) })
-                            }
-                            className="w-full accent-[#E50914] cursor-pointer"
-                          />
+                      {/* 1. Backdrop Opacity */}
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex justify-between text-xs text-zinc-300 font-semibold">
+                          <span>Перекрытие хардсабов</span>
+                          <span className="text-[#E50914] font-bold">
+                            {subtitleSettings.backdropOpacity}%
+                          </span>
                         </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="5"
+                          value={subtitleSettings.backdropOpacity}
+                          onChange={(e) =>
+                            updateSubtitleSettings({ backdropOpacity: Number(e.target.value) })
+                          }
+                          className="w-full accent-[#E50914] cursor-pointer"
+                        />
+                      </div>
 
-                        {/* 2. Bottom Offset */}
-                        <div className="flex flex-col gap-1.5">
-                          <span className="text-xs text-zinc-300 font-semibold">Высота расположения</span>
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {[
-                              { label: "Низко", val: "bottom-4" },
-                              { label: "Стандарт", val: "bottom-10" },
-                              { label: "Выше титров", val: "bottom-20" },
-                            ].map((item) => (
-                              <button
-                                key={item.val}
-                                onClick={() =>
-                                  updateSubtitleSettings({
-                                    bottomOffset: item.val as SubtitleSettings["bottomOffset"],
-                                  })
-                                }
-                                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                  subtitleSettings.bottomOffset === item.val
-                                    ? "bg-white text-black font-extrabold shadow"
-                                    : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                                }`}
-                              >
-                                {item.label}
-                              </button>
-                            ))}
-                          </div>
+                      {/* 2. Bottom Offset */}
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-xs text-zinc-300 font-semibold">Высота расположения</span>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[
+                            { label: "Низко", val: "bottom-14" },
+                            { label: "Стандарт", val: "bottom-20" },
+                            { label: "Выше титров", val: "bottom-28" },
+                          ].map((item) => (
+                            <button
+                              key={item.val}
+                              onClick={() =>
+                                updateSubtitleSettings({
+                                  bottomOffset: item.val as SubtitleSettings["bottomOffset"],
+                                })
+                              }
+                              className={`py-1.5 px-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
+                                subtitleSettings.bottomOffset === item.val
+                                  ? "bg-white text-black font-extrabold shadow"
+                                  : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
                         </div>
+                      </div>
 
-                        {/* 3. Font Size: sm / md / lg */}
-                        <div className="flex flex-col gap-1.5">
-                          <span className="text-xs text-zinc-300 font-semibold">Размер шрифта</span>
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {[
-                              { label: "Обычный", val: "sm" },
-                              { label: "Крупный", val: "md" },
-                              { label: "Максимум", val: "lg" },
-                            ].map((item) => (
-                              <button
-                                key={item.val}
-                                onClick={() =>
-                                  updateSubtitleSettings({
-                                    fontSize: item.val as SubtitleFontSize,
-                                  })
-                                }
-                                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                  subtitleSettings.fontSize === item.val
-                                    ? "bg-white text-black font-extrabold shadow"
-                                    : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                                }`}
-                              >
-                                {item.label}
-                              </button>
-                            ))}
-                          </div>
+                      {/* 3. Font Size: sm / md / lg */}
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-xs text-zinc-300 font-semibold">Размер шрифта</span>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[
+                            { label: "Обычный", val: "sm" },
+                            { label: "Крупный", val: "md" },
+                            { label: "Максимум", val: "lg" },
+                          ].map((item) => (
+                            <button
+                              key={item.val}
+                              onClick={() =>
+                                updateSubtitleSettings({
+                                  fontSize: item.val as SubtitleFontSize,
+                                })
+                              }
+                              className={`py-1.5 px-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
+                                subtitleSettings.fontSize === item.val
+                                  ? "bg-white text-black font-extrabold shadow"
+                                  : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -933,14 +1033,34 @@ export default function InteractivePlayer({
                 {/* Fullscreen Toggle */}
                 <button
                   onClick={toggleFullscreen}
-                  className="p-2 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl transition-colors cursor-pointer"
+                  className="p-1.5 sm:p-2 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl transition-colors cursor-pointer"
                   title={isFullscreen ? "Выйти из полноэкранного режима" : "Полноэкранный режим"}
                 >
                   {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
                 </button>
+
+                {/* Hide Controls Button */}
+                <button
+                  onClick={() => setIsControlsHidden(true)}
+                  className="p-1.5 sm:p-2 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl transition-colors cursor-pointer"
+                  title="Скрыть панель управления"
+                >
+                  <EyeOff className="w-4 h-4" />
+                </button>
               </div>
             </div>
-          )}
+
+            {/* Floating Unhide Controls Button when hidden */}
+            {isControlsHidden && (
+              <button
+                onClick={() => setIsControlsHidden(false)}
+                className="absolute bottom-3 right-3 z-40 p-2 sm:p-2.5 rounded-full bg-zinc-950/80 hover:bg-zinc-900 text-zinc-400 hover:text-white border border-white/10 backdrop-blur-md shadow-2xl transition-all duration-200 cursor-pointer animate-in fade-in"
+                title="Показать панель управления"
+              >
+                <Eye className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* RIGHT: Vertical Transcript Dialogue List (Automatically hidden in Fullscreen) */}
