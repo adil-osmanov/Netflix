@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Play, 
   Search, 
@@ -10,9 +10,7 @@ import {
   Loader2, 
   Tv, 
   RotateCw,
-  Settings2,
-  Sparkles,
-  BookOpen
+  Settings2
 } from "lucide-react";
 import { 
   RECOMMENDED_YOUTUBE_VIDEOS, 
@@ -30,9 +28,9 @@ const DEFAULT_SUBSCRIPTIONS: SubscribedChannel[] = [
 ];
 
 /**
- * Helper to strictly filter out YouTube Shorts:
+ * 100% Strict YouTube Shorts Filter:
  * - /shorts/ in url or id
- * - #shorts, #short, shorts, #tiktok, #reel in title/description
+ * - #shorts, #short, shorts, Short, Shorts in title or description
  * - duration < 90 seconds
  */
 function isYouTubeShort(video: {
@@ -46,17 +44,16 @@ function isYouTubeShort(video: {
   const desc = (video.description || "").toLowerCase();
   const id = (video.id || "").toLowerCase();
 
+  if (id.includes("shorts") || id.includes("/shorts/")) {
+    return true;
+  }
+
+  // Keywords and hashtag patterns
   if (
-    id.includes("shorts") ||
-    title.includes("#shorts") ||
-    title.includes("#short") ||
-    title.includes("shorts") ||
-    title.includes("#tiktok") ||
-    title.includes("#reel") ||
-    desc.includes("#shorts") ||
-    desc.includes("#short") ||
-    desc.includes("#tiktok") ||
-    desc.includes("#reel")
+    /\b(shorts?|tiktok|reels?)\b/i.test(title) ||
+    /#(shorts?|tiktok|reels?)/i.test(title) ||
+    /\b(shorts?|tiktok|reels?)\b/i.test(desc) ||
+    /#(shorts?|tiktok|reels?)/i.test(desc)
   ) {
     return true;
   }
@@ -95,12 +92,14 @@ export default function YouTubeCatalogPage() {
   const [subscriptions, setSubscriptions] = useState<SubscribedChannel[]>(DEFAULT_SUBSCRIPTIONS);
   const [subVideos, setSubVideos] = useState<YouTubeRecommendedVideo[]>([]);
   const [isLoadingSubs, setIsLoadingSubs] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   // Manage Channels Modal
   const [isManageModalOpen, setIsManageModalOpen] = useState<boolean>(false);
 
-  // Pagination: how many cards to show initially
+  // Infinite Scroll Pagination
   const [visibleCount, setVisibleCount] = useState<number>(16);
+  const observerTargetRef = useRef<HTMLDivElement>(null);
 
   // Load subscriptions from localStorage
   useEffect(() => {
@@ -131,7 +130,6 @@ export default function YouTubeCatalogPage() {
     setIsLoadingSubs(true);
     const allVideos: YouTubeRecommendedVideo[] = [];
 
-    // Parallel fetching for high performance
     await Promise.all(
       currentSubs.map(async (sub) => {
         try {
@@ -167,6 +165,19 @@ export default function YouTubeCatalogPage() {
   useEffect(() => {
     loadSubFeeds(subscriptions);
   }, [subscriptions, loadSubFeeds]);
+
+  // Handle Refresh feed button
+  const handleRefreshFeed = async () => {
+    setVisibleCount(16);
+    setIsRefreshing(true);
+    if (activeTab === "subscriptions") {
+      setSubVideos([]);
+      await loadSubFeeds(subscriptions);
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+    setIsRefreshing(false);
+  };
 
   // Handle Search / Direct Watch
   const handleSearchOrWatch = (e: React.FormEvent) => {
@@ -230,6 +241,36 @@ export default function YouTubeCatalogPage() {
     activeTab === "recommendations" ? filteredRecommendations : filteredSubVideos;
 
   const displayedVideos = currentVideos.slice(0, visibleCount);
+
+  // Infinite Scroll Observer for both tabs
+  useEffect(() => {
+    const target = observerTargetRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          setVisibleCount((prev) => {
+            if (prev < currentVideos.length) {
+              return prev + 16;
+            }
+            return prev;
+          });
+        }
+      },
+      {
+        root: null,
+        rootMargin: "350px",
+        threshold: 0.1,
+      }
+    );
+
+    observer.observe(target);
+    return () => {
+      observer.disconnect();
+    };
+  }, [currentVideos.length]);
 
   return (
     <div className="min-h-screen bg-[#141414] text-white pb-24 px-4 md:px-12 pt-4">
@@ -319,36 +360,40 @@ export default function YouTubeCatalogPage() {
 
             {/* Refresh feed button */}
             <button
-              onClick={() => loadSubFeeds(subscriptions)}
-              disabled={isLoadingSubs}
+              onClick={handleRefreshFeed}
+              disabled={isLoadingSubs || isRefreshing}
               className="p-2.5 rounded-full bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white transition-all cursor-pointer disabled:opacity-50"
               title="Обновить ленту видео"
             >
               <RotateCw
-                className={`w-3.5 h-3.5 ${isLoadingSubs ? "animate-spin text-[#E50914]" : ""}`}
+                className={`w-3.5 h-3.5 ${
+                  isLoadingSubs || isRefreshing ? "animate-spin text-[#E50914]" : ""
+                }`}
               />
             </button>
           </div>
 
-          {/* Right: Channel Management & Add Channel */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsManageModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-xs font-semibold text-zinc-300 hover:text-white transition-all cursor-pointer"
-              title="Настроить немецкие каналы"
-            >
-              <Settings2 size={13} className="text-zinc-400" />
-              <span className="hidden sm:inline">Каналы ({subscriptions.length})</span>
-            </button>
+          {/* Right: Channel Management & Add Channel ONLY rendered on subscriptions tab */}
+          {activeTab === "subscriptions" && (
+            <div className="flex items-center gap-2 animate-in fade-in duration-200">
+              <button
+                onClick={() => setIsManageModalOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-xs font-semibold text-zinc-300 hover:text-white transition-all cursor-pointer"
+                title="Настроить немецкие каналы"
+              >
+                <Settings2 size={13} className="text-zinc-400" />
+                <span className="hidden sm:inline">Каналы ({subscriptions.length})</span>
+              </button>
 
-            <button
-              onClick={() => setIsManageModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#E50914] hover:bg-[#b80710] text-xs font-bold text-white transition-all shadow-md cursor-pointer active:scale-95"
-            >
-              <Plus size={14} />
-              <span>Добавить канал</span>
-            </button>
-          </div>
+              <button
+                onClick={() => setIsManageModalOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#E50914] hover:bg-[#b80710] text-xs font-bold text-white transition-all shadow-md cursor-pointer active:scale-95"
+              >
+                <Plus size={14} />
+                <span>+ Добавить канал</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -375,7 +420,7 @@ export default function YouTubeCatalogPage() {
             {activeTab === "subscriptions" && (
               <button
                 onClick={() => setIsManageModalOpen(true)}
-                className="mt-2 px-4 py-2 rounded-xl bg-[#E50914] text-white text-xs font-bold hover:bg-[#b80710] transition-colors"
+                className="mt-2 px-4 py-2 rounded-xl bg-[#E50914] text-white text-xs font-bold hover:bg-[#b80710] transition-colors cursor-pointer"
               >
                 Добавить немецкий YouTube-канал
               </button>
@@ -454,15 +499,13 @@ export default function YouTubeCatalogPage() {
               ))}
             </div>
 
-            {/* Pagination: Load More Button */}
+            {/* Invisible Infinite Scroll Trigger Target */}
             {currentVideos.length > visibleCount && (
-              <div className="flex justify-center pt-10">
-                <button
-                  onClick={() => setVisibleCount((prev) => prev + 16)}
-                  className="px-8 py-3 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 hover:border-zinc-500 text-sm font-bold text-zinc-200 hover:text-white transition-all shadow-xl cursor-pointer active:scale-95"
-                >
-                  Загрузить ещё (+{Math.min(16, currentVideos.length - visibleCount)})
-                </button>
+              <div
+                ref={observerTargetRef}
+                className="h-20 w-full flex items-center justify-center pointer-events-none mt-4"
+              >
+                <Loader2 className="w-6 h-6 animate-spin text-zinc-600" />
               </div>
             )}
           </>

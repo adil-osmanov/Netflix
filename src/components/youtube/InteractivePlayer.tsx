@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { TranscriptItem } from "@/types/youtube";
-import { useYouTube, SubtitleSettings } from "@/context/YouTubeContext";
+import { useYouTube, SubtitleSettings, SUBTITLE_FONT_SIZE_CLASSES, SubtitleFontSize } from "@/context/YouTubeContext";
 import { saveWordAction } from "@/app/youtube/actions";
 import { mergeTranscriptSentences, cleanGermanWord } from "@/lib/subtitleUtils";
 import { 
@@ -113,6 +113,42 @@ export default function InteractivePlayer({
     isSaved: boolean;
     isSaving: boolean;
   } | null>(null);
+
+  // Automatic channel and video resolution via oEmbed when metadata is missing
+  const [resolvedChannelTitle, setResolvedChannelTitle] = useState<string>(
+    channelTitle && channelTitle !== "YouTube" ? channelTitle : ""
+  );
+  const [resolvedVideoTitle, setResolvedVideoTitle] = useState<string>(
+    videoTitle && videoTitle !== "Пользовательское видео" ? videoTitle : ""
+  );
+
+  useEffect(() => {
+    if (channelTitle && channelTitle !== "YouTube") {
+      setResolvedChannelTitle(channelTitle);
+    }
+    if (videoTitle && videoTitle !== "Пользовательское видео") {
+      setResolvedVideoTitle(videoTitle);
+    }
+
+    if (
+      (!channelTitle || channelTitle === "YouTube" || !videoTitle || videoTitle === "Пользовательское видео") &&
+      videoId
+    ) {
+      fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data) {
+            if (data.author_name) {
+              setResolvedChannelTitle(data.author_name);
+            }
+            if (data.title && (!videoTitle || videoTitle === "Пользовательское видео")) {
+              setResolvedVideoTitle(data.title);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [videoId, channelTitle, videoTitle]);
 
   // 1. Fetch & Merge Subtitles into full sentences
   useEffect(() => {
@@ -293,6 +329,37 @@ export default function InteractivePlayer({
     } catch {}
   };
 
+  // Keyboard shortcuts (Space/K = Play/Pause, F = Fullscreen, Arrows = Seek)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+
+      if (e.key === "f" || e.key === "F" || e.key === "а" || e.key === "А") {
+        e.preventDefault();
+        toggleFullscreen();
+      } else if (e.key === " " || e.key === "k" || e.key === "K") {
+        e.preventDefault();
+        handleTogglePlay();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        handleSeekRelative(-5);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        handleSeekRelative(5);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isPlaying]);
+
   // Strict active subtitle calculation: start <= currentTime < start + duration
   const activeSubtitleIndex = transcript.findIndex(
     (item) => currentTime >= item.start && currentTime < (item.start + item.duration)
@@ -445,7 +512,7 @@ export default function InteractivePlayer({
         lemma: pinnedWord.lemma,
         translation: pinnedWord.translation,
         sentence: pinnedWord.context,
-        channel_title: channelTitle || "Общее",
+        channel_title: resolvedChannelTitle || channelTitle || "Общее",
         source: "youtube",
         video_id: videoId,
       });
@@ -501,13 +568,13 @@ export default function InteractivePlayer({
       {!isFullscreen && (
         <div className="flex items-center justify-between">
           <div>
-            {channelTitle && (
+            {(resolvedChannelTitle || channelTitle) && (
               <span className="text-[#E50914] text-xs font-bold uppercase tracking-wider block mb-0.5">
-                {channelTitle}
+                {resolvedChannelTitle || channelTitle}
               </span>
             )}
             <h1 className="text-base md:text-xl font-extrabold text-white tracking-tight line-clamp-1">
-              {videoTitle || "Немецкое видео с субтитрами"}
+              {resolvedVideoTitle || videoTitle || "Немецкое видео с субтитрами"}
             </h1>
           </div>
 
@@ -515,7 +582,7 @@ export default function InteractivePlayer({
             {onBackToCatalog && (
               <button
                 onClick={onBackToCatalog}
-                className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs md:text-sm font-medium transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs md:text-sm font-medium transition-colors cursor-pointer"
               >
                 ← Каталог
               </button>
@@ -536,13 +603,21 @@ export default function InteractivePlayer({
                 : "aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-zinc-800/80"
             } group`}
           >
-            {/* YouTube IFrame Container */}
-            <div id={`yt-player-${videoId}`} className="w-full h-full" />
+            {/* YouTube IFrame Container - pointer-events-none prevents YouTube native top/share/watermark overlays */}
+            <div id={`yt-player-${videoId}`} className="w-full h-full pointer-events-none" />
 
-            {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER */}
+            {/* Transparent Interactive Shield: intercepts clicks to toggle play/pause & double-click for fullscreen */}
+            <div
+              onClick={handleTogglePlay}
+              onDoubleClick={toggleFullscreen}
+              className="absolute inset-0 z-10 cursor-pointer bg-transparent"
+              title={isPlaying ? "Пауза (клик) / На весь экран (двойной клик)" : "Воспроизвести (клик) / На весь экран (двойной клик)"}
+            />
+
+            {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER - above shield at z-20 */}
             <div
               onMouseLeave={handleSubtitleContainerMouseLeave}
-              className={`absolute ${subtitleSettings.bottomOffset} left-1/2 -translate-x-1/2 z-30 w-11/12 max-w-3xl text-center pointer-events-auto transition-all duration-150`}
+              className={`absolute ${subtitleSettings.bottomOffset} left-1/2 -translate-x-1/2 z-20 w-11/12 max-w-3xl text-center pointer-events-auto transition-all duration-150`}
             >
               {/* Masking Plate for Hardsubs */}
               <div
@@ -564,7 +639,9 @@ export default function InteractivePlayer({
                   </div>
                 ) : activeSubtitle ? (
                   <div
-                    className="line-clamp-2 text-center leading-snug flex flex-wrap justify-center items-center gap-x-2 gap-y-1 text-base sm:text-lg md:text-xl lg:text-2xl font-semibold text-white tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]"
+                    className={`line-clamp-2 text-center leading-snug flex flex-wrap justify-center items-center gap-x-2 gap-y-1 font-semibold text-white tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] ${
+                      SUBTITLE_FONT_SIZE_CLASSES[subtitleSettings.fontSize as SubtitleFontSize] || SUBTITLE_FONT_SIZE_CLASSES.md
+                    }`}
                   >
                     {activeSubtitle.text.split(/\s+/).map((word, idx) => (
                       <span
@@ -700,187 +777,181 @@ export default function InteractivePlayer({
             )}
           </div>
 
-          {/* Controls Bar (Speed, Seek, Subtitle Settings, Fullscreen) */}
-          <div
-            className={`${
-              isFullscreen
-                ? `absolute bottom-6 left-1/2 -translate-x-1/2 z-40 w-11/12 max-w-2xl transition-all duration-300 ${
-                    isControlsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
-                  }`
-                : "w-full"
-            } flex items-center justify-between bg-zinc-900/90 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-zinc-800 shadow-2xl text-sm`}
-          >
-            {/* Play & Seek */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleTogglePlay}
-                className="w-8 h-8 rounded-full bg-white hover:bg-zinc-200 text-black flex items-center justify-center transition-all cursor-pointer shadow-md"
-                title={isPlaying ? "Пауза" : "Воспроизвести"}
-              >
-                {isPlaying ? (
-                  <Pause className="w-4 h-4 fill-current" />
-                ) : (
-                  <Play className="w-4 h-4 fill-current ml-0.5" />
-                )}
-              </button>
-
-              <button
-                onClick={() => handleSeekRelative(-5)}
-                className="p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors bg-zinc-800/40 hover:bg-zinc-800"
-                title="Назад на 5 секунд"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => handleSeekRelative(5)}
-                className="p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors bg-zinc-800/40 hover:bg-zinc-800"
-                title="Вперед на 5 секунд"
-              >
-                <RotateCw className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Speed & Subtitle Settings & Fullscreen */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Speed Pills */}
-              <div className="flex items-center gap-1 text-xs text-zinc-400 bg-zinc-950/60 p-1 rounded-xl border border-zinc-800/80">
-                <Gauge className="w-3.5 h-3.5 text-zinc-500 ml-1 hidden sm:inline" />
-                {[0.75, 1, 1.25].map((rate) => (
-                  <button
-                    key={rate}
-                    onClick={() => handleSpeedChange(rate)}
-                    className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
-                      playbackRate === rate
-                        ? "bg-[#E50914] text-white shadow"
-                        : "text-zinc-400 hover:text-white hover:bg-zinc-800"
-                    }`}
-                  >
-                    {rate}x
-                  </button>
-                ))}
-              </div>
-
-              {/* Subtitle Settings Popover Trigger */}
-              <div className="relative">
+          {/* Controls Bar (Speed, Seek, Subtitle Settings, Fullscreen) - COMPLETELY HIDDEN in Fullscreen */}
+          {!isFullscreen && (
+            <div className="w-full flex items-center justify-between bg-zinc-900/90 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-zinc-800 shadow-2xl text-sm">
+              {/* Play & Seek */}
+              <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all border ${
-                    isSettingsOpen
-                      ? "bg-zinc-800 text-white border-zinc-600"
-                      : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700"
-                  }`}
-                  title="Настройки отображения субтитров"
+                  onClick={handleTogglePlay}
+                  className="w-8 h-8 rounded-full bg-white hover:bg-zinc-200 text-black flex items-center justify-center transition-all cursor-pointer shadow-md"
+                  title={isPlaying ? "Пауза" : "Воспроизвести"}
                 >
-                  <Sliders className="w-3.5 h-3.5 text-[#E50914]" />
-                  <span className="hidden sm:inline">Субтитры</span>
+                  {isPlaying ? (
+                    <Pause className="w-4 h-4 fill-current" />
+                  ) : (
+                    <Play className="w-4 h-4 fill-current ml-0.5" />
+                  )}
                 </button>
 
-                {isSettingsOpen && (
-                  <div className="absolute right-0 bottom-full mb-3 w-80 bg-[#181818] border border-zinc-700/80 rounded-2xl p-5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-4">
-                    <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                      <div className="flex items-center gap-2 text-white font-bold text-sm">
-                        <Sliders className="w-4 h-4 text-[#E50914]" />
-                        <span>Параметры субтитров</span>
-                      </div>
-                      <button
-                        onClick={() => setIsSettingsOpen(false)}
-                        className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
+                <button
+                  onClick={() => handleSeekRelative(-5)}
+                  className="p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors bg-zinc-800/40 hover:bg-zinc-800"
+                  title="Назад на 5 секунд"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
 
-                    {/* 1. Backdrop Opacity */}
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex justify-between text-xs text-zinc-300 font-semibold">
-                        <span>Перекрытие хардсабов</span>
-                        <span className="text-[#E50914] font-bold">
-                          {subtitleSettings.backdropOpacity}%
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        step="5"
-                        value={subtitleSettings.backdropOpacity}
-                        onChange={(e) =>
-                          updateSubtitleSettings({ backdropOpacity: Number(e.target.value) })
-                        }
-                        className="w-full accent-[#E50914] cursor-pointer"
-                      />
-                    </div>
-
-                    {/* 2. Bottom Offset */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xs text-zinc-300 font-semibold">Высота расположения</span>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {[
-                          { label: "Низко", val: "bottom-4" },
-                          { label: "Стандарт", val: "bottom-10" },
-                          { label: "Выше титров", val: "bottom-20" },
-                        ].map((item) => (
-                          <button
-                            key={item.val}
-                            onClick={() =>
-                              updateSubtitleSettings({
-                                bottomOffset: item.val as SubtitleSettings["bottomOffset"],
-                              })
-                            }
-                            className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
-                              subtitleSettings.bottomOffset === item.val
-                                ? "bg-white text-black font-extrabold shadow"
-                                : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                            }`}
-                          >
-                            {item.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 3. Font Size */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xs text-zinc-300 font-semibold">Размер шрифта</span>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {[
-                          { label: "Обычный", val: "text-lg" },
-                          { label: "Крупный", val: "text-2xl" },
-                          { label: "Максимум", val: "text-3xl" },
-                        ].map((item) => (
-                          <button
-                            key={item.val}
-                            onClick={() =>
-                              updateSubtitleSettings({
-                                fontSize: item.val as SubtitleSettings["fontSize"],
-                              })
-                            }
-                            className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
-                              subtitleSettings.fontSize === item.val
-                                ? "bg-white text-black font-extrabold shadow"
-                                : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                            }`}
-                          >
-                            {item.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <button
+                  onClick={() => handleSeekRelative(5)}
+                  className="p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors bg-zinc-800/40 hover:bg-zinc-800"
+                  title="Вперед на 5 секунд"
+                >
+                  <RotateCw className="w-4 h-4" />
+                </button>
               </div>
 
-              {/* Fullscreen Toggle */}
-              <button
-                onClick={toggleFullscreen}
-                className="p-2 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl transition-colors"
-                title={isFullscreen ? "Выйти из полноэкранного режима" : "Полноэкранный режим"}
-              >
-                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-              </button>
+              {/* Speed & Subtitle Settings & Fullscreen */}
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Speed Pills */}
+                <div className="flex items-center gap-1 text-xs text-zinc-400 bg-zinc-950/60 p-1 rounded-xl border border-zinc-800/80">
+                  <Gauge className="w-3.5 h-3.5 text-zinc-500 ml-1 hidden sm:inline" />
+                  {[0.75, 1, 1.25].map((rate) => (
+                    <button
+                      key={rate}
+                      onClick={() => handleSpeedChange(rate)}
+                      className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
+                        playbackRate === rate
+                          ? "bg-[#E50914] text-white shadow"
+                          : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                      }`}
+                    >
+                      {rate}x
+                    </button>
+                  ))}
+                </div>
+
+                {/* Subtitle Settings Popover Trigger */}
+                <div className="relative">
+                  <button
+                    onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all border ${
+                      isSettingsOpen
+                        ? "bg-zinc-800 text-white border-zinc-600"
+                        : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700"
+                    }`}
+                    title="Настройки отображения субтитров"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-[#E50914]" />
+                    <span className="hidden sm:inline">Субтитры</span>
+                  </button>
+
+                  {isSettingsOpen && (
+                    <div className="absolute right-0 bottom-full mb-3 w-80 bg-[#181818] border border-zinc-700/80 rounded-2xl p-5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-4">
+                      <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                        <div className="flex items-center gap-2 text-white font-bold text-sm">
+                          <Sliders className="w-4 h-4 text-[#E50914]" />
+                          <span>Параметры субтитров</span>
+                        </div>
+                        <button
+                          onClick={() => setIsSettingsOpen(false)}
+                          className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* 1. Backdrop Opacity */}
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex justify-between text-xs text-zinc-300 font-semibold">
+                          <span>Перекрытие хардсабов</span>
+                          <span className="text-[#E50914] font-bold">
+                            {subtitleSettings.backdropOpacity}%
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="5"
+                          value={subtitleSettings.backdropOpacity}
+                          onChange={(e) =>
+                            updateSubtitleSettings({ backdropOpacity: Number(e.target.value) })
+                          }
+                          className="w-full accent-[#E50914] cursor-pointer"
+                        />
+                      </div>
+
+                      {/* 2. Bottom Offset */}
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-xs text-zinc-300 font-semibold">Высота расположения</span>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[
+                            { label: "Низко", val: "bottom-4" },
+                            { label: "Стандарт", val: "bottom-10" },
+                            { label: "Выше титров", val: "bottom-20" },
+                          ].map((item) => (
+                            <button
+                              key={item.val}
+                              onClick={() =>
+                                updateSubtitleSettings({
+                                  bottomOffset: item.val as SubtitleSettings["bottomOffset"],
+                                })
+                              }
+                              className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
+                                subtitleSettings.bottomOffset === item.val
+                                  ? "bg-white text-black font-extrabold shadow"
+                                  : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 3. Font Size: sm / md / lg */}
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-xs text-zinc-300 font-semibold">Размер шрифта</span>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[
+                            { label: "Обычный", val: "sm" },
+                            { label: "Крупный", val: "md" },
+                            { label: "Максимум", val: "lg" },
+                          ].map((item) => (
+                            <button
+                              key={item.val}
+                              onClick={() =>
+                                updateSubtitleSettings({
+                                  fontSize: item.val as SubtitleFontSize,
+                                })
+                              }
+                              className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
+                                subtitleSettings.fontSize === item.val
+                                  ? "bg-white text-black font-extrabold shadow"
+                                  : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Fullscreen Toggle */}
+                <button
+                  onClick={toggleFullscreen}
+                  className="p-2 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl transition-colors cursor-pointer"
+                  title={isFullscreen ? "Выйти из полноэкранного режима" : "Полноэкранный режим"}
+                >
+                  {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* RIGHT: Vertical Transcript Dialogue List (Automatically hidden in Fullscreen) */}

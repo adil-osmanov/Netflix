@@ -158,8 +158,8 @@ export default function VocabularyModal() {
           </div>
         </div>
 
-        {/* Deck Channel Tabs */}
-        {deckKeys.length > 1 && (
+        {/* Deck Channel Tabs: Dynamically generated from unique channels */}
+        {savedWords.length > 0 && (
           <div className="px-5 py-2.5 bg-zinc-900/40 border-b border-zinc-800 flex items-center gap-2 overflow-x-auto no-scrollbar">
             {deckKeys.map((deck) => (
               <button

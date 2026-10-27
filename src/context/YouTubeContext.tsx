@@ -4,16 +4,24 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { UserWord } from "@/types/youtube";
 import { getSavedWordsAction, deleteSavedWordAction } from "@/app/youtube/actions";
 
+export type SubtitleFontSize = "sm" | "md" | "lg";
+
+export const SUBTITLE_FONT_SIZE_CLASSES: Record<SubtitleFontSize, string> = {
+  sm: "text-sm sm:text-base md:text-lg",
+  md: "text-base sm:text-lg md:text-xl",
+  lg: "text-lg sm:text-xl md:text-2xl",
+};
+
 export interface SubtitleSettings {
   backdropOpacity: number; // 0 to 100
   bottomOffset: "bottom-4" | "bottom-10" | "bottom-20";
-  fontSize: "text-lg" | "text-2xl" | "text-3xl";
+  fontSize: SubtitleFontSize;
 }
 
 const DEFAULT_SETTINGS: SubtitleSettings = {
   backdropOpacity: 85,
   bottomOffset: "bottom-10",
-  fontSize: "text-2xl",
+  fontSize: "md",
 };
 
 interface YouTubeContextType {

@@ -52,6 +52,16 @@ export async function GET(request: NextRequest) {
         const published = publishedMatch ? publishedMatch[1].trim() : "";
         const desc = descMatch ? descMatch[1].trim() : "";
 
+        // Extract poster dimensions and duration if present in RSS
+        const widthMatch = entry.match(/width="(\d+)"/);
+        const heightMatch = entry.match(/height="(\d+)"/);
+        const thumbWidth = widthMatch ? parseInt(widthMatch[1], 10) : 0;
+        const thumbHeight = heightMatch ? parseInt(heightMatch[1], 10) : 0;
+        const isVertical = thumbWidth > 0 && thumbHeight > 0 && thumbHeight >= thumbWidth;
+
+        const durationMatch = entry.match(/duration="(\d+)"/) || entry.match(/seconds="(\d+)"/);
+        const durationSec = durationMatch ? parseInt(durationMatch[1], 10) : 0;
+
         return {
           id,
           title: cleanTitle,
@@ -61,20 +71,23 @@ export async function GET(request: NextRequest) {
           level: "B1" as const,
           thumbnailUrl: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
           description: desc ? desc.slice(0, 160) : `${channel} • Последние выпуски`,
+          isVertical,
+          durationSec,
         };
       })
       .filter((v) => {
         if (v.id.length !== 11) return false;
-        const text = (v.title + " " + v.description).toLowerCase();
-        // 100% strict Shorts filter
+        // Block vertical videos (Shorts aspect ratio)
+        if (v.isVertical) return false;
+        // Block videos under 90 seconds
+        if (v.durationSec > 0 && v.durationSec < 90) return false;
+
+        const fullText = (v.title + " " + v.description + " " + v.id).toLowerCase();
+        // 100% strict Shorts filter (keywords, tags, url paths)
         if (
-          text.includes("#shorts") ||
-          text.includes("#short") ||
-          text.includes("shorts") ||
-          text.includes("#tiktok") ||
-          text.includes("#reels") ||
-          text.includes("#reel") ||
-          v.id.includes("/shorts/")
+          /\b(shorts?|tiktok|reels?)\b/i.test(fullText) ||
+          /#(shorts?|tiktok|reels?)/i.test(fullText) ||
+          fullText.includes("/shorts/")
         ) {
           return false;
         }
