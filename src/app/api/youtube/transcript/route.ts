@@ -1,52 +1,105 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { YoutubeTranscript } from 'youtube-transcript';
-import { TranscriptItem } from '@/types/youtube';
+import { NextRequest, NextResponse } from "next/server";
+import { TranscriptItem } from "@/types/youtube";
 
 const YOUTUBE_ID_REGEX = /^[a-zA-Z0-9_-]{11}$/;
 
+const INNERTUBE_API_URL = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false";
+const INNERTUBE_CLIENT_VERSION = "20.10.38";
+const INNERTUBE_CONTEXT = {
+  client: {
+    clientName: "ANDROID",
+    clientVersion: INNERTUBE_CLIENT_VERSION,
+  },
+};
+const INNERTUBE_USER_AGENT = `com.google.android.youtube/${INNERTUBE_CLIENT_VERSION} (Linux; U; Android 14)`;
+
 const INVIDIOUS_INSTANCES = [
-  'https://yt.chocolatemoo53.com',
-  'https://inv.nadeko.net',
-  'https://invidious.nerdvpn.de',
-  'https://invidious.einfachzocken.eu',
-  'https://yewtu.be',
+  "https://yt.chocolatemoo53.com",
+  "https://inv.nadeko.net",
+  "https://invidious.nerdvpn.de",
+  "https://invidious.einfachzocken.eu",
+  "https://yewtu.be",
 ];
 
 const PIPED_INSTANCES = [
-  'https://pipedapi.kavin.rocks',
-  'https://api.piped.privacydev.net',
-  'https://piped-api.garudalinux.org',
-  'https://pipedapi.leptons.xyz',
-  'https://cf.pipedapi.kavin.rocks',
+  "https://pipedapi.kavin.rocks",
+  "https://api.piped.privacydev.net",
+  "https://piped-api.garudalinux.org",
+  "https://pipedapi.leptons.xyz",
 ];
 
 function cleanSubtitleText(rawText: string): string {
-  if (!rawText) return '';
+  if (!rawText) return "";
   return rawText
-    .replace(/<[^>]+>/g, '') // Strip WebVTT/HTML tags like <c>, <00:00:01.000>
-    .replace(/&amp;/g, '&')
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\n+/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\n+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Universal XML parser for YouTube timedtext formats:
+ * Format 3: <p t="7550" d="1015">Text</p> (milliseconds)
+ * Format 1: <text start="7.55" dur="1.01">Text</text> (seconds)
+ */
+function parseTimedTextXml(xml: string): TranscriptItem[] {
+  const items: TranscriptItem[] = [];
+
+  // 1. Try Format 3: <p t="startMs" d="durMs">
+  const pMatches = [...xml.matchAll(/<p t="(\d+)" d="(\d+)"[^>]*>([\s\S]*?)<\/p>/g)];
+  if (pMatches.length > 0) {
+    for (const match of pMatches) {
+      const startMs = parseInt(match[1], 10);
+      const durMs = parseInt(match[2], 10);
+      const clean = cleanSubtitleText(match[3]);
+      if (clean && durMs >= 200) {
+        items.push({
+          text: clean,
+          start: Number((startMs / 1000).toFixed(2)),
+          duration: Number((durMs / 1000).toFixed(2)),
+        });
+      }
+    }
+    return items;
+  }
+
+  // 2. Try Format 1: <text start="startSec" dur="durSec">
+  const textMatches = [...xml.matchAll(/<text start="([^"]*)" dur="([^"]*)"[^>]*>([\s\S]*?)<\/text>/g)];
+  if (textMatches.length > 0) {
+    for (const match of textMatches) {
+      const start = parseFloat(match[1]);
+      const dur = parseFloat(match[2]);
+      const clean = cleanSubtitleText(match[3]);
+      if (clean && dur >= 0.2) {
+        items.push({
+          text: clean,
+          start: Number(start.toFixed(2)),
+          duration: Number(dur.toFixed(2)),
+        });
+      }
+    }
+  }
+
+  return items;
 }
 
 /**
  * Universal parser for WebVTT and SRT caption formats
  */
 function parseVttOrSrtToTranscript(content: string): TranscriptItem[] {
-  const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const lines = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
   const items: TranscriptItem[] = [];
 
   let currentStart = 0;
   let currentEnd = 0;
   let currentTextLines: string[] = [];
 
-  // Match 00:00:01.960 --> 00:00:05.430 or 00:01.960 --> 00:05.430
   const timeRegex = /(?:(\d{2}):)?(\d{2}):(\d{2})[.,](\d{3})\s*-->\s*(?:(\d{2}):)?(\d{2}):(\d{2})[.,](\d{3})/;
 
   function parseTime(hours?: string, mins?: string, secs?: string, ms?: string): number {
@@ -59,9 +112,8 @@ function parseVttOrSrtToTranscript(content: string): TranscriptItem[] {
 
   function flush() {
     if (currentTextLines.length > 0 && currentEnd > currentStart) {
-      const clean = cleanSubtitleText(currentTextLines.join(' '));
+      const clean = cleanSubtitleText(currentTextLines.join(" "));
       const duration = Number((currentEnd - currentStart).toFixed(2));
-      // Filter out empty lines or micro-glitch artifacts (< 0.2s)
       if (clean && duration >= 0.2) {
         items.push({
           text: clean,
@@ -77,10 +129,10 @@ function parseVttOrSrtToTranscript(content: string): TranscriptItem[] {
     const trimmed = line.trim();
     if (
       !trimmed ||
-      trimmed === 'WEBVTT' ||
-      trimmed.startsWith('Kind:') ||
-      trimmed.startsWith('Language:') ||
-      trimmed.startsWith('NOTE')
+      trimmed === "WEBVTT" ||
+      trimmed.startsWith("Kind:") ||
+      trimmed.startsWith("Language:") ||
+      trimmed.startsWith("NOTE")
     ) {
       continue;
     }
@@ -100,75 +152,103 @@ function parseVttOrSrtToTranscript(content: string): TranscriptItem[] {
 }
 
 /**
- * 1. Primary Method: Multi-level search via youtube-transcript
+ * 1. Primary Method: Fetch strictly manual German subtitles via InnerTube API
  */
-async function fetchViaYoutubeTranscript(videoId: string): Promise<TranscriptItem[]> {
-  const languagePriorities = ['de', 'de-DE', 'de-AT', 'de-CH', undefined];
-  let lastError: any = null;
+async function fetchViaInnerTube(videoId: string): Promise<TranscriptItem[]> {
+  const resp = await fetch(INNERTUBE_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": INNERTUBE_USER_AGENT,
+    },
+    body: JSON.stringify({
+      context: INNERTUBE_CONTEXT,
+      videoId,
+    }),
+  });
 
-  for (const lang of languagePriorities) {
-    try {
-      console.log(`[Transcript API] Trying youtube-transcript for ${videoId} with lang: ${lang || 'default'}...`);
-      const rawItems = await YoutubeTranscript.fetchTranscript(
-        videoId,
-        lang ? { lang } : undefined
-      );
-
-      if (rawItems && rawItems.length > 0) {
-        console.log(`[Transcript API] Success with youtube-transcript (lang: ${lang || 'default'}), items: ${rawItems.length}`);
-        return rawItems
-          .map((item) => ({
-            text: cleanSubtitleText(item.text),
-            start: Number((item.offset / 1000).toFixed(2)),
-            duration: Number((item.duration / 1000).toFixed(2)),
-          }))
-          .filter((item) => item.text.length > 0);
-      }
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`[Transcript API] youtube-transcript (${lang || 'default'}) failed:`, err?.message || err);
-    }
+  if (!resp.ok) {
+    throw new Error(`InnerTube request failed (status: ${resp.status})`);
   }
 
-  throw lastError || new Error('No transcripts returned from youtube-transcript');
+  const data = await resp.json();
+  const captionTracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+
+  if (!Array.isArray(captionTracks) || captionTracks.length === 0) {
+    throw new Error("У этого видео нет субтитров на YouTube");
+  }
+
+  // Filter STRICTLY for manual German subtitles (reject kind === 'asr', vssId starting with a., and auto-generated)
+  const manualGermanTrack = captionTracks.find((track: any) => {
+    const isAsr =
+      track.kind === "asr" ||
+      (track.vssId && track.vssId.startsWith("a.")) ||
+      /auto-generated|automatisch/i.test(track.name?.runs?.[0]?.text || track.name?.simpleText || "");
+
+    if (isAsr) return false;
+
+    const langCode = (track.languageCode || "").toLowerCase();
+    const trackName = (track.name?.runs?.[0]?.text || track.name?.simpleText || "").toLowerCase();
+
+    return langCode.startsWith("de") || trackName.includes("deutsch") || trackName.includes("german");
+  });
+
+  if (!manualGermanTrack) {
+    const hasOnlyAsr = captionTracks.some((t: any) => t.kind === "asr" || t.vssId?.startsWith("a."));
+    if (hasOnlyAsr) {
+      throw new Error("ASR_ONLY: Доступны только автоматические субтитры. Требуются качественные ручные субтитры.");
+    }
+    throw new Error("Ручные немецкие субтитры не найдены");
+  }
+
+  const subRes = await fetch(manualGermanTrack.baseUrl, {
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+  });
+
+  if (!subRes.ok) {
+    throw new Error(`Failed to download subtitle XML (status: ${subRes.status})`);
+  }
+
+  const xmlText = await subRes.text();
+  const parsed = parseTimedTextXml(xmlText);
+
+  if (parsed.length === 0) {
+    throw new Error("Пустой файл субтитров");
+  }
+
+  return parsed;
 }
 
 /**
- * 2. Fallback: Public Invidious API
+ * 2. Fallback: Public Invidious API (Strictly manual German tracks)
  */
 async function fetchViaInvidious(videoId: string): Promise<TranscriptItem[]> {
   for (const base of INVIDIOUS_INSTANCES) {
     try {
-      console.log(`[Transcript API] Fallback: Trying Invidious (${base}) for ${videoId}...`);
       const res = await fetch(`${base}/api/v1/captions/${videoId}`, {
         signal: AbortSignal.timeout(4500),
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
       });
 
-      if (!res.ok) {
-        console.warn(`[Transcript API] Invidious instance ${base} returned status: ${res.status}`);
-        continue;
-      }
+      if (!res.ok) continue;
 
       const data = await res.json();
       if (!data.captions || !Array.isArray(data.captions) || data.captions.length === 0) {
         continue;
       }
 
-      // Prioritize German subtitle track
-      const track =
-        data.captions.find(
-          (c: any) =>
-            c.languageCode?.toLowerCase().startsWith('de') ||
-            c.label?.toLowerCase().includes('german') ||
-            c.label?.toLowerCase().includes('deutsch')
-        ) || data.captions[0];
+      // Filter STRICTLY for manual German subtitle track
+      const track = data.captions.find((c: any) => {
+        const isAsr = c.kind === "asr" || /auto/i.test(c.label || "");
+        if (isAsr) return false;
+        const lang = (c.languageCode || "").toLowerCase();
+        const label = (c.label || "").toLowerCase();
+        return lang.startsWith("de") || label.includes("german") || label.includes("deutsch");
+      });
 
       if (!track?.url) continue;
 
-      const fullUrl = track.url.startsWith('http') ? track.url : `${base}${track.url}`;
-      console.log(`[Transcript API] Downloading VTT from Invidious: ${fullUrl}`);
-
+      const fullUrl = track.url.startsWith("http") ? track.url : `${base}${track.url}`;
       const vttRes = await fetch(fullUrl, { signal: AbortSignal.timeout(4500) });
       if (!vttRes.ok) continue;
 
@@ -176,52 +256,41 @@ async function fetchViaInvidious(videoId: string): Promise<TranscriptItem[]> {
       const parsedItems = parseVttOrSrtToTranscript(vttText);
 
       if (parsedItems.length > 0) {
-        console.log(`[Transcript API] Successfully parsed ${parsedItems.length} subtitles from Invidious (${base})`);
         return parsedItems;
       }
-    } catch (err: any) {
-      console.warn(`[Transcript API] Invidious ${base} error:`, err?.message || err);
-    }
+    } catch {}
   }
 
-  throw new Error('All Invidious fallback instances failed');
+  throw new Error("Invidious fallback did not find manual German captions");
 }
 
 /**
- * 3. Fallback: Public Piped API
+ * 3. Fallback: Public Piped API (Strictly manual German tracks)
  */
 async function fetchViaPiped(videoId: string): Promise<TranscriptItem[]> {
   for (const base of PIPED_INSTANCES) {
     try {
-      console.log(`[Transcript API] Fallback: Trying Piped (${base}) for ${videoId}...`);
       const res = await fetch(`${base}/streams/${videoId}`, {
         signal: AbortSignal.timeout(4500),
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
       });
 
-      if (!res.ok) {
-        console.warn(`[Transcript API] Piped instance ${base} returned status: ${res.status}`);
-        continue;
-      }
+      if (!res.ok) continue;
 
       const data = await res.json();
       const subs = data.subtitles;
-      if (!subs || !Array.isArray(subs) || subs.length === 0) {
-        continue;
-      }
+      if (!subs || !Array.isArray(subs) || subs.length === 0) continue;
 
-      // Prioritize German subtitle track
-      const track =
-        subs.find(
-          (s: any) =>
-            s.code?.toLowerCase().startsWith('de') ||
-            s.name?.toLowerCase().includes('german') ||
-            s.name?.toLowerCase().includes('deutsch')
-        ) || subs[0];
+      const track = subs.find((s: any) => {
+        if (s.autoGenerated) return false;
+        if (/auto/i.test(s.name || "")) return false;
+        const code = (s.code || "").toLowerCase();
+        const name = (s.name || "").toLowerCase();
+        return code.startsWith("de") || name.includes("german") || name.includes("deutsch");
+      });
 
       if (!track?.url) continue;
 
-      console.log(`[Transcript API] Downloading subtitle from Piped: ${track.url}`);
       const subRes = await fetch(track.url, { signal: AbortSignal.timeout(4500) });
       if (!subRes.ok) continue;
 
@@ -229,66 +298,50 @@ async function fetchViaPiped(videoId: string): Promise<TranscriptItem[]> {
       const parsedItems = parseVttOrSrtToTranscript(subText);
 
       if (parsedItems.length > 0) {
-        console.log(`[Transcript API] Successfully parsed ${parsedItems.length} subtitles from Piped (${base})`);
         return parsedItems;
       }
-    } catch (err: any) {
-      console.warn(`[Transcript API] Piped ${base} error:`, err?.message || err);
-    }
+    } catch {}
   }
 
-  throw new Error('All Piped fallback instances failed');
+  throw new Error("Piped fallback did not find manual German captions");
 }
 
 /**
- * Main transcript orchestrator
+ * Main transcript orchestrator (STRICTLY MANUAL GERMAN SUBTITLES)
  */
 async function getTranscript(videoId: string): Promise<TranscriptItem[]> {
-  const errors: string[] = [];
-
-  // Step 1: Multi-level youtube-transcript
+  // Step 1: InnerTube API
   try {
-    return await fetchViaYoutubeTranscript(videoId);
+    return await fetchViaInnerTube(videoId);
   } catch (err: any) {
-    const msg = `Primary (youtube-transcript) failed: ${err?.message || err}`;
-    console.warn(msg);
-    errors.push(msg);
+    if (err?.message?.startsWith("ASR_ONLY")) {
+      throw err;
+    }
   }
 
   // Step 2: Fallback to Invidious
   try {
     return await fetchViaInvidious(videoId);
-  } catch (err: any) {
-    const msg = `Fallback 1 (Invidious) failed: ${err?.message || err}`;
-    console.warn(msg);
-    errors.push(msg);
-  }
+  } catch {}
 
   // Step 3: Fallback to Piped
   try {
     return await fetchViaPiped(videoId);
-  } catch (err: any) {
-    const msg = `Fallback 2 (Piped) failed: ${err?.message || err}`;
-    console.warn(msg);
-    errors.push(msg);
-  }
+  } catch {}
 
-  console.error(`[Transcript API] All methods exhausted for videoId: ${videoId}`, errors);
-  throw new Error(
-    `Субтитры недоступны для этого видео (или YouTube ограничил доступ). Подробности: ${errors.join('; ')}`
-  );
+  throw new Error("У этого видео нет доступных ручных немецких субтитров (автосабы ASR исключены).");
 }
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const videoId = searchParams.get('videoId')?.trim();
+    const videoId = searchParams.get("videoId")?.trim();
 
     if (!videoId || !YOUTUBE_ID_REGEX.test(videoId)) {
       return NextResponse.json(
         {
-          error: 'Некорректный идентификатор YouTube видео (должен состоять ровно из 11 символов).',
-          details: 'Invalid videoId parameter',
+          error: "Некорректный идентификатор YouTube видео (должен состоять ровно из 11 символов).",
+          details: "Invalid videoId parameter",
         },
         { status: 400 }
       );
@@ -300,28 +353,22 @@ export async function GET(request: NextRequest) {
       { transcript },
       {
         headers: {
-          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
         },
       }
     );
   } catch (error: any) {
-    const message = error?.message || 'Неизвестная ошибка';
-    console.error(`[Transcript API GET error]:`, message);
-
-    const isNotFound =
-      message.includes('Transcript is disabled') ||
-      message.includes('No transcripts') ||
-      message.includes('All Invidious') ||
-      message.includes('All Piped');
+    const message = error?.message || "Неизвестная ошибка";
+    const isAsrOnly = message.includes("ASR_ONLY") || message.includes("автоматические субтитры") || message.includes("ручных");
 
     return NextResponse.json(
       {
-        error: isNotFound
-          ? 'У этого видео нет доступных субтитров или YouTube заблокировал доступ к ним. Пожалуйста, попробуйте другое видео.'
-          : 'Не удалось получить субтитры из-за ошибки сети.',
+        error: isAsrOnly
+          ? "У этого видео доступны только автоматические субтитры (ASR). Раздел поддерживает только ролики с проверенными ручными субтитрами."
+          : "Субтитры недоступны для данного видео.",
         details: message,
       },
-      { status: isNotFound ? 404 : 500 }
+      { status: 404 }
     );
   }
 }
@@ -334,8 +381,8 @@ export async function POST(request: NextRequest) {
     if (!videoId || !YOUTUBE_ID_REGEX.test(videoId)) {
       return NextResponse.json(
         {
-          error: 'Некорректный идентификатор YouTube видео (должен состоять ровно из 11 символов).',
-          details: 'Invalid videoId parameter',
+          error: "Некорректный идентификатор YouTube видео (должен состоять ровно из 11 символов).",
+          details: "Invalid videoId parameter",
         },
         { status: 400 }
       );
@@ -344,15 +391,17 @@ export async function POST(request: NextRequest) {
     const transcript = await getTranscript(videoId);
     return NextResponse.json({ transcript });
   } catch (error: any) {
-    const message = error?.message || 'Неизвестная ошибка';
-    console.error(`[Transcript API POST error]:`, message);
+    const message = error?.message || "Неизвестная ошибка";
+    const isAsrOnly = message.includes("ASR_ONLY") || message.includes("автоматические субтитры") || message.includes("ручных");
 
     return NextResponse.json(
       {
-        error: 'Не удалось получить субтитры.',
+        error: isAsrOnly
+          ? "У этого видео доступны только автоматические субтитры (ASR). Требуются качественные ручные субтитры."
+          : "Не удалось получить субтитры.",
         details: message,
       },
-      { status: 500 }
+      { status: 404 }
     );
   }
 }

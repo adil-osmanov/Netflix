@@ -5,7 +5,14 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const channelIdsParam = searchParams.get("channelIds") || "";
-    const channelIds = channelIdsParam.split(",").map((s) => s.trim()).filter(Boolean);
+    const rawChannelIds = channelIdsParam.split(",").map((s) => s.trim()).filter(Boolean);
+    const channelIds = Array.from(
+      new Set(
+        rawChannelIds.map((id) =>
+          id === "UCBxb2fqPB4w05QKumFO7Smw" ? "UCbxb2fqe9oNgglAoYqsYOtQ" : id
+        )
+      )
+    );
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.max(1, Math.min(50, parseInt(searchParams.get("limit") || "16", 10)));
     const excludeParam = searchParams.get("exclude") || "";

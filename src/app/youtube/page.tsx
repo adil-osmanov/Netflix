@@ -18,6 +18,7 @@ import {
 } from "@/data/youtubeVideos";
 import { YouTubeRecommendedVideo } from "@/types/youtube";
 import InteractivePlayer from "@/components/youtube/InteractivePlayer";
+import VideoCard from "@/components/youtube/VideoCard";
 import ManageChannelsModal, { SubscribedChannel } from "@/components/youtube/ManageChannelsModal";
 
 const DEFAULT_SUBSCRIPTIONS: SubscribedChannel[] = [
@@ -155,11 +156,20 @@ export default function YouTubeCatalogPage() {
             });
             setRecPage(page);
           }
-          setHasMoreRec(data.hasMore !== false);
+          if (data.videos.length === 0 || data.videos.length < 16) {
+            setHasMoreRec(false);
+          } else {
+            setHasMoreRec(data.hasMore !== false);
+          }
+        } else {
+          setHasMoreRec(false);
         }
+      } else {
+        setHasMoreRec(false);
       }
     } catch (err) {
       console.warn("Failed to load recommendations:", err);
+      setHasMoreRec(false);
     } finally {
       setIsLoadingRec(false);
       setIsLoadingMoreRec(false);
@@ -199,11 +209,20 @@ export default function YouTubeCatalogPage() {
             });
             setSubPage(page);
           }
-          setHasMoreSub(data.hasMore === true);
+          if (data.videos.length === 0 || data.videos.length < 16) {
+            setHasMoreSub(false);
+          } else {
+            setHasMoreSub(data.hasMore === true);
+          }
+        } else {
+          setHasMoreSub(false);
         }
+      } else {
+        setHasMoreSub(false);
       }
     } catch (err) {
       console.warn("Failed to load subscriptions:", err);
+      setHasMoreSub(false);
     } finally {
       setIsLoadingSubs(false);
       setIsLoadingMoreSub(false);
@@ -269,8 +288,12 @@ export default function YouTubeCatalogPage() {
   const handleRefreshFeed = async () => {
     setIsRefreshing(true);
     if (activeTab === "subscriptions") {
+      setSubPage(1);
+      setHasMoreSub(true);
       await loadSubscriptions(subscriptions, 1, true);
     } else {
+      setRecPage(1);
+      setHasMoreRec(true);
       await loadRecommendations(1, true);
     }
     setIsRefreshing(false);
@@ -499,8 +522,9 @@ export default function YouTubeCatalogPage() {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
               {currentVideos.map((video) => (
-                <div
+                <VideoCard
                   key={video.id}
+                  video={video}
                   onClick={() =>
                     setActiveVideo({
                       id: video.id,
@@ -508,66 +532,7 @@ export default function YouTubeCatalogPage() {
                       channel: video.channel,
                     })
                   }
-                  className="group bg-zinc-900/50 hover:bg-zinc-800/60 border border-zinc-800/80 hover:border-zinc-700/80 rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl flex flex-col"
-                >
-                  {/* Thumbnail Container */}
-                  <div className="relative aspect-video w-full bg-zinc-950 overflow-hidden">
-                    <img
-                      src={video.thumbnailUrl}
-                      alt={video.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/20" />
-
-                    {/* Level Badge */}
-                    <div className="absolute top-2.5 left-2.5 z-10">
-                      <span
-                        className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded shadow ${
-                          video.level === "B2"
-                            ? "bg-amber-600 text-white"
-                            : video.level === "C1"
-                            ? "bg-purple-600 text-white"
-                            : "bg-emerald-600 text-white"
-                        }`}
-                      >
-                        {video.level || "B1"}
-                      </span>
-                    </div>
-
-                    {/* Duration Badge */}
-                    {video.durationText && (
-                      <div className="absolute bottom-2 right-2.5 z-10 bg-black/80 text-zinc-300 text-[10px] font-mono px-1.5 py-0.5 rounded border border-white/10">
-                        {video.durationText}
-                      </div>
-                    )}
-
-                    {/* Play Hover Overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
-                      <div className="w-11 h-11 rounded-full bg-[#E50914] text-white flex items-center justify-center shadow-xl transform scale-75 group-hover:scale-100 transition-transform">
-                        <Play className="w-4 h-4 fill-current ml-0.5" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Info */}
-                  <div className="p-3.5 flex flex-col flex-1 justify-between">
-                    <div>
-                      <span className="text-[#E50914] text-[10px] font-bold uppercase tracking-wider block mb-1">
-                        {video.channel}
-                      </span>
-                      <h3 className="text-xs sm:text-sm font-bold text-white line-clamp-2 leading-snug group-hover:text-red-400 transition-colors">
-                        {video.title}
-                      </h3>
-                    </div>
-
-                    {video.description && (
-                      <p className="text-zinc-500 text-[11px] line-clamp-2 mt-2 leading-relaxed">
-                        {video.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
+                />
               ))}
             </div>
 
@@ -589,7 +554,7 @@ export default function YouTubeCatalogPage() {
 
       {/* Modal Interactive Player */}
       {activeVideo && (
-        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col items-center justify-start overflow-y-auto p-2 sm:p-4 md:p-6 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col p-2 sm:p-4 overflow-hidden animate-in fade-in duration-150">
           <InteractivePlayer
             videoId={activeVideo.id}
             videoTitle={activeVideo.title}

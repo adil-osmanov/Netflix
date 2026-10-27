@@ -24,6 +24,7 @@ export interface UserWord {
   sentence?: string;
   context_sentence?: string;
   channel_title?: string;
+  video_title?: string;
   source: string;
   video_id: string;
   created_at: string;
