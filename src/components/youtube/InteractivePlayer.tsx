@@ -63,6 +63,36 @@ export default function InteractivePlayer({
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isControlsVisible, setIsControlsVisible] = useState<boolean>(true);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const resetControlsTimeout = useCallback(() => {
+    setIsControlsVisible(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    if (isFullscreen) {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setIsControlsVisible(false);
+      }, 2500);
+    }
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    if (!isFullscreen) {
+      setIsControlsVisible(true);
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    } else {
+      resetControlsTimeout();
+    }
+    return () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, [isFullscreen, resetControlsTimeout]);
 
   // Settings popover
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -143,10 +173,13 @@ export default function InteractivePlayer({
         videoId: videoId,
         playerVars: {
           autoplay: 1,
+          controls: 0,
+          disablekb: 1,
           modestbranding: 1,
           rel: 0,
           cc_load_policy: 0, // Disable native YouTube CC so our custom overlay is used
           iv_load_policy: 3,
+          fs: 0,
           playsinline: 1,
           enablejsapi: 1,
         },
@@ -457,9 +490,10 @@ export default function InteractivePlayer({
   return (
     <div
       ref={mainContainerRef}
+      onMouseMove={resetControlsTimeout}
       className={`relative w-full ${
         isFullscreen
-          ? "fixed inset-0 z-[1000] bg-black p-0 flex flex-col justify-center"
+          ? "fixed inset-0 z-[1000] bg-black p-0 flex flex-col justify-center select-none"
           : "max-w-7xl mx-auto px-2 sm:px-4 md:px-6 py-2 flex flex-col gap-4"
       }`}
     >
@@ -512,7 +546,7 @@ export default function InteractivePlayer({
             >
               {/* Masking Plate for Hardsubs */}
               <div
-                className="inline-block mx-auto rounded-xl px-5 sm:px-7 py-2.5 sm:py-3.5 shadow-2xl border border-white/10 transition-all duration-150"
+                className="max-w-3xl w-auto mx-auto px-5 py-2.5 rounded-xl bg-black/90 backdrop-blur-md border border-white/10 shadow-2xl transition-all duration-150"
                 style={{
                   backgroundColor: `rgba(0, 0, 0, ${bgOpacityValue})`,
                   backdropFilter: subtitleSettings.backdropOpacity > 20 ? "blur(4px)" : "none",
@@ -530,7 +564,7 @@ export default function InteractivePlayer({
                   </div>
                 ) : activeSubtitle ? (
                   <div
-                    className={`flex flex-wrap justify-center items-center gap-x-2 gap-y-1.5 font-bold tracking-wide text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] ${subtitleSettings.fontSize}`}
+                    className="line-clamp-2 text-center leading-snug flex flex-wrap justify-center items-center gap-x-2 gap-y-1 text-base sm:text-lg md:text-xl lg:text-2xl font-semibold text-white tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]"
                   >
                     {activeSubtitle.text.split(/\s+/).map((word, idx) => (
                       <span
@@ -667,7 +701,15 @@ export default function InteractivePlayer({
           </div>
 
           {/* Controls Bar (Speed, Seek, Subtitle Settings, Fullscreen) */}
-          <div className="flex items-center justify-between bg-zinc-900/80 px-4 py-2.5 rounded-2xl border border-zinc-800 text-sm">
+          <div
+            className={`${
+              isFullscreen
+                ? `absolute bottom-6 left-1/2 -translate-x-1/2 z-40 w-11/12 max-w-2xl transition-all duration-300 ${
+                    isControlsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
+                  }`
+                : "w-full"
+            } flex items-center justify-between bg-zinc-900/90 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-zinc-800 shadow-2xl text-sm`}
+          >
             {/* Play & Seek */}
             <div className="flex items-center gap-3">
               <button

@@ -8,6 +8,7 @@ export interface YouTubeRecommendedVideo {
   id: string;
   title: string;
   channel: string;
+  channelId?: string;
   level: 'A2' | 'B1' | 'B2' | 'C1';
   thumbnailUrl: string;
   description: string;
