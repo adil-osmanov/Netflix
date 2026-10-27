@@ -11,7 +11,7 @@ export interface YouTubeRecommendedVideo {
   channelId?: string;
   level: 'A2' | 'B1' | 'B2' | 'C1';
   thumbnailUrl: string;
-  description: string;
+  description?: string;
   durationText?: string;
   published?: string;
 }

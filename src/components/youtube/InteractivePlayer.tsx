@@ -201,22 +201,25 @@ export default function InteractivePlayer({
     async function loadTranscript() {
       try {
         const resp = await fetch(`/api/youtube/transcript?videoId=${videoId}`);
-        const data = await resp.json();
+        const data = await resp.json().catch(() => ({}));
 
         if (isCancelled) return;
 
-        if (resp.ok && data.transcript && data.transcript.length > 0) {
+        if (resp.ok && Array.isArray(data.transcript) && data.transcript.length > 0) {
           // Merge fragmented phrases into natural complete sentences
           const mergedSentences = mergeTranscriptSentences(data.transcript);
-          setTranscript(mergedSentences);
+          setTranscript(Array.isArray(mergedSentences) ? mergedSentences : []);
+          setTranscriptError(null);
         } else {
+          setTranscript([]);
           setTranscriptError(
-            data.error || "У этого видео нет доступных немецких субтитров."
+            data.error || "Субтитры недоступны для этого видео"
           );
         }
-      } catch (err: any) {
+      } catch {
         if (!isCancelled) {
-          setTranscriptError("Ошибка загрузки субтитров. Проверьте соединение с интернетом.");
+          setTranscript([]);
+          setTranscriptError("Субтитры недоступны для этого видео");
         }
       } finally {
         if (!isCancelled) {
@@ -258,16 +261,47 @@ export default function InteractivePlayer({
           modestbranding: 1,
           rel: 0,
           cc_load_policy: 0, // Disable native YouTube CC so our custom overlay is used
+          cc_lang_pref: "none",
           iv_load_policy: 3,
           fs: 0,
           playsinline: 1,
           enablejsapi: 1,
         },
         events: {
-          onReady: () => {},
+          onReady: (event: any) => {
+            // Guarantee native YouTube CC captions are completely turned off/unloaded
+            try {
+              const p = event?.target || playerRef.current;
+              if (p) {
+                if (typeof p.unloadModule === "function") {
+                  p.unloadModule("captions");
+                  p.unloadModule("cc");
+                }
+                if (typeof p.setOption === "function") {
+                  p.setOption("captions", "track", {});
+                  p.setOption("cc", "track", {});
+                  p.setOption("captions", "reload", false);
+                }
+              }
+            } catch {}
+          },
           onStateChange: (event: any) => {
             // 1 = PLAYING, 2 = PAUSED, 0 = ENDED
             setIsPlaying(event.data === 1);
+            if (event.data === 1) {
+              try {
+                const p = event?.target || playerRef.current;
+                if (p) {
+                  if (typeof p.unloadModule === "function") {
+                    p.unloadModule("captions");
+                    p.unloadModule("cc");
+                  }
+                  if (typeof p.setOption === "function") {
+                    p.setOption("captions", "track", {});
+                  }
+                }
+              } catch {}
+            }
           },
           onError: (event: any) => {
             // Codes 101/150: embedding blocked by copyright owner
@@ -411,11 +445,14 @@ export default function InteractivePlayer({
     };
   }, [isPlaying]);
 
+  // Safe transcript array guard
+  const safeTranscript = Array.isArray(transcript) ? transcript : [];
+
   // Strict active subtitle calculation: start <= currentTime < start + duration
-  const activeSubtitleIndex = transcript.findIndex(
-    (item) => currentTime >= item.start && currentTime < (item.start + item.duration)
+  const activeSubtitleIndex = safeTranscript.findIndex(
+    (item) => item && typeof item.start === "number" && currentTime >= item.start && currentTime < (item.start + (item.duration || 0))
   );
-  const activeSubtitle = activeSubtitleIndex !== -1 ? transcript[activeSubtitleIndex] : null;
+  const activeSubtitle = activeSubtitleIndex !== -1 ? safeTranscript[activeSubtitleIndex] : null;
 
   // Auto-scroll side list to active sentence
   useEffect(() => {
@@ -899,17 +936,16 @@ export default function InteractivePlayer({
                   <span>Загрузка субтитров...</span>
                 </div>
               ) : transcriptError ? (
-                <div className="flex items-center gap-2 text-amber-400 text-xs sm:text-sm py-1">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <span>{transcriptError}</span>
+                <div className="flex items-center justify-center gap-2 text-zinc-400 text-xs sm:text-sm py-1">
+                  <span>Субтитры недоступны для этого видео</span>
                 </div>
-              ) : activeSubtitle ? (
+              ) : activeSubtitle && typeof activeSubtitle.text === "string" ? (
                 <div
                   className={`line-clamp-2 text-center leading-snug flex flex-wrap justify-center items-center gap-x-2 gap-y-1 font-sans font-semibold text-white tracking-normal drop-shadow-md ${
                     SUBTITLE_FONT_SIZE_CLASSES[subtitleSettings.fontSize as SubtitleFontSize] || SUBTITLE_FONT_SIZE_CLASSES.md
                   }`}
                 >
-                  {activeSubtitle.text.split(/\s+/).map((word, idx) => (
+                  {activeSubtitle.text.split(/\s+/).filter(Boolean).map((word, idx) => (
                     <span
                       key={idx}
                       onMouseEnter={() => handleMouseEnterWord(word, activeSubtitle.text)}
@@ -1069,7 +1105,7 @@ export default function InteractivePlayer({
               <span>Субтитры диалога</span>
             </div>
             <span className="text-zinc-500 text-xs">
-              {transcript.length > 0 ? `${transcript.length} предложений` : ""}
+              {safeTranscript.length > 0 ? `${safeTranscript.length} предложений` : ""}
             </span>
           </div>
 
@@ -1077,13 +1113,13 @@ export default function InteractivePlayer({
             <div className="flex-1 flex items-center justify-center text-zinc-500 text-xs">
               Загрузка предложений...
             </div>
-          ) : transcript.length === 0 ? (
+          ) : safeTranscript.length === 0 ? (
             <div className="flex-1 flex items-center justify-center text-zinc-500 text-xs text-center px-4">
-              Субтитры недоступны
+              Субтитры недоступны для этого видео
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 no-scrollbar">
-              {transcript.map((item, index) => {
+              {safeTranscript.map((item, index) => {
                 const isActive = index === activeSubtitleIndex;
                 const minutes = Math.floor(item.start / 60);
                 const seconds = Math.floor(item.start % 60);

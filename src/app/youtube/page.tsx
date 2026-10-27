@@ -93,6 +93,9 @@ export default function YouTubeCatalogPage() {
   const [isManageModalOpen, setIsManageModalOpen] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
+  // Random seed generated on initial load (randomizes order on every F5 / Cmd+R)
+  const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1000000) + 1);
+
   // Infinite Scroll Trigger Ref
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
 
@@ -105,9 +108,7 @@ export default function YouTubeCatalogPage() {
   const [isLoadingMoreSub, setIsLoadingMoreSub] = useState<boolean>(false);
 
   // Recommendations state
-  const [recommendations, setRecommendations] = useState<YouTubeRecommendedVideo[]>(() => {
-    return [...RECOMMENDED_YOUTUBE_VIDEOS].sort(() => Math.random() - 0.5);
-  });
+  const [recommendations, setRecommendations] = useState<YouTubeRecommendedVideo[]>([]);
   const [recPage, setRecPage] = useState<number>(1);
   const [hasMoreRec, setHasMoreRec] = useState<boolean>(true);
   const [isLoadingRec, setIsLoadingRec] = useState<boolean>(false);
@@ -132,102 +133,105 @@ export default function YouTubeCatalogPage() {
     } catch {}
   };
 
-  // 1. Fetch Recommendations from API
-  const loadRecommendations = useCallback(async (page: number, isReset: boolean = false) => {
-    if (isReset) {
-      setIsLoadingRec(true);
-    } else {
-      setIsLoadingMoreRec(true);
-    }
-
-    try {
-      const resp = await fetch(`/api/youtube/recommendations?page=${page}&limit=16`);
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.videos && Array.isArray(data.videos)) {
-          if (isReset) {
-            setRecommendations(data.videos);
-            setRecPage(1);
-          } else {
-            setRecommendations((prev) => {
-              const existingIds = new Set(prev.map((v) => v.id));
-              const fresh = data.videos.filter((v: YouTubeRecommendedVideo) => !existingIds.has(v.id));
-              return [...prev, ...fresh];
-            });
-            setRecPage(page);
-          }
-          if (data.videos.length === 0 || data.videos.length < 16) {
-            setHasMoreRec(false);
-          } else {
-            setHasMoreRec(data.hasMore !== false);
-          }
-        } else {
-          setHasMoreRec(false);
-        }
+  // 1. Fetch Recommendations from unified infinite feed API
+  const loadRecommendations = useCallback(
+    async (page: number, isReset: boolean = false, customSeed?: number) => {
+      const currentSeed = customSeed !== undefined ? customSeed : seed;
+      if (isReset) {
+        setIsLoadingRec(true);
       } else {
-        setHasMoreRec(false);
+        setIsLoadingMoreRec(true);
       }
-    } catch (err) {
-      console.warn("Failed to load recommendations:", err);
-      setHasMoreRec(false);
-    } finally {
-      setIsLoadingRec(false);
-      setIsLoadingMoreRec(false);
-    }
-  }, []);
 
-  // 2. Fetch Subscriptions from API
-  const loadSubscriptions = useCallback(async (currentSubs: SubscribedChannel[], page: number, isReset: boolean = false) => {
-    if (currentSubs.length === 0) {
-      setSubVideos([]);
-      setHasMoreSub(false);
-      return;
-    }
-
-    if (isReset) {
-      setIsLoadingSubs(true);
-    } else {
-      setIsLoadingMoreSub(true);
-    }
-
-    try {
-      const channelIds = currentSubs.map((s) => s.id).join(",");
-      const resp = await fetch(
-        `/api/youtube/subscriptions?channelIds=${encodeURIComponent(channelIds)}&page=${page}&limit=16`
-      );
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.videos && Array.isArray(data.videos)) {
-          if (isReset) {
-            setSubVideos(data.videos);
-            setSubPage(1);
-          } else {
-            setSubVideos((prev) => {
-              const existingIds = new Set(prev.map((v) => v.id));
-              const fresh = data.videos.filter((v: YouTubeRecommendedVideo) => !existingIds.has(v.id));
-              return [...prev, ...fresh];
-            });
-            setSubPage(page);
+      try {
+        const resp = await fetch(
+          `/api/youtube/feed?tab=recommendations&page=${page}&limit=16&seed=${currentSeed}`
+        );
+        if (resp.ok) {
+          const data = await resp.json();
+          if (Array.isArray(data.videos) && data.videos.length > 0) {
+            if (isReset) {
+              setRecommendations(data.videos);
+              setRecPage(1);
+            } else {
+              setRecommendations((prev) => {
+                const existingIds = new Set(prev.map((v) => v.id));
+                const fresh = data.videos.filter(
+                  (v: YouTubeRecommendedVideo) => !existingIds.has(v.id)
+                );
+                return [...prev, ...(fresh.length > 0 ? fresh : data.videos)];
+              });
+              setRecPage(page);
+            }
+            setHasMoreRec(true);
           }
-          if (data.videos.length === 0 || data.videos.length < 16) {
-            setHasMoreSub(false);
-          } else {
-            setHasMoreSub(data.hasMore === true);
-          }
-        } else {
-          setHasMoreSub(false);
         }
-      } else {
+      } catch (err) {
+        console.warn("Failed to load recommendations:", err);
+      } finally {
+        setIsLoadingRec(false);
+        setIsLoadingMoreRec(false);
+      }
+    },
+    [seed]
+  );
+
+  // 2. Fetch Subscriptions from unified infinite feed API
+  const loadSubscriptions = useCallback(
+    async (
+      currentSubs: SubscribedChannel[],
+      page: number,
+      isReset: boolean = false,
+      customSeed?: number
+    ) => {
+      if (currentSubs.length === 0) {
+        setSubVideos([]);
         setHasMoreSub(false);
+        return;
       }
-    } catch (err) {
-      console.warn("Failed to load subscriptions:", err);
-      setHasMoreSub(false);
-    } finally {
-      setIsLoadingSubs(false);
-      setIsLoadingMoreSub(false);
-    }
-  }, []);
+      const currentSeed = customSeed !== undefined ? customSeed : seed;
+
+      if (isReset) {
+        setIsLoadingSubs(true);
+      } else {
+        setIsLoadingMoreSub(true);
+      }
+
+      try {
+        const channelIds = currentSubs.map((s) => s.id).join(",");
+        const resp = await fetch(
+          `/api/youtube/feed?tab=subscriptions&channelIds=${encodeURIComponent(
+            channelIds
+          )}&page=${page}&limit=16&seed=${currentSeed}`
+        );
+        if (resp.ok) {
+          const data = await resp.json();
+          if (Array.isArray(data.videos) && data.videos.length > 0) {
+            if (isReset) {
+              setSubVideos(data.videos);
+              setSubPage(1);
+            } else {
+              setSubVideos((prev) => {
+                const existingIds = new Set(prev.map((v) => v.id));
+                const fresh = data.videos.filter(
+                  (v: YouTubeRecommendedVideo) => !existingIds.has(v.id)
+                );
+                return [...prev, ...(fresh.length > 0 ? fresh : data.videos)];
+              });
+              setSubPage(page);
+            }
+            setHasMoreSub(true);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load subscriptions:", err);
+      } finally {
+        setIsLoadingSubs(false);
+        setIsLoadingMoreSub(false);
+      }
+    },
+    [seed]
+  );
 
   // Initial loads
   useEffect(() => {
@@ -238,7 +242,7 @@ export default function YouTubeCatalogPage() {
     loadSubscriptions(subscriptions, 1, true);
   }, [subscriptions, loadSubscriptions]);
 
-  // Infinite Scroll Observer for both tabs
+  // Infinite Scroll Observer for continuous endless pagination
   useEffect(() => {
     const target = loadMoreTriggerRef.current;
     if (!target) return;
@@ -260,7 +264,7 @@ export default function YouTubeCatalogPage() {
       },
       {
         root: null,
-        rootMargin: "400px",
+        rootMargin: "500px",
         threshold: 0.1,
       }
     );
@@ -284,17 +288,20 @@ export default function YouTubeCatalogPage() {
     subscriptions,
   ]);
 
-  // Handle Refresh feed button
+  // Handle Refresh feed button (<RotateCw />)
   const handleRefreshFeed = async () => {
     setIsRefreshing(true);
+    const newSeed = Date.now();
+    setSeed(newSeed);
+
     if (activeTab === "subscriptions") {
       setSubPage(1);
       setHasMoreSub(true);
-      await loadSubscriptions(subscriptions, 1, true);
+      await loadSubscriptions(subscriptions, 1, true, newSeed);
     } else {
       setRecPage(1);
       setHasMoreRec(true);
-      await loadRecommendations(1, true);
+      await loadRecommendations(1, true, newSeed);
     }
     setIsRefreshing(false);
   };
@@ -340,7 +347,7 @@ export default function YouTubeCatalogPage() {
           (v) =>
             v.title.toLowerCase().includes(query) ||
             v.channel.toLowerCase().includes(query) ||
-            v.description.toLowerCase().includes(query) ||
+            (v.description || "").toLowerCase().includes(query) ||
             v.level.toLowerCase().includes(query)
         )
       : recommendations
