@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Search, Menu, X } from "lucide-react";
 import { useState, useEffect, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, usePathname } from "next/navigation";
 import { useSearch } from "./SearchContext";
 
 function NavbarContent() {
@@ -13,7 +13,9 @@ function NavbarContent() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const currentCategory = searchParams.get('category') || 'all';
+  const isYouTube = pathname?.startsWith('/youtube');
   
   const { searchTerm, setSearchTerm } = useSearch();
 
@@ -31,9 +33,14 @@ function NavbarContent() {
 
   const linkBaseClass = "text-base md:text-[14px] whitespace-nowrap transition-colors cursor-pointer";
   const getLinkClass = (category: string) => 
-    currentCategory === category && !searchTerm
+    !isYouTube && currentCategory === category && !searchTerm
       ? `${linkBaseClass} text-white font-bold` 
       : `${linkBaseClass} text-[#e5e5e5] hover:text-[#b3b3b3] font-normal`;
+
+  const getYouTubeLinkClass = () =>
+    isYouTube && !searchTerm
+      ? `${linkBaseClass} text-white font-bold flex items-center gap-1.5`
+      : `${linkBaseClass} text-[#e5e5e5] hover:text-[#b3b3b3] font-normal flex items-center gap-1.5`;
 
   return (
     <nav className={`fixed top-0 left-0 w-full z-50 transition-colors duration-500 ${isScrolled || showSearch ? 'bg-[#141414]' : 'bg-gradient-to-b from-black/80 to-transparent'}`}>
@@ -56,6 +63,10 @@ function NavbarContent() {
             <Link href="/?category=movies" onClick={() => setSearchTerm('')} className={getLinkClass('movies')}>Фильмы</Link>
             <Link href="/?category=series" onClick={() => setSearchTerm('')} className={getLinkClass('series')}>Сериалы</Link>
             <Link href="/?category=cartoons" onClick={() => setSearchTerm('')} className={getLinkClass('cartoons')}>Мультфильмы</Link>
+            <Link href="/youtube" onClick={() => setSearchTerm('')} className={getYouTubeLinkClass()}>
+              <span>YouTube</span>
+              <span className="text-[10px] px-1.5 py-0.2 bg-[#E50914] text-white rounded font-bold uppercase tracking-wider">DE</span>
+            </Link>
           </div>
         </div>
 
@@ -99,6 +110,10 @@ function NavbarContent() {
           <Link href="/?category=movies" onClick={() => { setSearchTerm(''); setMobileMenuOpen(false); }} className={getLinkClass('movies')}>Фильмы</Link>
           <Link href="/?category=series" onClick={() => { setSearchTerm(''); setMobileMenuOpen(false); }} className={getLinkClass('series')}>Сериалы</Link>
           <Link href="/?category=cartoons" onClick={() => { setSearchTerm(''); setMobileMenuOpen(false); }} className={getLinkClass('cartoons')}>Мультфильмы</Link>
+          <Link href="/youtube" onClick={() => { setSearchTerm(''); setMobileMenuOpen(false); }} className={getYouTubeLinkClass()}>
+            <span>YouTube</span>
+            <span className="text-[10px] px-1.5 py-0.2 bg-[#E50914] text-white rounded font-bold uppercase tracking-wider">DE</span>
+          </Link>
         </div>
       </div>
     </nav>
