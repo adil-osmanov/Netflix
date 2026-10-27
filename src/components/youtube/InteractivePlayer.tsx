@@ -22,7 +22,8 @@ import {
   Gauge,
   Maximize,
   Minimize,
-  Loader2
+  Loader2,
+  ArrowLeft
 } from "lucide-react";
 
 declare global {
@@ -401,20 +402,15 @@ export default function InteractivePlayer({
     }
   };
 
-  // Hover-to-Translate with Debounced Auto-Pause/Resume
-  const handleMouseEnterWord = async (rawWord: string, sentence: string) => {
-    const cleaned = cleanGermanWord(rawWord);
-    if (!cleaned) return;
+  // Pause video when cursor enters anywhere inside the subtitle container
+  const handleSubtitleContainerMouseEnter = () => {
+    if (pinnedWord) return;
 
-    // Clear resume timer so moving between words does not resume video!
     if (resumeTimeoutRef.current) {
       clearTimeout(resumeTimeoutRef.current);
       resumeTimeoutRef.current = null;
     }
 
-    if (pinnedWord) return;
-
-    // Pause video if playing
     if (isPlaying) {
       wasPlayingRef.current = true;
       if (playerRef.current) {
@@ -423,34 +419,9 @@ export default function InteractivePlayer({
         } catch {}
       }
     }
-
-    setHoveredWord({ word: cleaned, lemma: cleaned, translation: "", isLoading: true });
-    const { lemma, translation } = await fetchContextualTranslation(cleaned, sentence);
-    setHoveredWord({ word: cleaned, lemma, translation, isLoading: false });
   };
 
-  const handleMouseLeaveWord = () => {
-    if (pinnedWord) return;
-
-    // Debounce resume by 180ms to allow smooth mouse movement between words
-    if (resumeTimeoutRef.current) {
-      clearTimeout(resumeTimeoutRef.current);
-    }
-
-    resumeTimeoutRef.current = setTimeout(() => {
-      setHoveredWord(null);
-      if (wasPlayingRef.current) {
-        wasPlayingRef.current = false;
-        if (playerRef.current) {
-          try {
-            playerRef.current.playVideo();
-          } catch {}
-        }
-      }
-    }, 180);
-  };
-
-  // Failsafe: When cursor completely leaves subtitle container
+  // Resume playback when cursor leaves the entire subtitle container (unless a word is pinned)
   const handleSubtitleContainerMouseLeave = () => {
     if (pinnedWord) return;
 
@@ -468,6 +439,20 @@ export default function InteractivePlayer({
         } catch {}
       }
     }
+  };
+
+  // Hover-to-Translate word
+  const handleMouseEnterWord = async (rawWord: string, sentence: string) => {
+    const cleaned = cleanGermanWord(rawWord);
+    if (!cleaned || pinnedWord) return;
+
+    setHoveredWord({ word: cleaned, lemma: cleaned, translation: "", isLoading: true });
+    const { lemma, translation } = await fetchContextualTranslation(cleaned, sentence);
+    setHoveredWord({ word: cleaned, lemma, translation, isLoading: false });
+  };
+
+  const handleMouseLeaveWord = () => {
+    // Left word; hover card cleared or updated on next word or container leave
   };
 
   // Click on word pins the card
@@ -566,7 +551,19 @@ export default function InteractivePlayer({
     >
       {/* Top Header / Video Meta (Hidden in Fullscreen) */}
       {!isFullscreen && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3">
+          {onBackToCatalog && (
+            <div className="flex items-center">
+              <button
+                onClick={onBackToCatalog}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-white/10 backdrop-blur-md transition cursor-pointer"
+              >
+                <ArrowLeft size={16} />
+                <span className="text-xs font-medium">Назад к списку</span>
+              </button>
+            </div>
+          )}
+
           <div>
             {(resolvedChannelTitle || channelTitle) && (
               <span className="text-[#E50914] text-xs font-bold uppercase tracking-wider block mb-0.5">
@@ -576,17 +573,6 @@ export default function InteractivePlayer({
             <h1 className="text-base md:text-xl font-extrabold text-white tracking-tight line-clamp-1">
               {resolvedVideoTitle || videoTitle || "Немецкое видео с субтитрами"}
             </h1>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {onBackToCatalog && (
-              <button
-                onClick={onBackToCatalog}
-                className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs md:text-sm font-medium transition-colors cursor-pointer"
-              >
-                ← Каталог
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -604,7 +590,7 @@ export default function InteractivePlayer({
             } group`}
           >
             {/* YouTube IFrame Container - pointer-events-none prevents YouTube native top/share/watermark overlays */}
-            <div id={`yt-player-${videoId}`} className="w-full h-full pointer-events-none" />
+            <div id={`yt-player-${videoId}`} className="w-full h-full pointer-events-none select-none" />
 
             {/* Transparent Interactive Shield: intercepts clicks to toggle play/pause & double-click for fullscreen */}
             <div
@@ -614,10 +600,11 @@ export default function InteractivePlayer({
               title={isPlaying ? "Пауза (клик) / На весь экран (двойной клик)" : "Воспроизвести (клик) / На весь экран (двойной клик)"}
             />
 
-            {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER - above shield at z-20 */}
+            {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER - above shield at z-30 */}
             <div
+              onMouseEnter={handleSubtitleContainerMouseEnter}
               onMouseLeave={handleSubtitleContainerMouseLeave}
-              className={`absolute ${subtitleSettings.bottomOffset} left-1/2 -translate-x-1/2 z-20 w-11/12 max-w-3xl text-center pointer-events-auto transition-all duration-150`}
+              className={`absolute ${subtitleSettings.bottomOffset} left-1/2 -translate-x-1/2 z-30 w-11/12 max-w-3xl text-center pointer-events-auto transition-all duration-150`}
             >
               {/* Masking Plate for Hardsubs */}
               <div
@@ -847,94 +834,96 @@ export default function InteractivePlayer({
                   </button>
 
                   {isSettingsOpen && (
-                    <div className="absolute right-0 bottom-full mb-3 w-80 bg-[#181818] border border-zinc-700/80 rounded-2xl p-5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-4">
-                      <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                        <div className="flex items-center gap-2 text-white font-bold text-sm">
-                          <Sliders className="w-4 h-4 text-[#E50914]" />
-                          <span>Параметры субтитров</span>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm pointer-events-auto animate-in fade-in duration-150">
+                      <div className="w-80 max-w-full bg-zinc-950/95 border border-zinc-800 rounded-2xl p-5 shadow-2xl z-50 pointer-events-auto flex flex-col gap-4">
+                        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                          <div className="flex items-center gap-2 text-white font-bold text-sm">
+                            <Sliders className="w-4 h-4 text-[#E50914]" />
+                            <span>Параметры субтитров</span>
+                          </div>
+                          <button
+                            onClick={() => setIsSettingsOpen(false)}
+                            className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => setIsSettingsOpen(false)}
-                          className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
 
-                      {/* 1. Backdrop Opacity */}
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex justify-between text-xs text-zinc-300 font-semibold">
-                          <span>Перекрытие хардсабов</span>
-                          <span className="text-[#E50914] font-bold">
-                            {subtitleSettings.backdropOpacity}%
-                          </span>
+                        {/* 1. Backdrop Opacity */}
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex justify-between text-xs text-zinc-300 font-semibold">
+                            <span>Перекрытие хардсабов</span>
+                            <span className="text-[#E50914] font-bold">
+                              {subtitleSettings.backdropOpacity}%
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="5"
+                            value={subtitleSettings.backdropOpacity}
+                            onChange={(e) =>
+                              updateSubtitleSettings({ backdropOpacity: Number(e.target.value) })
+                            }
+                            className="w-full accent-[#E50914] cursor-pointer"
+                          />
                         </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="5"
-                          value={subtitleSettings.backdropOpacity}
-                          onChange={(e) =>
-                            updateSubtitleSettings({ backdropOpacity: Number(e.target.value) })
-                          }
-                          className="w-full accent-[#E50914] cursor-pointer"
-                        />
-                      </div>
 
-                      {/* 2. Bottom Offset */}
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-xs text-zinc-300 font-semibold">Высота расположения</span>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          {[
-                            { label: "Низко", val: "bottom-4" },
-                            { label: "Стандарт", val: "bottom-10" },
-                            { label: "Выше титров", val: "bottom-20" },
-                          ].map((item) => (
-                            <button
-                              key={item.val}
-                              onClick={() =>
-                                updateSubtitleSettings({
-                                  bottomOffset: item.val as SubtitleSettings["bottomOffset"],
-                                })
-                              }
-                              className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
-                                subtitleSettings.bottomOffset === item.val
-                                  ? "bg-white text-black font-extrabold shadow"
-                                  : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                              }`}
-                            >
-                              {item.label}
-                            </button>
-                          ))}
+                        {/* 2. Bottom Offset */}
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-xs text-zinc-300 font-semibold">Высота расположения</span>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {[
+                              { label: "Низко", val: "bottom-4" },
+                              { label: "Стандарт", val: "bottom-10" },
+                              { label: "Выше титров", val: "bottom-20" },
+                            ].map((item) => (
+                              <button
+                                key={item.val}
+                                onClick={() =>
+                                  updateSubtitleSettings({
+                                    bottomOffset: item.val as SubtitleSettings["bottomOffset"],
+                                  })
+                                }
+                                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                  subtitleSettings.bottomOffset === item.val
+                                    ? "bg-white text-black font-extrabold shadow"
+                                    : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                                }`}
+                              >
+                                {item.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* 3. Font Size: sm / md / lg */}
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-xs text-zinc-300 font-semibold">Размер шрифта</span>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          {[
-                            { label: "Обычный", val: "sm" },
-                            { label: "Крупный", val: "md" },
-                            { label: "Максимум", val: "lg" },
-                          ].map((item) => (
-                            <button
-                              key={item.val}
-                              onClick={() =>
-                                updateSubtitleSettings({
-                                  fontSize: item.val as SubtitleFontSize,
-                                })
-                              }
-                              className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
-                                subtitleSettings.fontSize === item.val
-                                  ? "bg-white text-black font-extrabold shadow"
-                                  : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                              }`}
-                            >
-                              {item.label}
-                            </button>
-                          ))}
+                        {/* 3. Font Size: sm / md / lg */}
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-xs text-zinc-300 font-semibold">Размер шрифта</span>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {[
+                              { label: "Обычный", val: "sm" },
+                              { label: "Крупный", val: "md" },
+                              { label: "Максимум", val: "lg" },
+                            ].map((item) => (
+                              <button
+                                key={item.val}
+                                onClick={() =>
+                                  updateSubtitleSettings({
+                                    fontSize: item.val as SubtitleFontSize,
+                                  })
+                                }
+                                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                  subtitleSettings.fontSize === item.val
+                                    ? "bg-white text-black font-extrabold shadow"
+                                    : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                                }`}
+                              >
+                                {item.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>

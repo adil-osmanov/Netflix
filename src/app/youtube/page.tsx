@@ -166,7 +166,12 @@ export default function YouTubeCatalogPage() {
     loadSubFeeds(subscriptions);
   }, [subscriptions, loadSubFeeds]);
 
-  // Handle Refresh feed button
+  // Recommendations state with verified B1-B2 pool
+  const [recommendations, setRecommendations] = useState<YouTubeRecommendedVideo[]>(() => {
+    return [...RECOMMENDED_YOUTUBE_VIDEOS].sort(() => Math.random() - 0.5);
+  });
+
+  // Handle Refresh feed button (smoothly updates state without full page reload)
   const handleRefreshFeed = async () => {
     setVisibleCount(16);
     setIsRefreshing(true);
@@ -174,7 +179,9 @@ export default function YouTubeCatalogPage() {
       setSubVideos([]);
       await loadSubFeeds(subscriptions);
     } else {
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      // Pick a fresh randomized selection from verified B1-B2 channel pool
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      setRecommendations([...RECOMMENDED_YOUTUBE_VIDEOS].sort(() => Math.random() - 0.5));
     }
     setIsRefreshing(false);
   };
@@ -217,14 +224,14 @@ export default function YouTubeCatalogPage() {
 
   const filteredRecommendations = (
     isSearchQuery
-      ? RECOMMENDED_YOUTUBE_VIDEOS.filter(
+      ? recommendations.filter(
           (v) =>
             v.title.toLowerCase().includes(query) ||
             v.channel.toLowerCase().includes(query) ||
             v.description.toLowerCase().includes(query) ||
             v.level.toLowerCase().includes(query)
         )
-      : RECOMMENDED_YOUTUBE_VIDEOS
+      : recommendations
   ).filter((v) => !isYouTubeShort(v));
 
   const filteredSubVideos = (
@@ -387,10 +394,10 @@ export default function YouTubeCatalogPage() {
 
               <button
                 onClick={() => setIsManageModalOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#E50914] hover:bg-[#b80710] text-xs font-bold text-white transition-all shadow-md cursor-pointer active:scale-95"
+                className="flex items-center px-3.5 py-2 rounded-full bg-[#E50914] hover:bg-[#b80710] text-xs font-bold text-white transition-all shadow-md cursor-pointer active:scale-95"
               >
-                <Plus size={14} />
-                <span>+ Добавить канал</span>
+                <Plus size={14} className="mr-1.5" />
+                <span>Добавить канал</span>
               </button>
             </div>
           )}
@@ -515,16 +522,6 @@ export default function YouTubeCatalogPage() {
       {/* Modal Interactive Player */}
       {activeVideo && (
         <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col items-center justify-start overflow-y-auto p-2 sm:p-4 md:p-6 animate-in fade-in duration-150">
-          <div className="w-full max-w-7xl flex justify-end mb-2">
-            <button
-              onClick={() => setActiveVideo(null)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-              <span>Закрыть плеер</span>
-            </button>
-          </div>
-
           <InteractivePlayer
             videoId={activeVideo.id}
             videoTitle={activeVideo.title}

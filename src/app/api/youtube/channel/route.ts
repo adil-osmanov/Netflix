@@ -12,13 +12,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
-    const resp = await fetch(rssUrl, {
+    // YouTube UULF (Uploads - Long Form) playlist:
+    // If channelId starts with UC..., replacing UC with UULF loads YouTube's dedicated Longform playlist,
+    // which 100% excludes Shorts at the source!
+    let rssUrl = channelId.startsWith("UC")
+      ? `https://www.youtube.com/feeds/videos.xml?playlist_id=UULF${channelId.slice(2)}`
+      : `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
+
+    let resp = await fetch(rssUrl, {
       next: { revalidate: 1800 }, // Cache feed for 30 minutes
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
       },
     });
+
+    // If UULF playlist returned not ok, fallback to standard channel_id feed
+    if (!resp.ok && channelId.startsWith("UC")) {
+      rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
+      resp = await fetch(rssUrl, {
+        next: { revalidate: 1800 },
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      });
+    }
 
     if (!resp.ok) {
       return NextResponse.json(
