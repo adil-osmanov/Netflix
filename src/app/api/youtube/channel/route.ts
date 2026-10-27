@@ -58,7 +58,14 @@ export async function GET(request: NextRequest) {
         thumbnailUrl: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
         description: `${channel} • Последние выпуски`,
       };
-    }).filter((v) => v.id.length === 11);
+    }).filter((v) => {
+      if (v.id.length !== 11) return false;
+      const t = v.title.toLowerCase();
+      if (t.includes('#shorts') || t.includes('#short') || t.includes('shorts') || t.includes('#tiktok')) {
+        return false;
+      }
+      return true;
+    });
 
     return NextResponse.json(
       { channelId, videos },

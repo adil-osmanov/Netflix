@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { TranscriptItem } from "@/types/youtube";
 import { useYouTube, SubtitleSettings } from "@/context/YouTubeContext";
 import { saveWordAction } from "@/app/youtube/actions";
+import { mergeTranscriptSentences, cleanGermanWord } from "@/lib/subtitleUtils";
 import { 
   Play, 
   Pause, 
@@ -19,8 +20,8 @@ import {
   Bookmark,
   Sparkles,
   Gauge,
-  Layers,
-  ChevronRight,
+  Maximize,
+  Minimize,
   Loader2
 } from "lucide-react";
 
@@ -46,9 +47,12 @@ export default function InteractivePlayer({
 }: InteractivePlayerProps) {
   const { subtitleSettings, updateSubtitleSettings, refreshSavedWords } = useYouTube();
 
+  const mainContainerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
   const wasPlayingRef = useRef<boolean>(false);
-  const translationCacheRef = useRef<Map<string, string>>(new Map());
+  const resumeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const translationCacheRef = useRef<Map<string, { lemma: string; translation: string }>>(new Map());
+  const activeSideItemRef = useRef<HTMLDivElement>(null);
 
   // Subtitles & Player state
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
@@ -58,27 +62,29 @@ export default function InteractivePlayer({
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
-  // UI state
-  const [isTranscriptDrawerOpen, setIsTranscriptDrawerOpen] = useState<boolean>(false);
+  // Settings popover
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
-  // Hover-to-Translate & Pinned Word state
+  // Hover & Pinned Word state
   const [hoveredWord, setHoveredWord] = useState<{
     word: string;
+    lemma: string;
     translation: string;
     isLoading: boolean;
   } | null>(null);
 
   const [pinnedWord, setPinnedWord] = useState<{
     word: string;
+    lemma: string;
     translation: string;
     context: string;
     isSaved: boolean;
     isSaving: boolean;
   } | null>(null);
 
-  // 1. Fetch Subtitles from our API route
+  // 1. Fetch & Merge Subtitles into full sentences
   useEffect(() => {
     let isCancelled = false;
     setIsLoadingTranscript(true);
@@ -92,7 +98,9 @@ export default function InteractivePlayer({
         if (isCancelled) return;
 
         if (resp.ok && data.transcript && data.transcript.length > 0) {
-          setTranscript(data.transcript);
+          // Merge fragmented phrases into natural complete sentences
+          const mergedSentences = mergeTranscriptSentences(data.transcript);
+          setTranscript(mergedSentences);
         } else {
           setTranscriptError(
             data.error || "У этого видео нет доступных немецких субтитров."
@@ -118,7 +126,7 @@ export default function InteractivePlayer({
     };
   }, [videoId]);
 
-  // 2. Initialize YouTube IFrame API
+  // 2. Initialize YouTube IFrame API & 50ms High-Frequency Sync
   useEffect(() => {
     let timer: NodeJS.Timeout;
 
@@ -171,7 +179,7 @@ export default function InteractivePlayer({
         };
       }
 
-      // Sync currentTime every 100ms
+      // High-Frequency 50ms interval to eliminate subtitle desync
       timer = setInterval(() => {
         if (
           playerRef.current &&
@@ -182,7 +190,7 @@ export default function InteractivePlayer({
             setCurrentTime(time);
           } catch {}
         }
-      }, 100);
+      }, 50);
     }
 
     return () => {
@@ -194,6 +202,27 @@ export default function InteractivePlayer({
       }
     };
   }, [videoId]);
+
+  // 3. Fullscreen change listener
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!mainContainerRef.current) return;
+    if (!document.fullscreenElement) {
+      mainContainerRef.current.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  };
 
   // Player Controls
   const handleTogglePlay = () => {
@@ -231,42 +260,61 @@ export default function InteractivePlayer({
     } catch {}
   };
 
-  // Find active subtitle item with +0.3s tolerance to eliminate flickering
+  // Strict active subtitle calculation: start <= currentTime < start + duration
   const activeSubtitleIndex = transcript.findIndex(
-    (item) => currentTime >= item.start && currentTime <= item.start + item.duration + 0.3
+    (item) => currentTime >= item.start && currentTime < (item.start + item.duration)
   );
   const activeSubtitle = activeSubtitleIndex !== -1 ? transcript[activeSubtitleIndex] : null;
 
-  // Clean word helper
-  const cleanWord = (raw: string): string => {
-    return raw.replace(/^[\s.,/#!$%"?^&*;:{}=\-_`~()«»„“”'’–—]+|[\s.,/#!$%"?^&*;:{}=\-_`~()«»„“”'’–—]+$/g, "");
-  };
-
-  // Translate word helper with caching
-  const translateWord = async (word: string): Promise<string> => {
-    if (translationCacheRef.current.has(word.toLowerCase())) {
-      return translationCacheRef.current.get(word.toLowerCase())!;
+  // Auto-scroll side list to active sentence
+  useEffect(() => {
+    if (activeSideItemRef.current && !isFullscreen) {
+      activeSideItemRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+  }, [activeSubtitleIndex, isFullscreen]);
+
+  // Fetch translation & lemma with in-memory caching
+  const fetchContextualTranslation = async (
+    word: string,
+    sentence: string
+  ): Promise<{ lemma: string; translation: string }> => {
+    const cacheKey = `${word.toLowerCase()}_${sentence.slice(0, 30).toLowerCase()}`;
+    if (translationCacheRef.current.has(cacheKey)) {
+      return translationCacheRef.current.get(cacheKey)!;
+    }
+
     try {
-      const resp = await fetch(`/api/translate?text=${encodeURIComponent(word)}&from=de&to=ru`);
+      const resp = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word, sentence }),
+      });
       const data = await resp.json();
-      const translation = data.translation || "Перевод не найден";
-      translationCacheRef.current.set(word.toLowerCase(), translation);
-      return translation;
+      const result = {
+        lemma: data.lemma || word,
+        translation: data.translation || "Перевод не найден",
+      };
+      translationCacheRef.current.set(cacheKey, result);
+      return result;
     } catch {
-      return "Ошибка перевода";
+      return { lemma: word, translation: "Ошибка перевода" };
     }
   };
 
-  // Hover-to-Translate & Auto-Pause/Resume Logic
-  const handleMouseEnterWord = async (rawWord: string) => {
-    const cleaned = cleanWord(rawWord);
+  // Hover-to-Translate with Debounced Auto-Pause/Resume
+  const handleMouseEnterWord = async (rawWord: string, sentence: string) => {
+    const cleaned = cleanGermanWord(rawWord);
     if (!cleaned) return;
 
-    // If pinned word is open, don't override with hover
+    // Clear resume timer so moving between words does not resume video!
+    if (resumeTimeoutRef.current) {
+      clearTimeout(resumeTimeoutRef.current);
+      resumeTimeoutRef.current = null;
+    }
+
     if (pinnedWord) return;
 
-    // Auto-pause if playing
+    // Pause video if playing
     if (isPlaying) {
       wasPlayingRef.current = true;
       if (playerRef.current) {
@@ -276,17 +324,42 @@ export default function InteractivePlayer({
       }
     }
 
-    setHoveredWord({ word: cleaned, translation: "", isLoading: true });
-    const trans = await translateWord(cleaned);
-    setHoveredWord({ word: cleaned, translation: trans, isLoading: false });
+    setHoveredWord({ word: cleaned, lemma: cleaned, translation: "", isLoading: true });
+    const { lemma, translation } = await fetchContextualTranslation(cleaned, sentence);
+    setHoveredWord({ word: cleaned, lemma, translation, isLoading: false });
   };
 
   const handleMouseLeaveWord = () => {
     if (pinnedWord) return;
 
-    setHoveredWord(null);
+    // Debounce resume by 180ms to allow smooth mouse movement between words
+    if (resumeTimeoutRef.current) {
+      clearTimeout(resumeTimeoutRef.current);
+    }
 
-    // Auto-resume if it was playing before hover
+    resumeTimeoutRef.current = setTimeout(() => {
+      setHoveredWord(null);
+      if (wasPlayingRef.current) {
+        wasPlayingRef.current = false;
+        if (playerRef.current) {
+          try {
+            playerRef.current.playVideo();
+          } catch {}
+        }
+      }
+    }, 180);
+  };
+
+  // Failsafe: When cursor completely leaves subtitle container
+  const handleSubtitleContainerMouseLeave = () => {
+    if (pinnedWord) return;
+
+    if (resumeTimeoutRef.current) {
+      clearTimeout(resumeTimeoutRef.current);
+      resumeTimeoutRef.current = null;
+    }
+
+    setHoveredWord(null);
     if (wasPlayingRef.current) {
       wasPlayingRef.current = false;
       if (playerRef.current) {
@@ -297,11 +370,11 @@ export default function InteractivePlayer({
     }
   };
 
+  // Click on word pins the card
   const handleClickWord = async (rawWord: string, sentence: string) => {
-    const cleaned = cleanWord(rawWord);
+    const cleaned = cleanGermanWord(rawWord);
     if (!cleaned) return;
 
-    // Freeze playback
     if (playerRef.current) {
       try {
         playerRef.current.pauseVideo();
@@ -309,13 +382,18 @@ export default function InteractivePlayer({
     }
     wasPlayingRef.current = false;
 
-    // Clear hover tooltip and pin the word
+    if (resumeTimeoutRef.current) {
+      clearTimeout(resumeTimeoutRef.current);
+      resumeTimeoutRef.current = null;
+    }
+
     setHoveredWord(null);
-    const trans = await translateWord(cleaned);
+    const { lemma, translation } = await fetchContextualTranslation(cleaned, sentence);
 
     setPinnedWord({
       word: cleaned,
-      translation: trans,
+      lemma,
+      translation,
       context: sentence,
       isSaved: false,
       isSaving: false,
@@ -331,8 +409,10 @@ export default function InteractivePlayer({
     try {
       const res = await saveWordAction({
         word: pinnedWord.word,
+        lemma: pinnedWord.lemma,
         translation: pinnedWord.translation,
-        context_sentence: pinnedWord.context,
+        sentence: pinnedWord.context,
+        channel_title: channelTitle || "Общее",
         source: "youtube",
         video_id: videoId,
       });
@@ -350,7 +430,6 @@ export default function InteractivePlayer({
     }
   };
 
-  // Web Speech API German pronunciation
   const handleSpeak = (word: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     try {
@@ -373,445 +452,453 @@ export default function InteractivePlayer({
     }
   };
 
-  // Background opacity calculation (0 to 1)
   const bgOpacityValue = (subtitleSettings.backdropOpacity / 100).toFixed(2);
 
   return (
-    <div className="relative w-full max-w-6xl mx-auto px-2 sm:px-4 md:px-6 py-4 flex flex-col gap-4">
-      {/* Top Header / Video Meta */}
-      <div className="flex items-center justify-between">
-        <div>
-          {channelTitle && (
-            <span className="text-[#E50914] text-xs font-bold uppercase tracking-wider block mb-0.5">
-              {channelTitle}
-            </span>
-          )}
-          <h1 className="text-lg md:text-2xl font-extrabold text-white tracking-tight line-clamp-1">
-            {videoTitle || "Немецкое видео с субтитрами"}
-          </h1>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex items-center gap-2">
-          {onBackToCatalog && (
-            <button
-              onClick={onBackToCatalog}
-              className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs md:text-sm font-medium transition-colors"
-            >
-              ← Каталог
-            </button>
-          )}
-
-          {/* Toggle Transcript Drawer Button */}
-          <button
-            onClick={() => setIsTranscriptDrawerOpen(!isTranscriptDrawerOpen)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold transition-all border ${
-              isTranscriptDrawerOpen
-                ? "bg-[#E50914] text-white border-transparent shadow-lg shadow-red-900/30"
-                : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800"
-            }`}
-          >
-            <List className="w-4 h-4" />
-            <span className="hidden sm:inline">Показать стенограмму</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Central Video Player Box with Subtitle Overlay */}
-      <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-zinc-800/80 group">
-        {/* YouTube IFrame Container */}
-        <div id={`yt-player-${videoId}`} className="w-full h-full" />
-
-        {/* SUBTITLE OVERLAY INSIDE THE VIDEO CONTAINER */}
-        <div
-          className={`absolute ${subtitleSettings.bottomOffset} left-1/2 -translate-x-1/2 z-30 w-11/12 max-w-4xl text-center pointer-events-auto transition-all duration-200`}
-        >
-          {/* Backdrop mask plate to cover baked-in subtitles (hardsubs) */}
-          <div
-            className="inline-block mx-auto rounded-xl px-5 sm:px-7 py-2.5 sm:py-3.5 shadow-2xl border border-white/10 transition-all duration-200"
-            style={{
-              backgroundColor: `rgba(0, 0, 0, ${bgOpacityValue})`,
-              backdropFilter: subtitleSettings.backdropOpacity > 20 ? "blur(4px)" : "none",
-            }}
-          >
-            {isLoadingTranscript ? (
-              <div className="flex items-center justify-center gap-2 py-1 text-zinc-400 text-sm">
-                <Loader2 className="w-4 h-4 animate-spin text-[#E50914]" />
-                <span>Загрузка субтитров...</span>
-              </div>
-            ) : transcriptError ? (
-              <div className="flex items-center gap-2 text-amber-400 text-xs sm:text-sm py-1">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span>{transcriptError}</span>
-              </div>
-            ) : activeSubtitle ? (
-              <div
-                className={`flex flex-wrap justify-center items-center gap-x-2 gap-y-1.5 font-bold tracking-wide text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] ${subtitleSettings.fontSize}`}
-              >
-                {activeSubtitle.text.split(/\s+/).map((word, idx) => (
-                  <span
-                    key={idx}
-                    onMouseEnter={() => handleMouseEnterWord(word)}
-                    onMouseLeave={handleMouseLeaveWord}
-                    onClick={() => handleClickWord(word, activeSubtitle.text)}
-                    className="cursor-pointer hover:bg-white/20 hover:text-red-400 rounded px-1.5 py-0.5 transition-colors duration-150 inline-block active:scale-95 select-none"
-                    title="Наведите для перевода или кликните для сохранения"
-                  >
-                    {word}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-zinc-500 text-sm sm:text-base italic py-1">
-                ... (пауза в речи) ...
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* HOVER TOOLTIP (TRANSLATION OVERLAY) */}
-        {hoveredWord && !pinnedWord && (
-          <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-40 bg-[#181818]/95 backdrop-blur-md border border-zinc-700/80 rounded-xl px-4 py-2.5 shadow-2xl flex items-center gap-3 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
-            <div>
-              <span className="text-[10px] text-zinc-400 uppercase tracking-wider block font-semibold">
-                {hoveredWord.word}
+    <div
+      ref={mainContainerRef}
+      className={`relative w-full ${
+        isFullscreen
+          ? "fixed inset-0 z-[1000] bg-black p-0 flex flex-col justify-center"
+          : "max-w-7xl mx-auto px-2 sm:px-4 md:px-6 py-2 flex flex-col gap-4"
+      }`}
+    >
+      {/* Top Header / Video Meta (Hidden in Fullscreen) */}
+      {!isFullscreen && (
+        <div className="flex items-center justify-between">
+          <div>
+            {channelTitle && (
+              <span className="text-[#E50914] text-xs font-bold uppercase tracking-wider block mb-0.5">
+                {channelTitle}
               </span>
-              {hoveredWord.isLoading ? (
-                <div className="flex items-center gap-1.5 text-zinc-400 text-xs py-0.5">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E50914]" />
-                  <span>Переводим...</span>
-                </div>
-              ) : (
-                <span className="text-sm sm:text-base font-bold text-white capitalize">
-                  {hoveredWord.translation}
-                </span>
-              )}
-            </div>
-            <span className="text-[10px] text-zinc-400 bg-zinc-800 px-2 py-1 rounded">
-              Клик для фиксации
-            </span>
-          </div>
-        )}
-
-        {/* PINNED WORD CARD (CLICK-TO-PIN) */}
-        {pinnedWord && (
-          <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 bg-[#181818] border border-zinc-700 rounded-2xl p-4 sm:p-5 shadow-2xl max-w-md w-[92%] sm:w-auto flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
-            {/* Header */}
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <span className="text-[11px] text-zinc-400 uppercase tracking-wider font-semibold block">
-                  Немецкое слово
-                </span>
-                <h4 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
-                  {pinnedWord.word}
-                </h4>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => handleSpeak(pinnedWord.word)}
-                  title="Озвучить"
-                  className="p-2 rounded-full bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors"
-                >
-                  <Volume2 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleResumePlayback}
-                  title="Закрыть и продолжить просмотр"
-                  className="p-2 rounded-full bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Translation Box */}
-            <div className="bg-zinc-900/90 rounded-xl px-4 py-2.5 border border-zinc-800">
-              <span className="text-[10px] text-zinc-500 uppercase tracking-wider block mb-0.5 font-semibold">
-                Перевод на русский
-              </span>
-              <p className="text-base sm:text-lg font-bold text-white capitalize">
-                {pinnedWord.translation}
-              </p>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                onClick={handleSavePinnedWord}
-                disabled={pinnedWord.isSaving || pinnedWord.isSaved}
-                className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  pinnedWord.isSaved
-                    ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/40"
-                    : pinnedWord.isSaving
-                    ? "bg-zinc-800 text-zinc-400 cursor-not-allowed"
-                    : "bg-[#E50914] hover:bg-[#b80710] text-white shadow-lg shadow-red-900/30 active:scale-95"
-                }`}
-              >
-                {pinnedWord.isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Сохранение...</span>
-                  </>
-                ) : pinnedWord.isSaved ? (
-                  <>
-                    <Check className="w-4 h-4 stroke-[3]" />
-                    <span>Сохранено во флешкарты</span>
-                  </>
-                ) : (
-                  <>
-                    <Bookmark className="w-4 h-4" />
-                    <span>Добавить во флешкарты</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                onClick={handleResumePlayback}
-                className="py-2.5 px-3.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-xs sm:text-sm transition-colors flex items-center gap-1.5"
-              >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Продолжить</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Modern Player Bar (Speed, Seeks, Subtitle Settings) */}
-      <div className="flex items-center justify-between bg-zinc-900/80 px-4 py-3 rounded-2xl border border-zinc-800 text-sm">
-        {/* Play & Seek */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleTogglePlay}
-            className="w-9 h-9 rounded-full bg-white hover:bg-zinc-200 text-black flex items-center justify-center transition-all cursor-pointer shadow-md"
-            title={isPlaying ? "Пауза" : "Воспроизвести"}
-          >
-            {isPlaying ? (
-              <Pause className="w-4 h-4 fill-current" />
-            ) : (
-              <Play className="w-4 h-4 fill-current ml-0.5" />
             )}
-          </button>
+            <h1 className="text-base md:text-xl font-extrabold text-white tracking-tight line-clamp-1">
+              {videoTitle || "Немецкое видео с субтитрами"}
+            </h1>
+          </div>
 
-          <button
-            onClick={() => handleSeekRelative(-5)}
-            className="p-2 text-zinc-400 hover:text-white rounded-lg transition-colors bg-zinc-800/40 hover:bg-zinc-800"
-            title="Назад на 5 секунд"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => handleSeekRelative(5)}
-            className="p-2 text-zinc-400 hover:text-white rounded-lg transition-colors bg-zinc-800/40 hover:bg-zinc-800"
-            title="Вперед на 5 секунд"
-          >
-            <RotateCw className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Speed Selector & Subtitle Settings */}
-        <div className="flex items-center gap-3">
-          {/* Speed Pills */}
-          <div className="flex items-center gap-1.5 text-xs text-zinc-400 bg-zinc-950/60 p-1 rounded-xl border border-zinc-800/80">
-            <Gauge className="w-3.5 h-3.5 text-zinc-500 ml-1 hidden sm:inline" />
-            {[0.75, 1, 1.25].map((rate) => (
+          <div className="flex items-center gap-2">
+            {onBackToCatalog && (
               <button
-                key={rate}
-                onClick={() => handleSpeedChange(rate)}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                  playbackRate === rate
-                    ? "bg-[#E50914] text-white shadow"
-                    : "text-zinc-400 hover:text-white hover:bg-zinc-800"
-                }`}
+                onClick={onBackToCatalog}
+                className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs md:text-sm font-medium transition-colors"
               >
-                {rate}x
+                ← Каталог
               </button>
-            ))}
-          </div>
-
-          {/* Subtitle Settings Button */}
-          <div className="relative">
-            <button
-              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all border ${
-                isSettingsOpen
-                  ? "bg-zinc-800 text-white border-zinc-600"
-                  : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700"
-              }`}
-              title="Настройки отображения субтитров"
-            >
-              <Sliders className="w-4 h-4 text-[#E50914]" />
-              <span className="hidden sm:inline">Настройки субтитров</span>
-            </button>
-
-            {/* Subtitle Settings Popover */}
-            {isSettingsOpen && (
-              <div className="absolute right-0 bottom-full mb-3 w-80 bg-[#181818] border border-zinc-700/80 rounded-2xl p-5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                  <div className="flex items-center gap-2 text-white font-bold text-sm">
-                    <Sliders className="w-4 h-4 text-[#E50914]" />
-                    <span>Параметры субтитров</span>
-                  </div>
-                  <button
-                    onClick={() => setIsSettingsOpen(false)}
-                    className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* 1. Backdrop Opacity (Masking Hardsubs) */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between text-xs text-zinc-300 font-semibold">
-                    <span>Перекрытие хардсабов</span>
-                    <span className="text-[#E50914] font-bold">
-                      {subtitleSettings.backdropOpacity}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="5"
-                    value={subtitleSettings.backdropOpacity}
-                    onChange={(e) =>
-                      updateSubtitleSettings({ backdropOpacity: Number(e.target.value) })
-                    }
-                    className="w-full accent-[#E50914] cursor-pointer"
-                  />
-                  <span className="text-[10px] text-zinc-500">
-                    100% — глухая черная плашка, полностью скрывающая вшитые титры
-                  </span>
-                </div>
-
-                {/* 2. Bottom Offset Presets */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs text-zinc-300 font-semibold">Высота расположения</span>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[
-                      { label: "Низко", val: "bottom-4" },
-                      { label: "Стандарт", val: "bottom-10" },
-                      { label: "Выше титров", val: "bottom-20" },
-                    ].map((item) => (
-                      <button
-                        key={item.val}
-                        onClick={() =>
-                          updateSubtitleSettings({
-                            bottomOffset: item.val as SubtitleSettings["bottomOffset"],
-                          })
-                        }
-                        className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
-                          subtitleSettings.bottomOffset === item.val
-                            ? "bg-white text-black font-extrabold shadow"
-                            : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                        }`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 3. Font Size Presets */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs text-zinc-300 font-semibold">Размер шрифта</span>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[
-                      { label: "Обычный", val: "text-lg" },
-                      { label: "Крупный", val: "text-2xl" },
-                      { label: "Максимум", val: "text-3xl" },
-                    ].map((item) => (
-                      <button
-                        key={item.val}
-                        onClick={() =>
-                          updateSubtitleSettings({
-                            fontSize: item.val as SubtitleSettings["fontSize"],
-                          })
-                        }
-                        className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
-                          subtitleSettings.fontSize === item.val
-                            ? "bg-white text-black font-extrabold shadow"
-                            : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                        }`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Slide-out Drawer: Full Transcript */}
-      {isTranscriptDrawerOpen && (
-        <div className="fixed inset-y-0 right-0 z-[100] w-full sm:w-[420px] bg-[#181818]/98 backdrop-blur-md border-l border-zinc-800 shadow-2xl flex flex-col animate-in slide-in-from-right duration-250">
-          {/* Drawer Header */}
-          <div className="p-4 sm:p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/60">
-            <div className="flex items-center gap-2 text-white font-bold text-base">
-              <List className="w-5 h-5 text-[#E50914]" />
-              <span>Стенограмма видео</span>
-            </div>
-            <button
-              onClick={() => setIsTranscriptDrawerOpen(false)}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Drawer Content */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-            {isLoadingTranscript ? (
-              <div className="py-20 text-center text-zinc-500 text-sm">
-                Загрузка стенограммы...
-              </div>
-            ) : transcript.length === 0 ? (
-              <div className="py-20 text-center text-zinc-500 text-sm">
-                Субтитры недоступны
-              </div>
-            ) : (
-              transcript.map((item, index) => {
-                const isActive = index === activeSubtitleIndex;
-                const minutes = Math.floor(item.start / 60);
-                const seconds = Math.floor(item.start % 60);
-                const timeStr = `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-
-                return (
-                  <div
-                    key={index}
-                    onClick={() => {
-                      handleSeekTo(item.start);
-                    }}
-                    className={`p-3 rounded-xl cursor-pointer transition-all border text-left ${
-                      isActive
-                        ? "bg-red-950/40 border-[#E50914]/60 text-white shadow-md"
-                        : "bg-zinc-900/40 border-zinc-800/60 text-zinc-300 hover:bg-zinc-800/60 hover:text-white"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span
-                        className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
-                          isActive
-                            ? "bg-[#E50914] text-white"
-                            : "bg-zinc-800 text-zinc-400"
-                        }`}
-                      >
-                        {timeStr}
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm leading-snug">{item.text}</p>
-                  </div>
-                );
-              })
             )}
           </div>
         </div>
       )}
+
+      {/* Main Screen Layout: Grid on Desktop (Player Left, Dialogue List Right), Fullscreen on Maximize */}
+      <div className={`w-full ${isFullscreen ? "h-full" : "grid grid-cols-1 lg:grid-cols-3 gap-6 items-start"}`}>
+        {/* LEFT / CENTER: Video Player Box + Overlay Subtitles */}
+        <div className={`${isFullscreen ? "w-full h-full" : "lg:col-span-2"} flex flex-col gap-3 relative`}>
+          {/* 16:9 Video Box (or full-height in fullscreen) */}
+          <div
+            className={`relative w-full ${
+              isFullscreen
+                ? "h-full flex-1 bg-black"
+                : "aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-zinc-800/80"
+            } group`}
+          >
+            {/* YouTube IFrame Container */}
+            <div id={`yt-player-${videoId}`} className="w-full h-full" />
+
+            {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER */}
+            <div
+              onMouseLeave={handleSubtitleContainerMouseLeave}
+              className={`absolute ${subtitleSettings.bottomOffset} left-1/2 -translate-x-1/2 z-30 w-11/12 max-w-3xl text-center pointer-events-auto transition-all duration-150`}
+            >
+              {/* Masking Plate for Hardsubs */}
+              <div
+                className="inline-block mx-auto rounded-xl px-5 sm:px-7 py-2.5 sm:py-3.5 shadow-2xl border border-white/10 transition-all duration-150"
+                style={{
+                  backgroundColor: `rgba(0, 0, 0, ${bgOpacityValue})`,
+                  backdropFilter: subtitleSettings.backdropOpacity > 20 ? "blur(4px)" : "none",
+                }}
+              >
+                {isLoadingTranscript ? (
+                  <div className="flex items-center justify-center gap-2 py-1 text-zinc-400 text-sm">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#E50914]" />
+                    <span>Загрузка субтитров...</span>
+                  </div>
+                ) : transcriptError ? (
+                  <div className="flex items-center gap-2 text-amber-400 text-xs sm:text-sm py-1">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{transcriptError}</span>
+                  </div>
+                ) : activeSubtitle ? (
+                  <div
+                    className={`flex flex-wrap justify-center items-center gap-x-2 gap-y-1.5 font-bold tracking-wide text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] ${subtitleSettings.fontSize}`}
+                  >
+                    {activeSubtitle.text.split(/\s+/).map((word, idx) => (
+                      <span
+                        key={idx}
+                        onMouseEnter={() => handleMouseEnterWord(word, activeSubtitle.text)}
+                        onMouseLeave={handleMouseLeaveWord}
+                        onClick={() => handleClickWord(word, activeSubtitle.text)}
+                        className="cursor-pointer hover:bg-white/20 hover:text-red-400 rounded px-1.5 py-0.5 transition-colors duration-100 inline-block active:scale-95 select-none"
+                        title="Наведите для перевода или кликните для сохранения"
+                      >
+                        {word}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-zinc-500 text-sm sm:text-base italic py-1">
+                    ... (пауза в речи) ...
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* HOVER TOOLTIP (COMPACT CARD OVER WORD) */}
+            {hoveredWord && !pinnedWord && (
+              <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-40 bg-[#181818]/95 backdrop-blur-md border border-zinc-700/80 rounded-xl px-4 py-2.5 shadow-2xl flex items-center gap-3 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto">
+                <div>
+                  {/* Lemma / Initial form */}
+                  {hoveredWord.lemma && (
+                    <span className="text-[10px] text-red-400 font-mono uppercase tracking-wider block font-semibold">
+                      {hoveredWord.lemma}
+                    </span>
+                  )}
+                  {hoveredWord.isLoading ? (
+                    <div className="flex items-center gap-1.5 text-zinc-400 text-xs py-0.5">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E50914]" />
+                      <span>Переводим...</span>
+                    </div>
+                  ) : (
+                    <span className="text-sm sm:text-base font-bold text-white capitalize">
+                      {hoveredWord.translation}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] text-zinc-400 bg-zinc-800 px-2 py-1 rounded">
+                  Клик для фиксации
+                </span>
+              </div>
+            )}
+
+            {/* PINNED WORD CARD */}
+            {pinnedWord && (
+              <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 bg-[#181818] border border-zinc-700 rounded-2xl p-4 sm:p-5 shadow-2xl max-w-md w-[92%] sm:w-auto flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    {pinnedWord.lemma && (
+                      <span className="text-[11px] text-red-400 font-mono font-semibold block mb-0.5">
+                        {pinnedWord.lemma}
+                      </span>
+                    )}
+                    <h4 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
+                      {pinnedWord.word}
+                    </h4>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleSpeak(pinnedWord.word)}
+                      title="Озвучить"
+                      className="p-2 rounded-full bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors"
+                    >
+                      <Volume2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleResumePlayback}
+                      title="Закрыть и продолжить просмотр"
+                      className="p-2 rounded-full bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Translation Box */}
+                <div className="bg-zinc-900/90 rounded-xl px-4 py-2.5 border border-zinc-800">
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider block mb-0.5 font-semibold">
+                    Точный контекстный перевод
+                  </span>
+                  <p className="text-base sm:text-lg font-bold text-white capitalize">
+                    {pinnedWord.translation}
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={handleSavePinnedWord}
+                    disabled={pinnedWord.isSaving || pinnedWord.isSaved}
+                    className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      pinnedWord.isSaved
+                        ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/40"
+                        : pinnedWord.isSaving
+                        ? "bg-zinc-800 text-zinc-400 cursor-not-allowed"
+                        : "bg-[#E50914] hover:bg-[#b80710] text-white shadow-lg shadow-red-900/30 active:scale-95"
+                    }`}
+                  >
+                    {pinnedWord.isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Сохранение...</span>
+                      </>
+                    ) : pinnedWord.isSaved ? (
+                      <>
+                        <Check className="w-4 h-4 stroke-[3]" />
+                        <span>В словаре</span>
+                      </>
+                    ) : (
+                      <>
+                        <Bookmark className="w-4 h-4" />
+                        <span>Сохранить в словарь</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={handleResumePlayback}
+                    className="py-2.5 px-3.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-xs sm:text-sm transition-colors flex items-center gap-1.5"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>Продолжить</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Controls Bar (Speed, Seek, Subtitle Settings, Fullscreen) */}
+          <div className="flex items-center justify-between bg-zinc-900/80 px-4 py-2.5 rounded-2xl border border-zinc-800 text-sm">
+            {/* Play & Seek */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleTogglePlay}
+                className="w-8 h-8 rounded-full bg-white hover:bg-zinc-200 text-black flex items-center justify-center transition-all cursor-pointer shadow-md"
+                title={isPlaying ? "Пауза" : "Воспроизвести"}
+              >
+                {isPlaying ? (
+                  <Pause className="w-4 h-4 fill-current" />
+                ) : (
+                  <Play className="w-4 h-4 fill-current ml-0.5" />
+                )}
+              </button>
+
+              <button
+                onClick={() => handleSeekRelative(-5)}
+                className="p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors bg-zinc-800/40 hover:bg-zinc-800"
+                title="Назад на 5 секунд"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => handleSeekRelative(5)}
+                className="p-1.5 text-zinc-400 hover:text-white rounded-lg transition-colors bg-zinc-800/40 hover:bg-zinc-800"
+                title="Вперед на 5 секунд"
+              >
+                <RotateCw className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Speed & Subtitle Settings & Fullscreen */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Speed Pills */}
+              <div className="flex items-center gap-1 text-xs text-zinc-400 bg-zinc-950/60 p-1 rounded-xl border border-zinc-800/80">
+                <Gauge className="w-3.5 h-3.5 text-zinc-500 ml-1 hidden sm:inline" />
+                {[0.75, 1, 1.25].map((rate) => (
+                  <button
+                    key={rate}
+                    onClick={() => handleSpeedChange(rate)}
+                    className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
+                      playbackRate === rate
+                        ? "bg-[#E50914] text-white shadow"
+                        : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    }`}
+                  >
+                    {rate}x
+                  </button>
+                ))}
+              </div>
+
+              {/* Subtitle Settings Popover Trigger */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all border ${
+                    isSettingsOpen
+                      ? "bg-zinc-800 text-white border-zinc-600"
+                      : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700"
+                  }`}
+                  title="Настройки отображения субтитров"
+                >
+                  <Sliders className="w-3.5 h-3.5 text-[#E50914]" />
+                  <span className="hidden sm:inline">Субтитры</span>
+                </button>
+
+                {isSettingsOpen && (
+                  <div className="absolute right-0 bottom-full mb-3 w-80 bg-[#181818] border border-zinc-700/80 rounded-2xl p-5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-4">
+                    <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                      <div className="flex items-center gap-2 text-white font-bold text-sm">
+                        <Sliders className="w-4 h-4 text-[#E50914]" />
+                        <span>Параметры субтитров</span>
+                      </div>
+                      <button
+                        onClick={() => setIsSettingsOpen(false)}
+                        className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* 1. Backdrop Opacity */}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex justify-between text-xs text-zinc-300 font-semibold">
+                        <span>Перекрытие хардсабов</span>
+                        <span className="text-[#E50914] font-bold">
+                          {subtitleSettings.backdropOpacity}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="5"
+                        value={subtitleSettings.backdropOpacity}
+                        onChange={(e) =>
+                          updateSubtitleSettings({ backdropOpacity: Number(e.target.value) })
+                        }
+                        className="w-full accent-[#E50914] cursor-pointer"
+                      />
+                    </div>
+
+                    {/* 2. Bottom Offset */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-xs text-zinc-300 font-semibold">Высота расположения</span>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[
+                          { label: "Низко", val: "bottom-4" },
+                          { label: "Стандарт", val: "bottom-10" },
+                          { label: "Выше титров", val: "bottom-20" },
+                        ].map((item) => (
+                          <button
+                            key={item.val}
+                            onClick={() =>
+                              updateSubtitleSettings({
+                                bottomOffset: item.val as SubtitleSettings["bottomOffset"],
+                              })
+                            }
+                            className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
+                              subtitleSettings.bottomOffset === item.val
+                                ? "bg-white text-black font-extrabold shadow"
+                                : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 3. Font Size */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-xs text-zinc-300 font-semibold">Размер шрифта</span>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[
+                          { label: "Обычный", val: "text-lg" },
+                          { label: "Крупный", val: "text-2xl" },
+                          { label: "Максимум", val: "text-3xl" },
+                        ].map((item) => (
+                          <button
+                            key={item.val}
+                            onClick={() =>
+                              updateSubtitleSettings({
+                                fontSize: item.val as SubtitleSettings["fontSize"],
+                              })
+                            }
+                            className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
+                              subtitleSettings.fontSize === item.val
+                                ? "bg-white text-black font-extrabold shadow"
+                                : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Fullscreen Toggle */}
+              <button
+                onClick={toggleFullscreen}
+                className="p-2 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl transition-colors"
+                title={isFullscreen ? "Выйти из полноэкранного режима" : "Полноэкранный режим"}
+              >
+                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT: Vertical Transcript Dialogue List (Automatically hidden in Fullscreen) */}
+        {!isFullscreen && (
+          <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 flex flex-col h-[460px] sm:h-[500px]">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800 mb-2">
+              <div className="flex items-center gap-2 text-white font-semibold text-sm">
+                <List className="w-4 h-4 text-[#E50914]" />
+                <span>Субтитры диалога</span>
+              </div>
+              <span className="text-zinc-500 text-xs">
+                {transcript.length > 0 ? `${transcript.length} предложений` : ""}
+              </span>
+            </div>
+
+            {isLoadingTranscript ? (
+              <div className="flex-1 flex items-center justify-center text-zinc-500 text-xs">
+                Загрузка предложений...
+              </div>
+            ) : transcript.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-zinc-500 text-xs text-center px-4">
+                Субтитры недоступны
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 no-scrollbar">
+                {transcript.map((item, index) => {
+                  const isActive = index === activeSubtitleIndex;
+                  const minutes = Math.floor(item.start / 60);
+                  const seconds = Math.floor(item.start % 60);
+                  const timeStr = `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+
+                  return (
+                    <div
+                      key={index}
+                      ref={isActive ? activeSideItemRef : null}
+                      onClick={() => handleSeekTo(item.start)}
+                      className={`p-3 rounded-xl cursor-pointer transition-all border text-left ${
+                        isActive
+                          ? "bg-red-950/40 border-[#E50914]/60 text-white shadow-md scale-[1.01]"
+                          : "bg-zinc-950/40 border-zinc-800/60 text-zinc-400 hover:bg-zinc-800/50 hover:text-white"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span
+                          className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ${
+                            isActive ? "bg-[#E50914] text-white" : "bg-zinc-800 text-zinc-500"
+                          }`}
+                        >
+                          {timeStr}
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm leading-relaxed">{item.text}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

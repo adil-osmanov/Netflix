@@ -18,7 +18,10 @@ export interface UserWord {
   id?: string;
   word: string;
   translation: string;
-  context_sentence: string;
+  lemma?: string;
+  sentence?: string;
+  context_sentence?: string;
+  channel_title?: string;
   source: string;
   video_id: string;
   created_at: string;

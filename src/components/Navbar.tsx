@@ -66,11 +66,11 @@ function NavbarContent() {
             <Link 
               href="/youtube" 
               onClick={() => setSearchTerm('')} 
-              className="group relative flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-red-950/40 via-black to-red-950/40 border border-red-600/40 hover:border-red-500 shadow-[0_0_12px_rgba(229,9,20,0.2)] hover:shadow-[0_0_20px_rgba(229,9,20,0.5)] transition-all duration-300"
+              className="group flex items-center gap-1.5 text-base md:text-[14px] font-medium text-zinc-300 hover:text-white transition-colors cursor-pointer"
             >
-              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-              <span className="text-xs font-semibold tracking-wide text-white group-hover:text-red-200">YouTube</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-red-600 text-white">DE</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-red-600 group-hover:shadow-[0_0_8px_#E50914] transition-all" />
+              <span>YouTube</span>
+              <span className="text-[10px] font-bold tracking-wider px-1 py-0.2 rounded bg-zinc-800 text-red-500 border border-red-900/40">DE</span>
             </Link>
           </div>
         </div>
@@ -118,13 +118,11 @@ function NavbarContent() {
           <Link 
             href="/youtube" 
             onClick={() => { setSearchTerm(''); setMobileMenuOpen(false); }} 
-            className="group relative flex items-center justify-between px-3.5 py-2 rounded-xl bg-gradient-to-r from-red-950/40 via-black to-red-950/40 border border-red-600/40 hover:border-red-500 transition-all duration-300"
+            className="group flex items-center gap-2 text-base font-medium text-zinc-300 hover:text-white transition-colors cursor-pointer py-1"
           >
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-              <span className="text-xs font-semibold tracking-wide text-white group-hover:text-red-200">YouTube Learning</span>
-            </div>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-red-600 text-white">DE</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-red-600 group-hover:shadow-[0_0_8px_#E50914] transition-all" />
+            <span>YouTube</span>
+            <span className="text-[10px] font-bold tracking-wider px-1 py-0.2 rounded bg-zinc-800 text-red-500 border border-red-900/40">DE</span>
           </Link>
         </div>
       </div>
