@@ -20,7 +20,9 @@ import { YouTubeRecommendedVideo } from "@/types/youtube";
 import { useYouTube } from "@/context/YouTubeContext";
 import VideoCard from "@/components/youtube/VideoCard";
 import ManageChannelsModal, { SubscribedChannel } from "@/components/youtube/ManageChannelsModal";
+import MediathekCatalog from "@/components/mediathek/MediathekCatalog";
 
+export type MediaSection = "youtube" | "mediathek";
 export type MainTab = "recommendations" | "subscriptions" | "favorites";
 
 const DEFAULT_SUBSCRIPTIONS: SubscribedChannel[] = [
@@ -96,6 +98,9 @@ function isYouTubeShort(video: {
 
 export default function YouTubeCatalogPage() {
   const { favorites, removeFavorite } = useYouTube();
+
+  // Переключатель медиа-раздела: YouTube DE vs ARD & ZDF Mediathek
+  const [mediaSection, setMediaSection] = useState<MediaSection>("youtube");
 
   // 1. Главная трехуровневая навигация: 'recommendations' | 'subscriptions' | 'favorites'
   const [activeTab, setActiveTab] = useState<MainTab>("recommendations");
@@ -416,12 +421,44 @@ export default function YouTubeCatalogPage() {
 
   return (
     <div className="min-h-screen bg-[#141414] text-white pb-24 px-4 md:px-12 pt-4">
-      {/* Top Controls: Centered Clean Search Bar */}
-      <div className="max-w-3xl mx-auto mb-6 pt-2">
-        <form
-          onSubmit={handleSearchOrWatch}
-          className="relative bg-zinc-900/90 border border-zinc-800 rounded-full px-4 py-2.5 flex items-center gap-2.5 focus-within:border-zinc-500 transition-all shadow-xl"
-        >
+      {/* Top Media Switcher: YouTube DE vs ARD & ZDF Mediathek */}
+      <div className="max-w-7xl mx-auto mb-6 pt-2 flex items-center justify-center">
+        <div className="inline-flex p-1 bg-zinc-900/90 border border-zinc-800 rounded-full shadow-lg">
+          <button
+            onClick={() => setMediaSection("youtube")}
+            className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              mediaSection === "youtube"
+                ? "bg-white text-black shadow-md"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-red-600" />
+            <span>YouTube DE</span>
+          </button>
+          <button
+            onClick={() => setMediaSection("mediathek")}
+            className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              mediaSection === "mediathek"
+                ? "bg-white text-black shadow-md"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-blue-500" />
+            <span>ARD & ZDF Mediathek</span>
+          </button>
+        </div>
+      </div>
+
+      {mediaSection === "mediathek" ? (
+        <MediathekCatalog />
+      ) : (
+        <>
+          {/* Top Controls: Centered Clean Search Bar */}
+          <div className="max-w-3xl mx-auto mb-6 pt-2">
+            <form
+              onSubmit={handleSearchOrWatch}
+              className="relative bg-zinc-900/90 border border-zinc-800 rounded-full px-4 py-2.5 flex items-center gap-2.5 focus-within:border-zinc-500 transition-all shadow-xl"
+            >
           <Search className="w-4 h-4 text-zinc-400 flex-shrink-0" />
           <input
             type="text"
@@ -684,6 +721,8 @@ export default function YouTubeCatalogPage() {
           </>
         )}
       </div>
+        </>
+      )}
 
       {/* Manage Channels Modal */}
       <ManageChannelsModal
