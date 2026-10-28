@@ -47,6 +47,15 @@ interface InteractivePlayerProps {
   onNextVideo?: () => void;
 }
 
+const LEAD_TIME = 0.15; // 150 миллисекунд упреждения для синхронизации с голосом
+
+function getArticleColor(article: string | null) {
+  if (article === "der") return "text-blue-400 font-bold";
+  if (article === "die") return "text-red-500 font-bold";
+  if (article === "das") return "text-emerald-400 font-bold";
+  return "text-zinc-400 font-medium";
+}
+
 export default function InteractivePlayer({
   videoId,
   videoTitle,
@@ -417,19 +426,31 @@ export default function InteractivePlayer({
     };
   }, [videoId, engineMode]);
 
-  // 4. High-precision requestAnimationFrame Timing Sync (Second-for-second)
+  // 4. High-precision requestAnimationFrame Timing Sync (with +150ms Lead-Time)
   useEffect(() => {
     let animId: number;
 
     const syncTime = () => {
       if (isPlaying) {
+        let rawTime = 0;
         if (engineMode === "native" && videoRef.current) {
-          setCurrentTime(videoRef.current.currentTime);
+          rawTime = videoRef.current.currentTime;
         } else if (playerRef.current && typeof playerRef.current.getCurrentTime === "function") {
           try {
-            const time = playerRef.current.getCurrentTime();
-            setCurrentTime(time);
+            rawTime = playerRef.current.getCurrentTime();
           } catch {}
+        }
+
+        setCurrentTime(rawTime);
+
+        // Опережающая компенсация (+150ms)
+        const activeTime = rawTime + LEAD_TIME;
+        const found = safeTranscript.find(
+          (item) => activeTime >= item.start && activeTime < item.start + (item.duration || 0)
+        );
+
+        if (found && found.text !== currentSubtitle?.text) {
+          setCurrentSubtitle(found);
         }
       }
       animId = requestAnimationFrame(syncTime);
@@ -437,23 +458,9 @@ export default function InteractivePlayer({
 
     animId = requestAnimationFrame(syncTime);
     return () => cancelAnimationFrame(animId);
-  }, [isPlaying, engineMode]);
+  }, [isPlaying, engineMode, safeTranscript, currentSubtitle]);
 
-  // 5. Update active subtitle strictly when playing (NEVER cleared on pause)
-  useEffect(() => {
-    if (isPlaying && safeTranscript.length > 0) {
-      const found = safeTranscript.find(
-        (item) =>
-          currentTime >= item.start &&
-          currentTime <= item.start + (item.duration || 0) + 0.15
-      );
-      if (found && found.text !== currentSubtitle?.text) {
-        setCurrentSubtitle(found);
-      }
-    }
-  }, [currentTime, isPlaying, safeTranscript, currentSubtitle]);
-
-  // 6. Safe Fullscreen Change Listener
+  // 5. Safe Fullscreen Change Listener
   useEffect(() => {
     const handleFsChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
@@ -514,16 +521,18 @@ export default function InteractivePlayer({
     }
 
     setCurrentTime(nextTime);
+    const activeTime = nextTime + LEAD_TIME;
     const found = safeTranscript.find(
-      (item) => nextTime >= item.start && nextTime <= item.start + (item.duration || 0) + 0.15
+      (item) => activeTime >= item.start && activeTime < item.start + (item.duration || 0)
     );
     if (found) setCurrentSubtitle(found);
   };
 
   const handleSeekTo = (seconds: number) => {
     setCurrentTime(seconds);
+    const activeTime = seconds + LEAD_TIME;
     const found = safeTranscript.find(
-      (item) => seconds >= item.start && seconds <= item.start + (item.duration || 0) + 0.15
+      (item) => activeTime >= item.start && activeTime < item.start + (item.duration || 0)
     );
     if (found) setCurrentSubtitle(found);
 
@@ -589,10 +598,11 @@ export default function InteractivePlayer({
   // Active dialogue index for right column
   const activeSubtitleIndex = useMemo(() => {
     if (!currentSubtitle) return -1;
+    const activeTime = currentTime + LEAD_TIME;
     return safeTranscript.findIndex(
       (item) =>
         item.text === currentSubtitle.text ||
-        (currentTime >= item.start && currentTime <= item.start + (item.duration || 0) + 0.15)
+        (activeTime >= item.start && activeTime < item.start + (item.duration || 0))
     );
   }, [safeTranscript, currentSubtitle, currentTime]);
 
@@ -691,7 +701,6 @@ export default function InteractivePlayer({
     });
 
     const data = await fetchContextualTranslation(cleaned, sentence);
-    // Ensure we are still hovering this exact word
     setHoveredWord((prev) => {
       if (!prev || prev.word !== cleaned) return prev;
       return {
@@ -1009,10 +1018,10 @@ export default function InteractivePlayer({
           {onBackToCatalog && (
             <button
               onClick={onBackToCatalog}
-              aria-label="Назад"
-              className="absolute top-4 left-4 z-40 w-9 h-9 rounded-full bg-black/70 hover:bg-zinc-800 border border-white/10 text-zinc-300 hover:text-white flex items-center justify-center backdrop-blur-md transition shadow-lg group cursor-pointer pointer-events-auto"
+              aria-label="Назад к каталогу"
+              className="absolute top-4 left-4 z-40 w-9 h-9 rounded-full bg-black/80 hover:bg-zinc-800 border border-white/10 text-zinc-300 hover:text-white flex items-center justify-center backdrop-blur-md transition shadow-lg cursor-pointer pointer-events-auto"
             >
-              <ArrowLeft className="group-hover:-translate-x-0.5 transition-transform" size={18} />
+              <ArrowLeft size={18} />
             </button>
           )}
 
@@ -1051,10 +1060,26 @@ export default function InteractivePlayer({
               <div
                 onClick={handleTogglePlay}
                 onDoubleClick={toggleFullscreen}
-                className="absolute inset-0 z-10 cursor-pointer bg-transparent"
+                className="absolute inset-0 z-20 cursor-pointer bg-transparent"
               />
             </>
           )}
+
+          {/* Кинематографическая маска при паузе / микропаузе (строго ПОД субтитрами) */}
+          <div 
+            className={`absolute inset-0 z-10 pointer-events-none transition-opacity duration-300 ease-in-out ${
+              !isPlaying ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            {/* Верхний градиент: полностью растворяет заголовок ролика, аватарку и значки YouTube */}
+            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black via-black/85 to-transparent" />
+
+            {/* Центральное мягкое затемнение: сглаживает белый круг кнопки Play по центру кадра */}
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
+
+            {/* Нижний градиент: мягкая подложка под субтитры */}
+            <div className="absolute bottom-0 left-0 right-0 h-36 bg-gradient-to-t from-black via-black/80 to-transparent" />
+          </div>
 
           {/* Embed Error Overlay (Codes 150 / 101 / 2 / 100) */}
           {embedError && (
@@ -1091,15 +1116,15 @@ export default function InteractivePlayer({
             </div>
           )}
 
-          {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER - Persistent on Pause, max 1 sentence (2 lines) */}
+          {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER - Persistent on Pause, max 1 sentence */}
           <div
             onMouseEnter={handleSubtitleContainerMouseEnter}
             onMouseLeave={handleSubtitleContainerMouseLeave}
-            className={`absolute ${subtitleSettings.bottomOffset} left-1/2 -translate-x-1/2 z-30 w-11/12 max-w-3xl text-center pointer-events-auto transition-all duration-150`}
+            className={`absolute ${subtitleSettings.bottomOffset} left-1/2 -translate-x-1/2 z-30 w-11/12 max-w-4xl text-center pointer-events-auto transition-all duration-150`}
           >
-            {/* Masking Plate for Hardsubs */}
+            {/* Masking Plate for Hardsubs (overflow-visible to prevent clipping tooltip) */}
             <div
-              className="max-w-3xl w-auto mx-auto px-6 py-3 rounded-xl bg-black/90 backdrop-blur-md border border-white/10 shadow-2xl transition-all duration-150"
+              className="relative z-20 mx-auto max-w-4xl px-6 py-3 rounded-2xl bg-black/90 border border-white/10 shadow-2xl overflow-visible backdrop-blur-md transition-all duration-150"
               style={{
                 backgroundColor: `rgba(0, 0, 0, ${bgOpacityValue})`,
                 backdropFilter: subtitleSettings.backdropOpacity > 20 ? "blur(4px)" : "none",
@@ -1116,109 +1141,73 @@ export default function InteractivePlayer({
                 </div>
               ) : currentSubtitle && typeof currentSubtitle.text === "string" ? (
                 <div
-                  className={`line-clamp-2 text-center leading-snug flex flex-wrap justify-center items-center gap-x-2 gap-y-1 font-sans font-semibold text-white tracking-normal drop-shadow-md ${
+                  className={`flex flex-wrap justify-center items-center gap-y-1 text-center font-medium drop-shadow-md ${
                     SUBTITLE_FONT_SIZE_CLASSES[subtitleSettings.fontSize as SubtitleFontSize] || SUBTITLE_FONT_SIZE_CLASSES.md
                   }`}
                 >
                   {currentSubtitle.text.split(/\s+/).filter(Boolean).map((word, idx) => {
-                    const cleaned = cleanGermanWord(word).toLowerCase();
-                    const isWordSaved = savedWordsSet.has(cleaned);
-                    const isJustSaved = justSavedWords.has(cleaned);
+                    const cleanWord = cleanGermanWord(word);
+                    const cleanedLower = cleanWord.toLowerCase();
+                    const isJustSaved = justSavedWords.has(cleanedLower);
 
                     return (
                       <span
                         key={idx}
-                        className="relative inline-block"
+                        className="relative inline-block mx-1"
                       >
-                        <span
+                        <button
+                          type="button"
                           onMouseEnter={() => handleMouseEnterWord(word, currentSubtitle.text, idx)}
                           onClick={() => handleClickWord(word, currentSubtitle.text)}
-                          className="cursor-pointer hover:bg-white/20 hover:text-red-400 rounded px-1.5 py-0.5 transition-colors duration-100 inline-block active:scale-95 select-none"
+                          className="hover:text-red-400 text-white transition-colors cursor-pointer select-none"
                         >
                           {word}
-                        </span>
+                        </button>
 
-                        {/* Adaptive Tooltip directly 8px above this hovered word */}
+                        {/* Всплывающий тултип: строго над словом, без сдвига строки */}
                         {hoveredWord && hoveredWordIdx === idx && (
                           <div
-                            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-auto w-max max-w-xs bg-[#141414]/95 backdrop-blur-xl border border-zinc-700/80 rounded-xl px-3.5 py-2.5 shadow-2xl flex flex-col gap-1.5 text-left animate-in fade-in zoom-in-95 duration-100"
+                            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-auto min-w-[120px] max-w-xs bg-zinc-950/95 border border-zinc-700/80 rounded-xl px-3 py-2 shadow-2xl text-center flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleClickWord(word, currentSubtitle.text);
                             }}
                           >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-1.5">
-                                {hoveredWord.article && (
-                                  <span
-                                    className={`font-bold lowercase text-xs sm:text-sm ${
-                                      hoveredWord.article === "der"
-                                        ? "text-blue-400"
-                                        : hoveredWord.article === "die"
-                                        ? "text-red-500"
-                                        : "text-emerald-400"
-                                    }`}
-                                  >
-                                    {hoveredWord.article}
-                                  </span>
-                                )}
-                                <span
-                                  className={`font-semibold text-xs sm:text-sm ${
-                                    hoveredWord.article ? "text-white" : "text-zinc-300"
-                                  }`}
-                                >
-                                  {hoveredWord.cleanWord || hoveredWord.wordClean || hoveredWord.lemma}
+                            <div className="text-xs font-semibold mb-0.5 flex items-center justify-center gap-1.5 flex-wrap">
+                              {hoveredWord.article && (
+                                <span className={getArticleColor(hoveredWord.article)}>
+                                  {hoveredWord.article}{" "}
                                 </span>
-                              </div>
-
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSpeak(hoveredWord.cleanWord || hoveredWord.wordClean || hoveredWord.word);
-                                  }}
-                                  title="Озвучить"
-                                  className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
-                                >
-                                  <Volume2 size={13} />
-                                </button>
-
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleClickWord(word, currentSubtitle.text);
-                                  }}
-                                  title={isWordSaved ? "Сохранено в словарь" : "Сохранить в словарь"}
-                                  className={`p-1 rounded transition cursor-pointer flex items-center gap-1 text-[11px] font-bold ${
-                                    isJustSaved
-                                      ? "text-emerald-400 bg-emerald-950/60"
-                                      : isWordSaved
-                                      ? "text-emerald-400 hover:text-emerald-300"
-                                      : "text-zinc-400 hover:text-white hover:bg-zinc-800"
-                                  }`}
-                                >
-                                  {isJustSaved || isWordSaved ? (
-                                    <Check size={13} className="text-emerald-400 stroke-[3]" />
-                                  ) : (
-                                    <Bookmark size={13} />
-                                  )}
-                                </button>
-                              </div>
+                              )}
+                              <span className="text-white">
+                                {hoveredWord.cleanWord || hoveredWord.wordClean || hoveredWord.lemma}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSpeak(hoveredWord.cleanWord || hoveredWord.wordClean || hoveredWord.word);
+                                }}
+                                title="Озвучить"
+                                className="p-0.5 text-zinc-400 hover:text-white transition cursor-pointer"
+                              >
+                                <Volume2 size={12} />
+                              </button>
                             </div>
 
                             {hoveredWord.isLoading ? (
-                              <div className="flex items-center gap-1.5 text-zinc-400 text-xs py-0.5">
+                              <div className="flex items-center justify-center gap-1.5 text-zinc-400 text-xs py-0.5">
                                 <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E50914]" />
                                 <span>Переводим...</span>
                               </div>
                             ) : (
-                              <div className="text-sm sm:text-base font-sans font-bold text-white capitalize leading-tight">
+                              <div className="text-sm font-medium text-zinc-100 capitalize">
                                 {hoveredWord.translation}
                               </div>
                             )}
 
                             {isJustSaved && (
-                              <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1 pt-0.5">
+                              <div className="text-[10px] text-emerald-400 font-medium flex items-center justify-center gap-1 pt-0.5">
                                 <Check size={11} className="stroke-[3]" />
                                 <span>Сохранено в словарь</span>
                               </div>
