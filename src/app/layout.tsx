@@ -14,7 +14,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Netflix",
-  description: "Смотрите фильмы, сериалы и мультфильмы онлайн",
+  description: "B1-B2 German Video Curator",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/icon-512.png",
+    shortcut: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 import { SearchProvider } from "@/components/SearchContext";
