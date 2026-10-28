@@ -233,11 +233,32 @@ export async function GET(request: NextRequest) {
     const limit = Math.max(1, Math.min(50, parseInt(searchParams.get("limit") || "16", 10)));
     const seedParam = searchParams.get("seed");
     const seed = seedParam ? parseInt(seedParam, 10) : 12345;
+    const channelsParam = searchParams.get("channels") || searchParams.get("channelIds") || "";
 
-    // Fetch from all curated B1 and B2 channels
-    const channelLists = await Promise.all(
-      POOL_CHANNELS.map((ch) => fetchVideosForChannel(ch.id, ch.name, ch.level))
-    );
+    let channelLists: YouTubeRecommendedVideo[][] = [];
+
+    if (tab === "subscriptions") {
+      const ids = channelsParam.split(",").map((s) => s.trim()).filter(Boolean);
+      const effectiveChannels = ids.length > 0
+        ? ids.map((id) => {
+            const poolMatch = POOL_CHANNELS.find((c) => c.id === normalizeChannelId(id));
+            return {
+              id,
+              name: poolMatch ? poolMatch.name : "Подписка",
+              level: poolMatch?.level || ("B1" as const),
+            };
+          })
+        : POOL_CHANNELS.slice(0, 4);
+
+      channelLists = await Promise.all(
+        effectiveChannels.map((ch) => fetchVideosForChannel(ch.id, ch.name, ch.level))
+      );
+    } else {
+      // Fetch from all curated B1 and B2 channels
+      channelLists = await Promise.all(
+        POOL_CHANNELS.map((ch) => fetchVideosForChannel(ch.id, ch.name, ch.level))
+      );
+    }
 
     // Interleave channels to ensure high thematic diversity (science, society, technology, reports)
     const baseVideos: YouTubeRecommendedVideo[] = [];
@@ -250,8 +271,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Add curated fallback base videos
-    baseVideos.push(...RECOMMENDED_YOUTUBE_VIDEOS);
+    // Add curated fallback base videos in recommendations tab
+    if (tab !== "subscriptions") {
+      baseVideos.push(...RECOMMENDED_YOUTUBE_VIDEOS);
+    }
 
     // Deduplicate and filter (5-25 min, strictly non-shorts and non-streams)
     const seen = new Set<string>();
