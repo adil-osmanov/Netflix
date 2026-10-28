@@ -17,8 +17,6 @@ import {
   RotateCw, 
   AlertCircle, 
   List, 
-  Volume2, 
-  Check, 
   Sliders, 
   X,
   Bookmark,
@@ -45,15 +43,6 @@ interface InteractivePlayerProps {
   channelTitle?: string;
   onBackToCatalog?: () => void;
   onNextVideo?: () => void;
-}
-
-const LEAD_TIME = 0.15; // 150 миллисекунд упреждения для синхронизации с голосом
-
-function getArticleColor(article: string | null) {
-  if (article === "der") return "text-blue-400 font-bold";
-  if (article === "die") return "text-red-500 font-bold";
-  if (article === "das") return "text-emerald-400 font-bold";
-  return "text-zinc-400 font-medium";
 }
 
 export default function InteractivePlayer({
@@ -91,6 +80,11 @@ export default function InteractivePlayer({
   // High-precision current time and persistent subtitle state
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [currentSubtitle, setCurrentSubtitle] = useState<TranscriptItem | null>(null);
+  const currentSubtitleRef = useRef<TranscriptItem | null>(null);
+
+  // Netflix-style Top Vignette fade delay (2 seconds retention after resuming)
+  const [showTopVignette, setShowTopVignette] = useState<boolean>(false);
+  const vignetteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
@@ -118,11 +112,6 @@ export default function InteractivePlayer({
   // Hover Word state strictly for floating tooltip
   const [hoveredWord, setHoveredWord] = useState<{
     word: string;
-    lemma: string;
-    article: "der" | "die" | "das" | null;
-    cleanWord: string;
-    wordClean: string;
-    pos: "noun" | "verb" | "adj" | "adv" | "other";
     translation: string;
     isLoading: boolean;
   } | null>(null);
@@ -217,6 +206,22 @@ export default function InteractivePlayer({
     }, 2000);
   };
 
+  // Netflix-style top vignette delay (fade 2 seconds after resuming)
+  useEffect(() => {
+    if (!isPlaying) {
+      if (vignetteTimeoutRef.current) clearTimeout(vignetteTimeoutRef.current);
+      setShowTopVignette(true);
+    } else {
+      // Держим градиент еще 2 секунды после старта, пока YouTube сам гасит свой интерфейс
+      vignetteTimeoutRef.current = setTimeout(() => {
+        setShowTopVignette(false);
+      }, 2000);
+    }
+    return () => {
+      if (vignetteTimeoutRef.current) clearTimeout(vignetteTimeoutRef.current);
+    };
+  }, [isPlaying]);
+
   // Body scroll lock when video player is open
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
@@ -224,6 +229,7 @@ export default function InteractivePlayer({
     return () => {
       document.body.style.overflow = originalStyle;
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      if (vignetteTimeoutRef.current) clearTimeout(vignetteTimeoutRef.current);
     };
   }, []);
 
@@ -252,6 +258,7 @@ export default function InteractivePlayer({
     setIsLoadingTranscript(true);
     setTranscriptError(null);
     setCurrentSubtitle(null);
+    currentSubtitleRef.current = null;
 
     async function loadTranscript() {
       try {
@@ -266,6 +273,7 @@ export default function InteractivePlayer({
           setTranscript(safeMerged);
           if (safeMerged.length > 0) {
             setCurrentSubtitle(safeMerged[0]);
+            currentSubtitleRef.current = safeMerged[0];
           }
           setTranscriptError(null);
         } else {
@@ -377,8 +385,11 @@ export default function InteractivePlayer({
             } catch {}
           },
           onStateChange: (event: any) => {
-            setIsPlaying(event.data === 1);
-            if (event.data === 1) {
+            const playing = event.data === 1;
+            setIsPlaying(playing);
+            if (playing) {
+              const actual = playerRef.current?.getCurrentTime() || 0;
+              timeSyncRef.current = { ytTime: actual, perfTime: performance.now() };
               try {
                 const p = event?.target || playerRef.current;
                 if (p && typeof p.unloadModule === "function") {
@@ -426,39 +437,72 @@ export default function InteractivePlayer({
     };
   }, [videoId, engineMode]);
 
-  // 4. High-precision requestAnimationFrame Timing Sync (with +150ms Lead-Time)
+  // 4. Dead Reckoning Engine & Continuous High-Precision Timing
+  const timeSyncRef = useRef<{ ytTime: number; perfTime: number }>({ ytTime: 0, perfTime: 0 });
+
+  // Функция получения непрерывного точного времени
+  const getHighPrecisionTime = useCallback(() => {
+    if (!isPlaying) return timeSyncRef.current.ytTime;
+    const elapsed = (performance.now() - timeSyncRef.current.perfTime) / 1000;
+    return timeSyncRef.current.ytTime + elapsed;
+  }, [isPlaying]);
+
+  // Бесшовное удержание фразы (Устранение дыр и мигания: при паузах до 2.0 сек не гасим субтитр)
+  const updateCurrentSubtitle = useCallback(
+    (time: number) => {
+      if (!transcript || transcript.length === 0) return;
+
+      // Ищем текущий активный субтитр
+      const index = transcript.findIndex((item, i) => {
+        const nextItem = transcript[i + 1];
+        const end =
+          nextItem && nextItem.start - item.start < 2.0
+            ? nextItem.start
+            : item.start + item.duration;
+        return time >= item.start && time < end;
+      });
+
+      if (index !== -1 && transcript[index] !== currentSubtitleRef.current) {
+        currentSubtitleRef.current = transcript[index];
+        setCurrentSubtitle(transcript[index]);
+      }
+    },
+    [transcript]
+  );
+
   useEffect(() => {
     let animId: number;
+    let lastPoll = 0;
 
-    const syncTime = () => {
+    const loop = (now: number) => {
       if (isPlaying) {
-        let rawTime = 0;
         if (engineMode === "native" && videoRef.current) {
-          rawTime = videoRef.current.currentTime;
+          const actual = videoRef.current.currentTime || 0;
+          timeSyncRef.current = { ytTime: actual, perfTime: now };
+          setCurrentTime(actual);
+          updateCurrentSubtitle(actual + 0.1);
         } else if (playerRef.current && typeof playerRef.current.getCurrentTime === "function") {
-          try {
-            rawTime = playerRef.current.getCurrentTime();
-          } catch {}
-        }
+          // Опрашиваем реальный плеер YouTube раз в 200мс для калибровки
+          if (now - lastPoll > 200) {
+            try {
+              const actual = playerRef.current.getCurrentTime() || 0;
+              timeSyncRef.current = { ytTime: actual, perfTime: now };
+              lastPoll = now;
+            } catch {}
+          }
 
-        setCurrentTime(rawTime);
-
-        // Опережающая компенсация (+150ms)
-        const activeTime = rawTime + LEAD_TIME;
-        const found = safeTranscript.find(
-          (item) => activeTime >= item.start && activeTime < item.start + (item.duration || 0)
-        );
-
-        if (found && found.text !== currentSubtitle?.text) {
-          setCurrentSubtitle(found);
+          // Расчет времени с упреждением 100мс на реакцию слуха/глаза
+          const preciseTime = getHighPrecisionTime() + 0.1;
+          setCurrentTime(getHighPrecisionTime());
+          updateCurrentSubtitle(preciseTime);
         }
       }
-      animId = requestAnimationFrame(syncTime);
+      animId = requestAnimationFrame(loop);
     };
 
-    animId = requestAnimationFrame(syncTime);
+    animId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animId);
-  }, [isPlaying, engineMode, safeTranscript, currentSubtitle]);
+  }, [isPlaying, engineMode, transcript, getHighPrecisionTime, updateCurrentSubtitle]);
 
   // 5. Safe Fullscreen Change Listener
   useEffect(() => {
@@ -514,27 +558,21 @@ export default function InteractivePlayer({
       videoRef.current.currentTime = nextTime;
     } else if (playerRef.current) {
       try {
-        const current = playerRef.current.getCurrentTime();
+        const current = playerRef.current.getCurrentTime() || timeSyncRef.current.ytTime;
         nextTime = Math.max(0, current + seconds);
         playerRef.current.seekTo(nextTime, true);
       } catch {}
     }
 
     setCurrentTime(nextTime);
-    const activeTime = nextTime + LEAD_TIME;
-    const found = safeTranscript.find(
-      (item) => activeTime >= item.start && activeTime < item.start + (item.duration || 0)
-    );
-    if (found) setCurrentSubtitle(found);
+    timeSyncRef.current = { ytTime: nextTime, perfTime: performance.now() };
+    updateCurrentSubtitle(nextTime + 0.1);
   };
 
   const handleSeekTo = (seconds: number) => {
     setCurrentTime(seconds);
-    const activeTime = seconds + LEAD_TIME;
-    const found = safeTranscript.find(
-      (item) => activeTime >= item.start && activeTime < item.start + (item.duration || 0)
-    );
-    if (found) setCurrentSubtitle(found);
+    timeSyncRef.current = { ytTime: seconds, perfTime: performance.now() };
+    updateCurrentSubtitle(seconds + 0.1);
 
     if (engineMode === "native" && videoRef.current) {
       videoRef.current.currentTime = seconds;
@@ -598,13 +636,8 @@ export default function InteractivePlayer({
   // Active dialogue index for right column
   const activeSubtitleIndex = useMemo(() => {
     if (!currentSubtitle) return -1;
-    const activeTime = currentTime + LEAD_TIME;
-    return safeTranscript.findIndex(
-      (item) =>
-        item.text === currentSubtitle.text ||
-        (activeTime >= item.start && activeTime < item.start + (item.duration || 0))
-    );
-  }, [safeTranscript, currentSubtitle, currentTime]);
+    return safeTranscript.findIndex((item) => item.text === currentSubtitle.text);
+  }, [safeTranscript, currentSubtitle]);
 
   // Auto-scroll side list to active sentence
   useEffect(() => {
@@ -691,11 +724,6 @@ export default function InteractivePlayer({
     setHoveredWordIdx(idx);
     setHoveredWord({
       word: cleaned,
-      lemma: cleaned,
-      article: null,
-      cleanWord: cleaned,
-      wordClean: cleaned,
-      pos: "other",
       translation: "",
       isLoading: true,
     });
@@ -705,11 +733,6 @@ export default function InteractivePlayer({
       if (!prev || prev.word !== cleaned) return prev;
       return {
         word: cleaned,
-        lemma: data.lemma,
-        article: data.article,
-        cleanWord: data.cleanWord || data.wordClean || cleaned,
-        wordClean: data.wordClean || data.cleanWord || cleaned,
-        pos: data.pos,
         translation: data.translation,
         isLoading: false,
       };
@@ -748,17 +771,6 @@ export default function InteractivePlayer({
     } catch (e) {
       console.error("Save word error:", e);
     }
-  };
-
-  const handleSpeak = (word: string) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(word);
-      u.lang = "de-DE";
-      u.rate = 0.85;
-      window.speechSynthesis.speak(u);
-    } catch {}
   };
 
   const bgOpacityValue = (subtitleSettings.backdropOpacity / 100).toFixed(2);
@@ -1065,21 +1077,12 @@ export default function InteractivePlayer({
             </>
           )}
 
-          {/* Кинематографическая маска при паузе / микропаузе (строго ПОД субтитрами) */}
+          {/* Премиальный кино-градиент Netflix с задержкой угасания элементов YouTube */}
           <div 
-            className={`absolute inset-0 z-10 pointer-events-none transition-opacity duration-300 ease-in-out ${
-              !isPlaying ? 'opacity-100' : 'opacity-0'
-            }`}
-          >
-            {/* Верхний градиент: полностью растворяет заголовок ролика, аватарку и значки YouTube */}
-            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black via-black/85 to-transparent" />
-
-            {/* Центральное мягкое затемнение: сглаживает белый круг кнопки Play по центру кадра */}
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
-
-            {/* Нижний градиент: мягкая подложка под субтитры */}
-            <div className="absolute bottom-0 left-0 right-0 h-36 bg-gradient-to-t from-black via-black/80 to-transparent" />
-          </div>
+            className={`absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black/75 via-black/25 to-transparent pointer-events-none z-10 transition-opacity duration-700 ease-out ${
+              showTopVignette ? 'opacity-100' : 'opacity-0'
+            }`} 
+          />
 
           {/* Embed Error Overlay (Codes 150 / 101 / 2 / 100) */}
           {embedError && (
@@ -1149,6 +1152,8 @@ export default function InteractivePlayer({
                     const cleanWord = cleanGermanWord(word);
                     const cleanedLower = cleanWord.toLowerCase();
                     const isJustSaved = justSavedWords.has(cleanedLower);
+                    const isHovered = hoveredWord && hoveredWordIdx === idx;
+                    const translation = isHovered ? hoveredWord.translation : null;
 
                     return (
                       <span
@@ -1159,59 +1164,19 @@ export default function InteractivePlayer({
                           type="button"
                           onMouseEnter={() => handleMouseEnterWord(word, currentSubtitle.text, idx)}
                           onClick={() => handleClickWord(word, currentSubtitle.text)}
-                          className="hover:text-red-400 text-white transition-colors cursor-pointer select-none"
+                          className={`hover:text-red-400 transition-colors cursor-pointer select-none ${
+                            isJustSaved ? "text-emerald-400 font-bold" : "text-white"
+                          }`}
                         >
                           {word}
                         </button>
 
-                        {/* Всплывающий тултип: строго над словом, без сдвига строки */}
-                        {hoveredWord && hoveredWordIdx === idx && (
-                          <div
-                            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-auto min-w-[120px] max-w-xs bg-zinc-950/95 border border-zinc-700/80 rounded-xl px-3 py-2 shadow-2xl text-center flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleClickWord(word, currentSubtitle.text);
-                            }}
-                          >
-                            <div className="text-xs font-semibold mb-0.5 flex items-center justify-center gap-1.5 flex-wrap">
-                              {hoveredWord.article && (
-                                <span className={getArticleColor(hoveredWord.article)}>
-                                  {hoveredWord.article}{" "}
-                                </span>
-                              )}
-                              <span className="text-white">
-                                {hoveredWord.cleanWord || hoveredWord.wordClean || hoveredWord.lemma}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSpeak(hoveredWord.cleanWord || hoveredWord.wordClean || hoveredWord.word);
-                                }}
-                                title="Озвучить"
-                                className="p-0.5 text-zinc-400 hover:text-white transition cursor-pointer"
-                              >
-                                <Volume2 size={12} />
-                              </button>
+                        {/* Ультра-компактный матовый тултип: ТОЛЬКО русский перевод */}
+                        {isHovered && (translation || hoveredWord.isLoading) && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                            <div className="px-3 py-1.5 rounded-lg bg-zinc-900/95 border border-white/15 text-xs font-medium text-white shadow-xl backdrop-blur-md whitespace-nowrap">
+                              {hoveredWord.isLoading ? "..." : translation}
                             </div>
-
-                            {hoveredWord.isLoading ? (
-                              <div className="flex items-center justify-center gap-1.5 text-zinc-400 text-xs py-0.5">
-                                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E50914]" />
-                                <span>Переводим...</span>
-                              </div>
-                            ) : (
-                              <div className="text-sm font-medium text-zinc-100 capitalize">
-                                {hoveredWord.translation}
-                              </div>
-                            )}
-
-                            {isJustSaved && (
-                              <div className="text-[10px] text-emerald-400 font-medium flex items-center justify-center gap-1 pt-0.5">
-                                <Check size={11} className="stroke-[3]" />
-                                <span>Сохранено в словарь</span>
-                              </div>
-                            )}
                           </div>
                         )}
                       </span>
