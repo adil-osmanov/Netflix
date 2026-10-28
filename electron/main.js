@@ -21,11 +21,13 @@ const YOUTUBE_CLEAN_CSS = `
 `;
 
 function createWindow() {
+  const iconPath = path.join(__dirname, '../public/icon-512.png');
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
     minWidth: 1024,
     minHeight: 700,
+    icon: iconPath,
     titleBarStyle: 'hiddenInset', // Нативный светофор macOS
     trafficLightPosition: { x: 16, y: 16 },
     backgroundColor: '#09090b',
@@ -54,6 +56,12 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Установка значка в доке macOS
+  if (process.platform === 'darwin' && app.dock) {
+    const dockIcon = path.join(__dirname, '../public/icon-512.png');
+    app.dock.setIcon(dockIcon);
+  }
+
   createWindow();
 
   app.on('activate', () => {

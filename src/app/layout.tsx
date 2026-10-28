@@ -21,8 +21,12 @@ export const metadata: Metadata = {
   description: "B1-B2 German Video Curator",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icon-512.png",
-    shortcut: "/icon-192.png",
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
     apple: "/apple-touch-icon.png",
   },
 };
