@@ -53,8 +53,17 @@ function parseDurationToSeconds(durationStr?: string): number | null {
 }
 
 /**
- * Filter out YouTube Shorts, live streams and videos outside 5–25 minutes:
+ * Filter out YouTube Shorts, live streams, broken videos, and videos under 3 minutes:
  */
+const BLOCKED_PATTERNS = [
+  /winnetou/i,
+  /die\s+entzifferung/i,
+  /harald\s+lesch.*terra/i,
+  /sarg\s+selbst/i,
+  /testosteron[-_\s]*krise/i,
+  /testosteron/i,
+];
+
 function isYouTubeShort(video: {
   title?: string;
   description?: string;
@@ -65,30 +74,37 @@ function isYouTubeShort(video: {
   const title = (video.title || "").toLowerCase();
   const desc = (video.description || "").toLowerCase();
   const id = (video.id || "").toLowerCase();
+  const combined = `${id} ${title} ${desc}`;
 
+  // 1. Blacklisted broken videos
+  if (BLOCKED_PATTERNS.some((p) => p.test(combined))) {
+    return true;
+  }
+
+  // 2. Direct shorts URL or ID
   if (id.includes("shorts") || id.includes("/shorts/")) {
     return true;
   }
 
-  // Keywords and hashtag patterns
+  // 3. Keywords and hashtag patterns
   if (
-    /\b(shorts?|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(title) ||
-    /#(shorts?|tiktok|reels?)/i.test(title) ||
-    /\b(shorts?|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(desc) ||
-    /#(shorts?|tiktok|reels?)/i.test(desc) ||
+    /\b(shorts?|short|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(title) ||
+    /#(shorts?|short|tiktok|reels?)/i.test(title) ||
+    /\b(shorts?|short|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(desc) ||
+    /#(shorts?|short|tiktok|reels?)/i.test(desc) ||
     title.includes("🔴")
   ) {
     return true;
   }
 
-  // Strict 5 to 25 minutes duration filter (300 to 1500 seconds)
-  if (video.duration && (video.duration < 300 || video.duration > 1500)) {
+  // 4. Strict duration filter: exclude videos under 3 minutes (180 seconds)
+  if (video.duration && video.duration < 180) {
     return true;
   }
 
   if (video.durationText) {
     const sec = parseDurationToSeconds(video.durationText);
-    if (sec !== null && (sec < 300 || sec > 1500)) {
+    if (sec !== null && sec < 180) {
       return true;
     }
   }

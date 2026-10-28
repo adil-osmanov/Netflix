@@ -9,13 +9,12 @@ import {
   Film, 
   Tv, 
   FileText, 
-  Clock, 
-  Subtitles, 
-  Calendar,
-  AlertCircle,
+  Bookmark, 
   RotateCw,
-  Sparkles
+  Sparkles,
+  AlertCircle
 } from "lucide-react";
+import { useYouTube } from "@/context/YouTubeContext";
 
 export interface MediathekMediaItem {
   id: string;
@@ -26,6 +25,7 @@ export interface MediathekMediaItem {
   duration: number; // in minutes
   url_website: string;
   url_subtitles?: string;
+  thumbnailUrl?: string;
   level: "B1" | "B2";
   date: string;
 }
@@ -49,21 +49,61 @@ const LEVELS: { id: LevelType; label: string; desc: string }[] = [
 function getChannelBadgeClass(channel: string): string {
   const ch = channel.toLowerCase();
   if (ch.includes("zdf")) {
-    return "bg-amber-500/20 text-amber-300 border-amber-500/40";
+    return "bg-amber-500/25 text-amber-300 border-amber-500/40";
   }
   if (ch.includes("ard") || ch.includes("das erste") || ch.includes("one")) {
-    return "bg-blue-600/20 text-blue-300 border-blue-500/40";
+    return "bg-blue-600/25 text-blue-300 border-blue-500/40";
   }
   if (ch.includes("arte")) {
-    return "bg-purple-600/20 text-purple-300 border-purple-500/40";
+    return "bg-purple-600/25 text-purple-300 border-purple-500/40";
   }
-  if (ch.includes("3sat") || ch.includes("ndr") || ch.includes("wdr") || ch.includes("swr") || ch.includes("mdr") || ch.includes("br") || ch.includes("rbb") || ch.includes("hr")) {
-    return "bg-teal-600/20 text-teal-300 border-teal-500/40";
+  if (
+    ch.includes("3sat") || 
+    ch.includes("ndr") || 
+    ch.includes("wdr") || 
+    ch.includes("swr") || 
+    ch.includes("mdr") || 
+    ch.includes("br") || 
+    ch.includes("rbb") || 
+    ch.includes("hr")
+  ) {
+    return "bg-teal-600/25 text-teal-300 border-teal-500/40";
   }
   return "bg-zinc-800 text-zinc-300 border-zinc-700";
 }
 
+function getClientFallbackThumbnail(channel: string, topic: string, title: string): string {
+  const ch = channel.toUpperCase();
+  let accentColor = "#e50914";
+  if (ch.includes("ZDF")) accentColor = "#fa7d00";
+  else if (ch.includes("ARD") || ch.includes("ERSTE")) accentColor = "#0055a5";
+  else if (ch.includes("ARTE")) accentColor = "#ff501a";
+  else if (ch.includes("3SAT") || ch.includes("WDR") || ch.includes("NDR") || ch.includes("SWR")) accentColor = "#00a399";
+
+  const safeTopic = (topic || "Mediathek").slice(0, 24).replace(/[<>&"]/g, '');
+  const safeTitle = (title || "Sendung").slice(0, 32).replace(/[<>&"]/g, '');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+    <defs>
+      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#18181b" />
+        <stop offset="100%" stop-color="#09090b" />
+      </linearGradient>
+    </defs>
+    <rect width="640" height="360" fill="url(#bg)" />
+    <circle cx="580" cy="80" r="130" fill="${accentColor}" opacity="0.14" />
+    <rect x="36" y="36" width="96" height="32" rx="6" fill="${accentColor}" opacity="0.25" />
+    <text x="84" y="58" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="15" font-weight="900" fill="${accentColor}" text-anchor="middle">${ch.slice(0, 10)}</text>
+    <text x="36" y="115" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="700" fill="#a1a1aa" letter-spacing="1">${safeTopic.toUpperCase()}</text>
+    <text x="36" y="185" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="22" font-weight="800" fill="#f4f4f5">${safeTitle}</text>
+  </svg>`;
+
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 export default function MediathekCatalog() {
+  const { isFavorite, toggleFavorite } = useYouTube();
+
   const [items, setItems] = useState<MediathekMediaItem[]>([]);
   const [category, setCategory] = useState<CategoryType>("ALL");
   const [level, setLevel] = useState<LevelType>("ALL");
@@ -160,8 +200,22 @@ export default function MediathekCatalog() {
   };
 
   const handleCardClick = (url: string) => {
-    // Seamless navigation inside Chrome App / current window
+    // Seamless in-window navigation inside Chrome App
     window.location.href = url;
+  };
+
+  const handleToggleFavorite = (e: React.MouseEvent, item: MediathekMediaItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFavorite({
+      id: item.url_website,
+      title: item.title,
+      channel: item.channel,
+      level: item.level,
+      thumbnailUrl: item.thumbnailUrl || getClientFallbackThumbnail(item.channel, item.topic, item.title),
+      description: item.topic,
+      durationText: `${item.duration} мин`,
+    });
   };
 
   return (
@@ -202,9 +256,9 @@ export default function MediathekCatalog() {
       </div>
 
       {/* Filter Controls: Categories & Level Chips */}
-      <div className="max-w-7xl mx-auto mb-8 space-y-4">
-        {/* Row 1: Categories */}
+      <div className="max-w-7xl mx-auto mb-8">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
+          {/* Categories */}
           <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
             {CATEGORIES.map((cat) => {
               const Icon = cat.icon;
@@ -247,20 +301,6 @@ export default function MediathekCatalog() {
             })}
           </div>
         </div>
-
-        {/* Info Banner about Subtitles */}
-        <div className="flex items-center justify-between text-xs text-zinc-400 px-1">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-800/80 border border-zinc-700 text-zinc-300 text-[11px] font-semibold">
-              <Subtitles className="w-3 h-3 text-red-400" />
-              100% Untertitel DE
-            </span>
-            <span>Официальные немецкие студийные субтитры (ARD/ZDF/Arte)</span>
-          </div>
-          <span className="text-[11px] text-zinc-500 hidden sm:inline">
-            Длительность от 15 минут • Без рекламы
-          </span>
-        </div>
       </div>
 
       {/* Error state */}
@@ -280,25 +320,12 @@ export default function MediathekCatalog() {
 
       {/* Initial Loading Skeleton */}
       {isLoading && (
-        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-4 flex flex-col justify-between h-64 animate-pulse"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="w-16 h-5 rounded bg-zinc-800" />
-                  <div className="w-10 h-5 rounded bg-zinc-800" />
-                </div>
-                <div className="w-3/4 h-5 rounded bg-zinc-800" />
-                <div className="w-full h-4 rounded bg-zinc-800/60" />
-                <div className="w-2/3 h-4 rounded bg-zinc-800/60" />
-              </div>
-              <div className="pt-4 border-t border-zinc-800/60 flex justify-between items-center">
-                <div className="w-20 h-4 rounded bg-zinc-800" />
-                <div className="w-16 h-4 rounded bg-zinc-800" />
-              </div>
+            <div key={i} className="flex flex-col gap-2 animate-pulse">
+              <div className="aspect-video w-full rounded-xl bg-zinc-800/60" />
+              <div className="w-4/5 h-4 rounded bg-zinc-800/80 mt-1" />
+              <div className="w-1/3 h-3 rounded bg-zinc-800/50" />
             </div>
           ))}
         </div>
@@ -315,90 +342,103 @@ export default function MediathekCatalog() {
         </div>
       )}
 
-      {/* Grid of Mediathek Cards */}
+      {/* Grid of Mediathek Cards - Unified with YouTube Card style */}
       {!isLoading && items.length > 0 && (
-        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => handleCardClick(item.url_website)}
-              className="group relative bg-[#181818] hover:bg-[#202020] border border-zinc-800 hover:border-zinc-600 rounded-2xl p-5 flex flex-col justify-between transition-all duration-300 cursor-pointer shadow-lg hover:shadow-2xl hover:scale-[1.015]"
-            >
-              {/* Card Header: Channel Badge & Level Badge */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider border ${getChannelBadgeClass(
-                      item.channel
-                    )}`}
-                  >
-                    {item.channel}
-                  </span>
+        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+          {items.map((item) => {
+            const isFav = isFavorite(item.url_website) || isFavorite(item.id);
 
-                  <div className="flex items-center gap-1.5">
-                    {/* B1 / B2 Badge */}
+            return (
+              <div
+                key={item.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleCardClick(item.url_website)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleCardClick(item.url_website);
+                  }
+                }}
+                className="group relative flex flex-col cursor-pointer text-left select-none"
+              >
+                {/* 1. Preview 16:9 */}
+                <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-all duration-300">
+                  <img
+                    src={item.thumbnailUrl || getClientFallbackThumbnail(item.channel, item.topic, item.title)}
+                    alt={item.title}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = getClientFallbackThumbnail(
+                        item.channel,
+                        item.topic,
+                        item.title
+                      );
+                    }}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
+
+                  {/* Top-Left: Channel Badge & Level Badge */}
+                  <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5">
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border backdrop-blur-md ${getChannelBadgeClass(
+                        item.channel
+                      )}`}
+                    >
+                      {item.channel}
+                    </span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold border backdrop-blur-md ${
                         item.level === "B1"
-                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                          : "bg-sky-500/15 text-sky-300 border-sky-500/30"
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                          : "bg-sky-500/20 text-sky-300 border-sky-500/40"
                       }`}
                     >
                       {item.level}
                     </span>
+                  </div>
 
-                    {/* German Subtitles Badge */}
-                    <span
-                      title="Немецкие студийные субтитры"
-                      className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-300 border border-zinc-700/80 flex items-center gap-0.5"
-                    >
-                      <Subtitles className="w-3 h-3 text-red-500" />
-                      <span>UT</span>
-                    </span>
+                  {/* Top-Right: Bookmark Favorite Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => handleToggleFavorite(e, item)}
+                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/90 backdrop-blur-md text-zinc-300 hover:text-white transition z-20 cursor-pointer"
+                    title={isFav ? "Удалить из избранного" : "Сохранить в избранное"}
+                  >
+                    <Bookmark
+                      size={15}
+                      className={
+                        isFav
+                          ? "fill-[#E50914] text-[#E50914] scale-110 transition-transform"
+                          : "text-zinc-400 hover:text-white transition-colors"
+                      }
+                    />
+                  </button>
+
+                  {/* Center Play Button on Hover */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-12 h-12 bg-red-600/90 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-lg translate-y-2 group-hover:translate-y-0">
+                      <Play className="w-5 h-5 fill-current ml-0.5" />
+                    </div>
+                  </div>
+
+                  {/* Bottom-Right: Duration Badge */}
+                  <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/85 text-[11px] font-medium text-white backdrop-blur-sm border border-white/10 font-mono">
+                    {item.duration} Min.
                   </div>
                 </div>
 
-                {/* Topic / Category Tag */}
-                {item.topic && (
-                  <p className="text-[11px] font-medium text-zinc-400 line-clamp-1 uppercase tracking-wide">
-                    {item.topic}
-                  </p>
-                )}
-
-                {/* Title */}
-                <h3 className="text-sm sm:text-base font-bold text-white line-clamp-2 leading-snug group-hover:text-red-400 transition-colors">
+                {/* 2. Text Below Preview (Title and Channel only) */}
+                <h3 className="mt-2 text-sm font-medium text-zinc-100 line-clamp-2 group-hover:text-white transition-colors leading-snug">
                   {item.title}
                 </h3>
-
-                {/* Description / Synopsis */}
-                <p className="text-xs text-zinc-400 line-clamp-3 leading-relaxed">
-                  {item.description || "Описание отсутствует."}
+                <p className="text-xs text-zinc-500 mt-0.5 truncate">
+                  {item.topic ? `${item.channel} • ${item.topic}` : item.channel}
                 </p>
               </div>
-
-              {/* Card Footer: Duration, Date & Play Indicator */}
-              <div className="mt-5 pt-3.5 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400">
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1 font-medium text-zinc-300">
-                    <Clock className="w-3 h-3 text-zinc-500" />
-                    {item.duration} Min.
-                  </span>
-                  {item.date && (
-                    <span className="flex items-center gap-1 text-zinc-500">
-                      <Calendar className="w-3 h-3" />
-                      {item.date}
-                    </span>
-                  )}
-                </div>
-
-                {/* Play action */}
-                <div className="flex items-center gap-1 text-xs font-semibold text-white group-hover:text-red-500 transition-colors">
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span className="hidden group-hover:inline">Смотреть</span>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

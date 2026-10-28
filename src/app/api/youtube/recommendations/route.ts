@@ -7,8 +7,45 @@ let cachedAllFeedVideos: YouTubeRecommendedVideo[] = [];
 let lastFetchTime = 0;
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
-async function fetchChannelVideos(channelId: string, channelName: string, level: "B1" | "B2"): Promise<YouTubeRecommendedVideo[]> {
+// Blacklist of known broken videos, deleted IDs, or misleading titles
+const BLOCKED_TITLE_PATTERNS = [
+  /winnetou/i,
+  /die\s+entzifferung/i,
+  /harald\s+lesch.*terra/i,
+  /sarg\s+selbst/i,
+  /testosteron[-_\s]*krise/i,
+  /testosteron/i,
+];
+
+function isBlockedVideo(v: { id?: string; title?: string; description?: string }): boolean {
+  const combined = `${v.id || ""} ${v.title || ""} ${v.description || ""}`.toLowerCase();
+  return BLOCKED_TITLE_PATTERNS.some((pattern) => pattern.test(combined));
+}
+
+function parseDurationSeconds(durationStr?: string): number | null {
+  if (!durationStr) return null;
+  const minMatch = durationStr.match(/(\d+)\s*(?:мин|min)/i);
+  if (minMatch) {
+    return parseInt(minMatch[1], 10) * 60;
+  }
+  const parts = durationStr.split(":").map(Number);
+  if (parts.some(isNaN)) return null;
+  if (parts.length === 2) {
+    return parts[0] * 60 + parts[1];
+  }
+  if (parts.length === 3) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+  return null;
+}
+
+async function fetchChannelVideos(
+  channelId: string, 
+  channelName: string, 
+  level: "B1" | "B2"
+): Promise<YouTubeRecommendedVideo[]> {
   try {
+    // UULF playlist fetches exclusively long-form videos (excludes YouTube Shorts)
     let rssUrl = channelId.startsWith("UC")
       ? `https://www.youtube.com/feeds/videos.xml?playlist_id=UULF${channelId.slice(2)}`
       : `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
@@ -68,14 +105,19 @@ async function fetchChannelVideos(channelId: string, channelName: string, level:
       .filter((v) => {
         if (!v.id || v.id.length !== 11) return false;
         if (v.isVertical) return false;
-        const text = (v.title + " " + v.description).toLowerCase();
+        if (isBlockedVideo(v)) return false;
+
+        const text = (v.title + " " + (v.description || "")).toLowerCase();
+
+        // Strict anti-shorts filter
         if (
-          /\b(shorts?|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(text) ||
-          /#(shorts?|tiktok|reels?)/i.test(text) ||
+          /\b(shorts?|tiktok|reels?|livestream|live-stream|24\/7|short)\b/i.test(text) ||
+          /#(shorts?|short|tiktok|reels?)/i.test(text) ||
           text.includes("🔴")
         ) {
           return false;
         }
+
         return true;
       });
   } catch {
@@ -116,6 +158,14 @@ export async function GET(request: NextRequest) {
 
       for (const v of [...interleaved, ...RECOMMENDED_YOUTUBE_VIDEOS]) {
         if (!v.id || !YOUTUBE_ID_REGEX.test(v.id)) continue;
+        if (isBlockedVideo(v)) continue;
+
+        // Duration check: exclude < 180 seconds (< 3 minutes) if duration is known
+        if (v.durationText) {
+          const sec = parseDurationSeconds(v.durationText);
+          if (sec !== null && sec < 180) continue;
+        }
+
         if (!seen.has(v.id)) {
           seen.add(v.id);
           combined.push(v);
@@ -126,8 +176,8 @@ export async function GET(request: NextRequest) {
       lastFetchTime = now;
     }
 
-    // Filter out already excluded IDs
-    const availableVideos = cachedAllFeedVideos.filter((v) => !excludeSet.has(v.id));
+    // Filter out already excluded IDs and blocked videos
+    const availableVideos = cachedAllFeedVideos.filter((v) => !excludeSet.has(v.id) && !isBlockedVideo(v));
 
     const offset = (page - 1) * limit;
     const pageVideos = availableVideos.slice(offset, offset + limit);

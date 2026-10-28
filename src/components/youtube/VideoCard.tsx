@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { Play, ExternalLink, Bookmark } from "lucide-react";
+import { Play, Bookmark } from "lucide-react";
 import { YouTubeRecommendedVideo } from "@/types/youtube";
 import { useYouTube } from "@/context/YouTubeContext";
 
 interface VideoCardProps {
   video: YouTubeRecommendedVideo & {
     youtube_id?: string;
+    duration_str?: string;
     sentenceCount?: number;
     wordCount?: number;
   };
@@ -18,16 +19,21 @@ interface VideoCardProps {
 export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
   const { isFavorite, toggleFavorite } = useYouTube();
   const videoId = video.youtube_id || video.id;
-  const [imgSrc, setImgSrc] = useState(
-    `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
-  );
-  const [isBroken, setIsBroken] = useState(false);
+
+  const [isDead, setIsDead] = useState(false);
+  const [thumbUrl, setThumbUrl] = useState(() => {
+    if (video.thumbnailUrl && !video.thumbnailUrl.includes("maxresdefault")) {
+      return video.thumbnailUrl;
+    }
+    return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  });
 
   const handleImageError = () => {
-    if (imgSrc.includes("maxresdefault")) {
-      setImgSrc(`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`);
+    if (thumbUrl.includes("maxresdefault")) {
+      setThumbUrl(`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`);
     } else {
-      setIsBroken(true);
+      // If hqdefault also fails, completely remove card from DOM
+      setIsDead(true);
     }
   };
 
@@ -43,14 +49,20 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
     }
   };
 
-  const handleOpenVideo = (youtubeId: string) => {
-    window.location.href = `https://www.youtube.com/watch?v=${youtubeId}`;
+  const handleOpenVideo = (id: string) => {
+    if (id.startsWith("http://") || id.startsWith("https://")) {
+      window.location.href = id;
+      return;
+    }
+    window.location.href = `https://www.youtube.com/watch?v=${id}`;
   };
 
   const level = (video.level || "B1").toUpperCase();
   const isB2 = level.startsWith("B2") || level === "C1" || level === "C2";
+  const durationDisplay = video.durationText || video.duration_str;
 
-  if (isBroken) return null;
+  // Complete removal from grid if video or thumbnail is broken
+  if (isDead) return null;
 
   return (
     <div
@@ -63,21 +75,21 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
           handleOpenVideo(videoId);
         }
       }}
-      className="group relative flex flex-col rounded-xl overflow-hidden bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-red-950/20 cursor-pointer text-left select-none"
+      className="group relative flex flex-col cursor-pointer text-left select-none"
     >
-      {/* 1. Preview thumbnail */}
-      <div className="relative aspect-video w-full bg-zinc-950 overflow-hidden">
+      {/* 1. Preview 16:9 */}
+      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-all duration-300">
         <img
-          src={imgSrc}
-          onError={handleImageError}
+          src={thumbUrl}
           alt={video.title}
-          className="w-full h-full object-cover transition duration-500 group-hover:scale-105"
+          onError={handleImageError}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/25 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
 
-        {/* Level badge in top-left */}
-        <div className="absolute top-2.5 left-2.5 z-10">
+        {/* Top-Left: Level Badge */}
+        <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5">
           <span
             className={
               isB2
@@ -89,27 +101,22 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
           </span>
         </div>
 
-        {/* Top-Right: ExternalLink icon & Bookmark */}
-        <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={handleFavoriteClick}
-            className="p-1.5 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md transition-all cursor-pointer group/fav"
-            title={isFav ? "Удалить из избранного" : "Сохранить в избранное"}
-          >
-            <Bookmark
-              size={14}
-              className={
-                isFav
-                  ? "fill-[#E50914] text-[#E50914] scale-110 transition-transform"
-                  : "text-zinc-400 group-hover/fav:text-white transition-colors"
-              }
-            />
-          </button>
-          <div className="p-1.5 rounded-full bg-black/60 backdrop-blur-md">
-            <ExternalLink size={16} className="text-zinc-400 group-hover:text-white transition-colors" />
-          </div>
-        </div>
+        {/* Top-Right: Bookmark Favorite Button */}
+        <button
+          type="button"
+          onClick={handleFavoriteClick}
+          className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/90 backdrop-blur-md text-zinc-300 hover:text-white transition z-20 cursor-pointer"
+          title={isFav ? "Удалить из избранного" : "Сохранить в избранное"}
+        >
+          <Bookmark
+            size={15}
+            className={
+              isFav
+                ? "fill-[#E50914] text-[#E50914] scale-110 transition-transform"
+                : "text-zinc-400 hover:text-white transition-colors"
+            }
+          />
+        </button>
 
         {/* Center Minimal Play Button on Hover */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -118,30 +125,19 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
           </div>
         </div>
 
-        {/* Duration badge in bottom-right */}
-        {video.durationText && (
-          <div className="absolute bottom-2 right-2.5 z-10 bg-black/85 text-zinc-300 text-[10px] font-mono font-medium px-2 py-0.5 rounded-md border border-white/10 backdrop-blur-sm">
-            {video.durationText}
+        {/* Bottom-Right: Duration Badge */}
+        {durationDisplay && (
+          <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/85 text-[11px] font-medium text-white backdrop-blur-sm border border-white/10 font-mono">
+            {durationDisplay}
           </div>
         )}
       </div>
 
-      {/* 2. Info below preview */}
-      <div className="p-3.5 flex flex-col flex-1 justify-between gap-1.5">
-        <h3 className="text-sm font-medium text-zinc-100 line-clamp-2 group-hover:text-white transition-colors leading-snug">
-          {video.title}
-        </h3>
-        <div className="flex items-center justify-between text-xs text-zinc-400 pt-1">
-          <span className="truncate max-w-[180px] hover:text-zinc-300 transition-colors">
-            {video.channel}
-          </span>
-          {(video.sentenceCount || video.wordCount) && (
-            <span className="text-[11px] text-zinc-500 whitespace-nowrap">
-              {video.sentenceCount ? `${video.sentenceCount} предл.` : `${video.wordCount} слов`}
-            </span>
-          )}
-        </div>
-      </div>
+      {/* 2. Text Below Preview (Title and Channel) */}
+      <h3 className="mt-2 text-sm font-medium text-zinc-100 line-clamp-2 group-hover:text-white transition-colors leading-snug">
+        {video.title}
+      </h3>
+      <p className="text-xs text-zinc-500 mt-0.5 truncate">{video.channel}</p>
     </div>
   );
 }

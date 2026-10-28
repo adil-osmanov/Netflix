@@ -16,6 +16,93 @@ interface MediathekItem {
   url_subtitles?: string;
 }
 
+// In-memory cache for extracted og:images across requests
+const ogImageCache = new Map<string, string>();
+
+async function fetchOgImage(url: string): Promise<string | null> {
+  if (!url) return null;
+  if (ogImageCache.has(url)) {
+    return ogImageCache.get(url)!;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2500);
+
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    // 1. og:image or twitter:image
+    const metaMatch =
+      html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+      html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i);
+
+    if (metaMatch && metaMatch[1]) {
+      const img = metaMatch[1];
+      ogImageCache.set(url, img);
+      return img;
+    }
+
+    // 2. ZDF JSON layouts in page
+    const zdfMatch =
+      html.match(/"dim1280X720":\s*"([^"]+)"/i) ||
+      html.match(/"dim1920X1080":\s*"([^"]+)"/i) ||
+      html.match(/"dim768X432":\s*"([^"]+)"/i);
+
+    if (zdfMatch && zdfMatch[1]) {
+      const img = zdfMatch[1].replace(/\\u0026/g, '&');
+      ogImageCache.set(url, img);
+      return img;
+    }
+  } catch {
+    // Network / timeout error
+  }
+  return null;
+}
+
+function getFallbackThumbnail(channel: string, topic: string, title: string): string {
+  const ch = channel.toUpperCase();
+  let accentColor = "#e50914";
+  if (ch.includes("ZDF")) {
+    accentColor = "#fa7d00";
+  } else if (ch.includes("ARD") || ch.includes("ERSTE")) {
+    accentColor = "#0055a5";
+  } else if (ch.includes("ARTE")) {
+    accentColor = "#ff501a";
+  } else if (ch.includes("3SAT") || ch.includes("WDR") || ch.includes("NDR") || ch.includes("SWR")) {
+    accentColor = "#00a399";
+  }
+
+  const safeTopic = (topic || "Mediathek").slice(0, 24).replace(/[<>&"]/g, '');
+  const safeTitle = (title || "Sendung").slice(0, 32).replace(/[<>&"]/g, '');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+    <defs>
+      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#18181b" />
+        <stop offset="100%" stop-color="#09090b" />
+      </linearGradient>
+    </defs>
+    <rect width="640" height="360" fill="url(#bg)" />
+    <circle cx="580" cy="80" r="130" fill="${accentColor}" opacity="0.14" />
+    <rect x="36" y="36" width="96" height="32" rx="6" fill="${accentColor}" opacity="0.25" />
+    <text x="84" y="58" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="15" font-weight="900" fill="${accentColor}" text-anchor="middle">${ch.slice(0, 10)}</text>
+    <text x="36" y="115" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="700" fill="#a1a1aa" letter-spacing="1">${safeTopic.toUpperCase()}</text>
+    <text x="36" y="185" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="22" font-weight="800" fill="#f4f4f5">${safeTitle}</text>
+  </svg>`;
+
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 export async function POST(req: Request) {
   try {
     const { offset = 0, size = 24, level = 'ALL', category = 'ALL', query = '' } = await req.json();
@@ -109,8 +196,24 @@ export async function POST(req: Request) {
       ? filtered
       : filtered.filter((item) => item.level === level);
 
+    const pageItems = finalItems.slice(0, size);
+
+    // Parallel extraction of real og:images for the current page batch
+    const itemsWithImages = await Promise.all(
+      pageItems.map(async (item) => {
+        let poster = await fetchOgImage(item.url_website);
+        if (!poster) {
+          poster = getFallbackThumbnail(item.channel, item.topic, item.title);
+        }
+        return {
+          ...item,
+          thumbnailUrl: poster,
+        };
+      })
+    );
+
     return NextResponse.json({
-      items: finalItems.slice(0, size),
+      items: itemsWithImages,
       hasMore: rawResults.length >= fetchSize,
     });
   } catch (error: any) {
