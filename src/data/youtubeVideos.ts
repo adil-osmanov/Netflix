@@ -93,25 +93,6 @@ export const RECOMMENDED_YOUTUBE_VIDEOS: YouTubeRecommendedVideo[] = [
     description: "Живое обсуждение актуальных тем и немецкой культуры в формате подкаста с четким произношением.",
     durationText: "24 мин",
   },
-  {
-    id: "5wK11fN6p3E",
-    title: "Was macht dich glücklich? Street Interview",
-    channel: "Easy German",
-    level: "B1",
-    thumbnailUrl: "https://i.ytimg.com/vi/5wK11fN6p3E/hqdefault.jpg",
-    description: "Уличные интервью с носителями языка в Германии: естественная разговорная речь и повседневные фразы.",
-    durationText: "10 мин",
-  },
-  {
-    id: "7X1WpX4i4Xo",
-    title: "Typisch Deutsch? Klischees im Check",
-    channel: "Easy German",
-    level: "B1",
-    thumbnailUrl: "https://i.ytimg.com/vi/7X1WpX4i4Xo/hqdefault.jpg",
-    description: "Разбор стереотипов о немцах с субтитрами: пунктуальность, порядок и привычки.",
-    durationText: "15 мин",
-  },
-
   // 2. DW Deutsch lernen (B1)
   {
     id: "_buguiVte80",
@@ -130,15 +111,6 @@ export const RECOMMENDED_YOUTUBE_VIDEOS: YouTubeRecommendedVideo[] = [
     thumbnailUrl: "https://i.ytimg.com/vi/sXeHoU9fbkA/hqdefault.jpg",
     description: "Образовательные сюжеты от DW с акцентом на понимание на слух и расширение словарного запаса.",
     durationText: "6 мин",
-  },
-  {
-    id: "2b9vL3aB9oA",
-    title: "Ticket nach Berlin: Abenteuer in Deutschland",
-    channel: "DW Deutsch lernen",
-    level: "B1",
-    thumbnailUrl: "https://i.ytimg.com/vi/2b9vL3aB9oA/hqdefault.jpg",
-    description: "Увлекательное реалити-путешествие изучающих немецкий язык по городам Германии.",
-    durationText: "14 мин",
   },
 
   // 3. MrWissen2go (B2)
@@ -188,15 +160,6 @@ export const RECOMMENDED_YOUTUBE_VIDEOS: YouTubeRecommendedVideo[] = [
     thumbnailUrl: "https://i.ytimg.com/vi/Jji8l37mX4Y/hqdefault.jpg",
     description: "Актуальное расследование WDR о безопасности общественного транспорта в Германии.",
     durationText: "30 мин",
-  },
-  {
-    id: "d8E88ZkX4YI",
-    title: "Leben am Limit: Junge Menschen in Not | WDR Doku",
-    channel: "WDR Doku",
-    level: "B2",
-    thumbnailUrl: "https://i.ytimg.com/vi/d8E88ZkX4YI/hqdefault.jpg",
-    description: "Социальный репортаж о вызовах и реалиях современной жизни молодежи в Германии.",
-    durationText: "42 мин",
   },
 
   // 5. Simplicissimus (B2)
@@ -317,22 +280,22 @@ export const RECOMMENDED_YOUTUBE_VIDEOS: YouTubeRecommendedVideo[] = [
 
   // 9. Galileo (B2)
   {
-    id: "bUo0h_1Z1o0",
-    title: "Wie entsteht eigentlich ein Döner? | Galileo",
+    id: "Ek8enIVSKGo",
+    title: "Haus gekauft, Bunker entdeckt: Die Festung unter dem Wohnzimmer | Galileo",
     channel: "Galileo",
     level: "B2",
-    thumbnailUrl: "https://i.ytimg.com/vi/bUo0h_1Z1o0/hqdefault.jpg",
-    description: "Galileo blickt hinter die Kulissen der Dönerproduktion in Deutschland.",
+    thumbnailUrl: "https://i.ytimg.com/vi/Ek8enIVSKGo/hqdefault.jpg",
+    description: "Galileo blickt hinter die Kulissen einer unglaublichen Entdeckung in Deutschland.",
     durationText: "14 мин",
   },
   {
-    id: "gN7T23Y74OQ",
-    title: "Das teuerste Restaurant der Welt | Galileo",
+    id: "M-SYuyDm3N0",
+    title: "Die Wahrheit über Vintage-Mode: Woher unsere Secondhand-Kleidung wirklich kommt | Galileo",
     channel: "Galileo",
     level: "B2",
-    thumbnailUrl: "https://i.ytimg.com/vi/gN7T23Y74OQ/hqdefault.jpg",
-    description: "Galileo testet kulinarische Meisterwerke und exklusive Gerichte.",
-    durationText: "16 мин",
+    thumbnailUrl: "https://i.ytimg.com/vi/M-SYuyDm3N0/hqdefault.jpg",
+    description: "Galileo recherchiert über die Wege und Geheimnisse der weltweiten Textilindustrie.",
+    durationText: "17 мин",
   },
 
   // 10. Terra X (B2)
@@ -348,13 +311,13 @@ export const RECOMMENDED_YOUTUBE_VIDEOS: YouTubeRecommendedVideo[] = [
 
   // 11. NDR Doku (B2)
   {
-    id: "J4HcLwVv4W4",
-    title: "Leben auf dem Land: Alltag im Norden | NDR Doku",
+    id: "LLQMps2LkKk",
+    title: "Notruf auf Fehmarn: Reaction von Sanitätern Sandrina & Hannes | NDR Doku",
     channel: "NDR Doku",
     level: "B2",
-    thumbnailUrl: "https://i.ytimg.com/vi/J4HcLwVv4W4/hqdefault.jpg",
-    description: "Authentische Einblicke in das Leben und Arbeiten im ländlichen Norddeutschland.",
-    durationText: "22 мин",
+    thumbnailUrl: "https://i.ytimg.com/vi/LLQMps2LkKk/hqdefault.jpg",
+    description: "Authentische Einblicke in den Alltag der Rettungskräfte an der Ostsee.",
+    durationText: "21 мин",
   },
 ];
 

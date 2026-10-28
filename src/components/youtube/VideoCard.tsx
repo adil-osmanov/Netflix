@@ -18,9 +18,18 @@ interface VideoCardProps {
 export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
   const { isFavorite, toggleFavorite } = useYouTube();
   const videoId = video.youtube_id || video.id;
-  const [thumbSrc, setThumbSrc] = useState(
-    video.thumbnailUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+  const [imgSrc, setImgSrc] = useState(
+    `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
   );
+  const [isBroken, setIsBroken] = useState(false);
+
+  const handleImageError = () => {
+    if (imgSrc.includes("maxresdefault")) {
+      setImgSrc(`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`);
+    } else {
+      setIsBroken(true);
+    }
+  };
 
   const isFav = isFavorite(video.id);
 
@@ -41,6 +50,8 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
   const level = (video.level || "B1").toUpperCase();
   const isB2 = level.startsWith("B2") || level === "C1" || level === "C2";
 
+  if (isBroken) return null;
+
   return (
     <div
       role="button"
@@ -57,12 +68,8 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
       {/* 1. Preview thumbnail */}
       <div className="relative aspect-video w-full bg-zinc-950 overflow-hidden">
         <img
-          src={thumbSrc}
-          onError={() => {
-            if (!thumbSrc.includes("mqdefault")) {
-              setThumbSrc(`https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`);
-            }
-          }}
+          src={imgSrc}
+          onError={handleImageError}
           alt={video.title}
           className="w-full h-full object-cover transition duration-500 group-hover:scale-105"
           loading="lazy"

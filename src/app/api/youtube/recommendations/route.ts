@@ -110,11 +110,12 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Add curated videos as fallback base
       const seen = new Set<string>();
       const combined: YouTubeRecommendedVideo[] = [];
+      const YOUTUBE_ID_REGEX = /^[a-zA-Z0-9_-]{11}$/;
 
       for (const v of [...interleaved, ...RECOMMENDED_YOUTUBE_VIDEOS]) {
+        if (!v.id || !YOUTUBE_ID_REGEX.test(v.id)) continue;
         if (!seen.has(v.id)) {
           seen.add(v.id);
           combined.push(v);
