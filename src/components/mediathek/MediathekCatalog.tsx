@@ -115,6 +115,7 @@ export default function MediathekCatalog() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1000000) + 1);
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -137,6 +138,7 @@ export default function MediathekCatalog() {
           level,
           category,
           query: activeQuery,
+          seed,
         }),
       });
 
@@ -157,7 +159,15 @@ export default function MediathekCatalog() {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [category, level, activeQuery]);
+  }, [category, level, activeQuery, seed]);
+
+  const handleRefresh = () => {
+    const newSeed = Math.floor(Math.random() * 1000000) + 1;
+    setSeed(newSeed);
+    setItems([]);
+    setOffset(0);
+    setHasMore(true);
+  };
 
   // Initial load or when filters change
   useEffect(() => {
@@ -278,6 +288,16 @@ export default function MediathekCatalog() {
                 </button>
               );
             })}
+
+            {/* Кнопка обновления ↻ */}
+            <button
+              onClick={handleRefresh}
+              disabled={isLoading}
+              className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition disabled:opacity-50 cursor-pointer shadow"
+              title="Обновить ленту"
+            >
+              <RotateCw className={`w-4 h-4 text-red-500 ${isLoading ? "animate-spin" : ""}`} />
+            </button>
           </div>
 
           {/* Level Switcher (Right side) */}

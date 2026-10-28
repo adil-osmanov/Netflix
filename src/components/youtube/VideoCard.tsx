@@ -8,6 +8,7 @@ import { useYouTube } from "@/context/YouTubeContext";
 interface VideoCardProps {
   video: YouTubeRecommendedVideo & {
     youtube_id?: string;
+    url_website?: string;
     duration_str?: string;
     sentenceCount?: number;
     wordCount?: number;
@@ -18,26 +19,34 @@ interface VideoCardProps {
 
 export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
   const { isFavorite, toggleFavorite } = useYouTube();
-  const videoId = video.youtube_id || video.id;
+  const videoId = video.youtube_id || video.id || video.url_website || "";
+  const isExternalUrl = videoId.startsWith("http://") || videoId.startsWith("https://") || Boolean(video.url_website);
 
   const [isDead, setIsDead] = useState(false);
   const [thumbUrl, setThumbUrl] = useState(() => {
     if (video.thumbnailUrl && !video.thumbnailUrl.includes("maxresdefault")) {
       return video.thumbnailUrl;
     }
+    if (isExternalUrl) {
+      return video.thumbnailUrl || "";
+    }
     return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
   });
 
   const handleImageError = () => {
+    if (isExternalUrl) {
+      // Never hide external Mediathek videos on image load issue
+      return;
+    }
     if (thumbUrl.includes("maxresdefault")) {
       setThumbUrl(`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`);
     } else {
-      // If hqdefault also fails, completely remove card from DOM
+      // If hqdefault also fails for YouTube, remove card from DOM
       setIsDead(true);
     }
   };
 
-  const isFav = isFavorite(video.id);
+  const isFav = isFavorite(video.id) || (video.url_website ? isFavorite(video.url_website) : false);
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -54,6 +63,10 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
       window.location.href = id;
       return;
     }
+    if (video.url_website) {
+      window.location.href = video.url_website;
+      return;
+    }
     window.location.href = `https://www.youtube.com/watch?v=${id}`;
   };
 
@@ -61,7 +74,7 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
   const isB2 = level.startsWith("B2") || level === "C1" || level === "C2";
   const durationDisplay = video.durationText || video.duration_str;
 
-  // Complete removal from grid if video or thumbnail is broken
+  // Complete removal from grid only if YouTube video or thumbnail is completely broken
   if (isDead) return null;
 
   return (
@@ -79,17 +92,28 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
     >
       {/* 1. Preview 16:9 */}
       <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-all duration-300">
-        <img
-          src={thumbUrl}
-          alt={video.title}
-          onError={handleImageError}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
-        />
+        {thumbUrl ? (
+          <img
+            src={thumbUrl}
+            alt={video.title}
+            onError={handleImageError}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-500 text-xs font-medium">
+            {video.channel || "ARD / ZDF"}
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
 
-        {/* Top-Left: Level Badge */}
+        {/* Top-Left: Channel Badge (if Mediathek) or Level Badge */}
         <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5">
+          {video.channel && isExternalUrl && (
+            <span className="bg-zinc-800/80 border border-zinc-700 text-zinc-300 text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md">
+              {video.channel}
+            </span>
+          )}
           <span
             className={
               isB2

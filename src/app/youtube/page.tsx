@@ -97,14 +97,14 @@ function isYouTubeShort(video: {
     return true;
   }
 
-  // 4. Strict duration filter: exclude videos under 3 minutes (180 seconds)
-  if (video.duration && video.duration < 180) {
+  // 4. Strict duration filter: exclude videos under 4 minutes (240 seconds)
+  if (video.duration && video.duration < 240) {
     return true;
   }
 
   if (video.durationText) {
     const sec = parseDurationToSeconds(video.durationText);
-    if (sec !== null && sec < 180) {
+    if (sec !== null && sec < 240) {
       return true;
     }
   }
@@ -397,43 +397,53 @@ export default function YouTubeCatalogPage() {
   const query = searchInput.trim().toLowerCase();
   const isSearchQuery = query.length > 0 && !extractYouTubeId(searchInput.trim());
 
-  const currentVideos = baseVideos.filter((video) => {
-    // 0. Filter out Shorts, streams and durations outside 5–25 min
-    if (isYouTubeShort(video)) return false;
+  const currentVideos =
+    activeTab === "favorites"
+      ? favorites.filter((video) => {
+          if (!isSearchQuery) return true;
+          return (
+            (video.title || "").toLowerCase().includes(query) ||
+            (video.channel || "").toLowerCase().includes(query) ||
+            (video.description || "").toLowerCase().includes(query)
+          );
+        })
+      : baseVideos.filter((video) => {
+          // 0. Filter out Shorts, streams and durations under 4 min
+          if (isYouTubeShort(video)) return false;
 
-    // 1. Поиск по текущей активной вкладке
-    const matchesSearch =
-      !isSearchQuery ||
-      video.title.toLowerCase().includes(query) ||
-      video.channel.toLowerCase().includes(query) ||
-      (video.description || "").toLowerCase().includes(query);
+          // 1. Поиск по текущей активной вкладке
+          const matchesSearch =
+            !isSearchQuery ||
+            (video.title || "").toLowerCase().includes(query) ||
+            (video.channel || "").toLowerCase().includes(query) ||
+            (video.description || "").toLowerCase().includes(query);
 
-    if (!matchesSearch) return false;
+          if (!matchesSearch) return false;
 
-    // 2. Контекстные фильтры вкладок
-    if (activeTab === "recommendations") {
-      const l = (video.level || "B1").toUpperCase();
-      const isB2 = l.startsWith("B2") || l === "C1" || l === "C2";
-      return (
-        selectedLevel === "ALL" ||
-        (selectedLevel === "B1" && !isB2) ||
-        (selectedLevel === "B2" && isB2)
-      );
-    }
+          // 2. Контекстные фильтры вкладок
+          if (activeTab === "recommendations") {
+            const l = (video.level || "B1").toUpperCase();
+            const isB2 = l.startsWith("B2") || l === "C1" || l === "C2";
+            return (
+              selectedLevel === "ALL" ||
+              (selectedLevel === "B1" && !isB2) ||
+              (selectedLevel === "B2" && isB2)
+            );
+          }
 
-    if (activeTab === "subscriptions") {
-      if (selectedSubscribedChannel === "ALL") return true;
-      const chClean = video.channel.toLowerCase().trim();
-      const selClean = selectedSubscribedChannel.toLowerCase().trim();
-      return (
-        chClean === selClean ||
-        chClean.includes(selClean) ||
-        video.channelId === selectedSubscribedChannel
-      );
-    }
+          if (activeTab === "subscriptions") {
+            if (selectedSubscribedChannel === "ALL") return true;
+            const chClean = (video.channel || "").toLowerCase().trim();
+            const selClean = selectedSubscribedChannel.toLowerCase().trim();
+            return (
+              chClean === selClean ||
+              chClean.includes(selClean) ||
+              video.channelId === selectedSubscribedChannel
+            );
+          }
 
-    return true;
-  });
+          return true;
+        });
 
   return (
     <div className="min-h-screen bg-[#141414] text-white pb-24 px-4 md:px-12 pt-4">
@@ -659,25 +669,36 @@ export default function YouTubeCatalogPage() {
 
       {/* Main Video Feed Area */}
       <div className="max-w-7xl mx-auto">
-        {/* Loading State on initial fetch */}
-        {((activeTab === "subscriptions" && isLoadingSubs && subVideos.length === 0) ||
+        {activeTab === "favorites" ? (
+          favorites.length === 0 ? (
+            <div className="py-20 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl text-center flex flex-col items-center justify-center p-8 gap-3 max-w-lg mx-auto">
+              <Bookmark className="w-10 h-10 text-zinc-600" />
+              <h3 className="text-base font-bold text-white">Вы пока не добавили ни одного видео в избранное</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Нажмите на значок закладки на любой карточке, чтобы добавить видео в этот список.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+              {currentVideos.map((video) => (
+                <VideoCard
+                  key={(video as any).youtube_id || video.id || (video as any).url_website}
+                  video={video}
+                  onRemoveFavorite={() => removeFavorite(video.id)}
+                />
+              ))}
+            </div>
+          )
+        ) : ((activeTab === "subscriptions" && isLoadingSubs && subVideos.length === 0) ||
           (activeTab === "recommendations" && isLoadingRec && recommendations.length === 0)) ? (
           <div className="py-24 flex flex-col items-center justify-center gap-3 text-zinc-400">
             <Loader2 className="w-8 h-8 animate-spin text-[#E50914]" />
             <span className="text-sm font-medium">Загрузка свежих видео из немецких каналов...</span>
           </div>
         ) : currentVideos.length === 0 ? (
-          /* Empty State */
+          /* Empty State for recommendations / subscriptions */
           <div className="py-20 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl text-center flex flex-col items-center justify-center p-8 gap-3 max-w-lg mx-auto">
-            {activeTab === "favorites" ? (
-              <>
-                <Bookmark className="w-10 h-10 text-zinc-600" />
-                <h3 className="text-base font-bold text-white">Вы пока не сохранили ни одного видео</h3>
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  Нажмите на значок закладки на любой карточке, чтобы добавить видео в этот список.
-                </p>
-              </>
-            ) : activeTab === "subscriptions" ? (
+            {activeTab === "subscriptions" ? (
               <>
                 <Tv className="w-10 h-10 text-zinc-600" />
                 <h3 className="text-base font-bold text-white">В ваших подписках пока нет доступных видео</h3>
@@ -704,28 +725,22 @@ export default function YouTubeCatalogPage() {
             )}
           </div>
         ) : (
-          /* Video Grid (Strictly non-Shorts, 5–25 min, opens in same window) */
+          /* Video Grid (Strictly non-Shorts, >= 4 min, opens in same window) */
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
               {currentVideos.map((video) => (
                 <VideoCard
-                  key={video.id}
+                  key={(video as any).youtube_id || video.id || (video as any).url_website}
                   video={video}
-                  onRemoveFavorite={
-                    activeTab === "favorites"
-                      ? () => removeFavorite(video.id)
-                      : undefined
-                  }
                 />
               ))}
             </div>
 
             {/* Infinite Scroll Trigger Target */}
-            {activeTab !== "favorites" && (
-              <div
-                ref={loadMoreTriggerRef}
-                className="h-20 w-full flex items-center justify-center mt-6 pointer-events-none"
-              >
+            <div
+              ref={loadMoreTriggerRef}
+              className="h-20 w-full flex items-center justify-center mt-6 pointer-events-none"
+            >
                 {(isLoadingMoreRec || isLoadingMoreSub) && (
                   <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm">
                     <Loader2 className="w-5 h-5 animate-spin text-[#E50914]" />
@@ -733,7 +748,6 @@ export default function YouTubeCatalogPage() {
                   </div>
                 )}
               </div>
-            )}
           </>
         )}
       </div>

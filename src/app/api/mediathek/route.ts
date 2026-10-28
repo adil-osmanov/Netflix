@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface MediathekItem {
   id?: string;
   channel: string;
@@ -15,6 +18,11 @@ interface MediathekItem {
   url_subtitle?: string;
   url_subtitles?: string;
 }
+
+const TOPICS_POOL = [
+  'Terra X', 'Doku', 'Wissen', 'Film', 'Krimi', 'Reportage',
+  'SWR Handwerkskunst', 'NDR Doku', 'ZDFinfo', 'Arte', 'Technik', 'Natur'
+];
 
 // In-memory cache for extracted og:images across requests
 const ogImageCache = new Map<string, string>();
@@ -103,34 +111,58 @@ function getFallbackThumbnail(channel: string, topic: string, title: string): st
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+// Fisher-Yates shuffle
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 export async function POST(req: Request) {
   try {
-    const { offset = 0, size = 24, level = 'ALL', category = 'ALL', query = '' } = await req.json();
+    const { 
+      offset = 0, 
+      size = 24, 
+      level = 'ALL', 
+      category = 'ALL', 
+      query = '', 
+      seed = 0 
+    } = await req.json();
 
     // Shaping search queries
     const queries: Array<{ fields: string[]; query: string }> = [];
 
     if (query && query.trim()) {
       queries.push({ fields: ['title', 'topic', 'description'], query: query.trim() });
-    }
-
-    if (category === 'films') {
+    } else if (category === 'films') {
       queries.push({ fields: ['topic', 'title'], query: 'Film' });
     } else if (category === 'series') {
       queries.push({ fields: ['topic', 'title'], query: 'Serie' });
     } else if (category === 'doku') {
       queries.push({ fields: ['topic', 'title'], query: 'Doku' });
+    } else if (category === 'ALL' && seed) {
+      // Pick dynamic rotating topic from pool on user rotation/refresh
+      const poolIndex = Math.abs(Number(seed)) % TOPICS_POOL.length;
+      const topicToQuery = TOPICS_POOL[poolIndex];
+      queries.push({ fields: ['topic', 'title'], query: topicToQuery });
     }
 
-    // We fetch a larger batch because we strictly filter for subtitles and >= 15 min
+    // Larger batch for quality filtering
     const fetchSize = Math.max(size * 3, 60);
+
+    // Random offset shift if seed is provided on initial page
+    const randomShift = (offset === 0 && seed) ? (Math.floor(Math.random() * 5) * 10) : 0;
+    const effectiveOffset = offset + randomShift;
 
     const payload = {
       queries,
       sortBy: 'timestamp',
       sortOrder: 'desc',
       future: false,
-      offset,
+      offset: effectiveOffset,
       size: fetchSize,
     };
 
@@ -192,13 +224,15 @@ export async function POST(req: Request) {
       });
 
     // Level filter
-    const finalItems = level === 'ALL'
+    const levelFiltered = level === 'ALL'
       ? filtered
       : filtered.filter((item) => item.level === level);
 
-    const pageItems = finalItems.slice(0, size);
+    // Shuffle so cards don't appear in monolithic blocks of one TV series
+    const shuffled = shuffleArray(levelFiltered);
+    const pageItems = shuffled.slice(0, size);
 
-    // Parallel extraction of real og:images for the current page batch
+    // Parallel extraction of real og:images for current page batch
     const itemsWithImages = await Promise.all(
       pageItems.map(async (item) => {
         let poster = await fetchOgImage(item.url_website);

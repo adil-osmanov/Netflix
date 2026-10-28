@@ -22,6 +22,24 @@ function isBlockedVideo(v: { id?: string; title?: string; description?: string }
   return BLOCKED_TITLE_PATTERNS.some((pattern) => pattern.test(combined));
 }
 
+function isShortDuration(str?: string): boolean {
+  if (!str) return false;
+  const minMatch = str.match(/(\d+)\s*(?:мин|min)/i);
+  if (minMatch) {
+    return parseInt(minMatch[1], 10) < 4;
+  }
+  const parts = str.split(":").map(Number);
+  if (parts.some(isNaN)) return false;
+  if (parts.length === 2) {
+    // MM:SS -> if minutes < 4 -> short
+    return parts[0] < 4;
+  }
+  if (parts.length === 1) {
+    return parts[0] < 240;
+  }
+  return false;
+}
+
 function parseDurationSeconds(durationStr?: string): number | null {
   if (!durationStr) return null;
   const minMatch = durationStr.match(/(\d+)\s*(?:мин|min)/i);
@@ -107,12 +125,13 @@ async function fetchChannelVideos(
         if (v.isVertical) return false;
         if (isBlockedVideo(v)) return false;
 
-        const text = (v.title + " " + (v.description || "")).toLowerCase();
+        const text = `${v.id} ${v.title} ${v.description || ""}`.toLowerCase();
 
-        // Strict anti-shorts filter
+        // Strict anti-shorts filter: tags, keywords, URLs
         if (
-          /\b(shorts?|tiktok|reels?|livestream|live-stream|24\/7|short)\b/i.test(text) ||
+          /\b(shorts?|short|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(text) ||
           /#(shorts?|short|tiktok|reels?)/i.test(text) ||
+          text.includes("/shorts/") ||
           text.includes("🔴")
         ) {
           return false;
@@ -160,10 +179,11 @@ export async function GET(request: NextRequest) {
         if (!v.id || !YOUTUBE_ID_REGEX.test(v.id)) continue;
         if (isBlockedVideo(v)) continue;
 
-        // Duration check: exclude < 180 seconds (< 3 minutes) if duration is known
+        // Strict 4-minute duration filter (>= 240 seconds)
         if (v.durationText) {
+          if (isShortDuration(v.durationText)) continue;
           const sec = parseDurationSeconds(v.durationText);
-          if (sec !== null && sec < 180) continue;
+          if (sec !== null && sec < 240) continue;
         }
 
         if (!seen.has(v.id)) {
