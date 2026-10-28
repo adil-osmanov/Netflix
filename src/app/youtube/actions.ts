@@ -1,7 +1,7 @@
 "use server";
 
 import { supabase } from "@/utils/supabase";
-import { UserWord } from "@/types/youtube";
+import { UserWord, YouTubeRecommendedVideo } from "@/types/youtube";
 
 export async function saveWordAction(wordData: {
   word: string;
@@ -252,5 +252,117 @@ export async function clearChannelDeckAction(channelTitle: string): Promise<{ su
     }
   } catch {}
 
+  return { success: true };
+}
+
+export async function getFavoritesAction(): Promise<{ success: boolean; data: YouTubeRecommendedVideo[] }> {
+  const list: YouTubeRecommendedVideo[] = [];
+  try {
+    const { data, error } = await supabase
+      .from("user_favorites")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error && Array.isArray(data) && data.length > 0) {
+      for (const d of data) {
+        list.push({
+          id: d.video_id || d.id,
+          title: d.title || "",
+          channel: d.channel_title || d.channel || "YouTube",
+          level: (d.level as any) || "B1",
+          thumbnailUrl: d.thumbnail_url || `https://i.ytimg.com/vi/${d.video_id || d.id}/hqdefault.jpg`,
+          durationText: d.duration || d.durationText || "",
+        });
+      }
+      return { success: true, data: list };
+    }
+  } catch {}
+
+  // Fallback to global_settings if table was empty or missing
+  try {
+    const { data } = await supabase
+      .from("global_settings")
+      .select("value")
+      .eq("key", "user_favorites")
+      .maybeSingle();
+    if (data?.value && Array.isArray(data.value)) {
+      return { success: true, data: data.value };
+    }
+  } catch {}
+
+  return { success: true, data: list };
+}
+
+export async function toggleFavoriteAction(
+  video: YouTubeRecommendedVideo
+): Promise<{ success: boolean; isFavorite: boolean }> {
+  let isFav = false;
+  try {
+    const { data } = await supabase
+      .from("user_favorites")
+      .select("id")
+      .eq("video_id", video.id)
+      .maybeSingle();
+
+    if (data?.id) {
+      await supabase.from("user_favorites").delete().eq("video_id", video.id);
+      isFav = false;
+    } else {
+      await supabase.from("user_favorites").insert({
+        video_id: video.id,
+        title: video.title,
+        channel_title: video.channel,
+        thumbnail_url: video.thumbnailUrl,
+        duration: video.durationText || "",
+        level: video.level || "B1",
+        created_at: new Date().toISOString(),
+      });
+      isFav = true;
+    }
+  } catch {
+    // If table doesn't exist, we will toggle in global_settings below
+  }
+
+  // Synchronize with global_settings
+  try {
+    const { data } = await supabase
+      .from("global_settings")
+      .select("value")
+      .eq("key", "user_favorites")
+      .maybeSingle();
+    let current: any[] = [];
+    if (data?.value && Array.isArray(data.value)) {
+      current = data.value;
+    }
+    const exists = current.some((v: any) => v.id === video.id);
+    let updated: any[];
+    if (exists) {
+      updated = current.filter((v: any) => v.id !== video.id);
+      isFav = false;
+    } else {
+      updated = [video, ...current.filter((v: any) => v.id !== video.id)];
+      isFav = true;
+    }
+    await supabase.from("global_settings").upsert({ key: "user_favorites", value: updated });
+  } catch {}
+
+  return { success: true, isFavorite: isFav };
+}
+
+export async function removeFavoriteAction(videoId: string): Promise<{ success: boolean }> {
+  try {
+    await supabase.from("user_favorites").delete().eq("video_id", videoId);
+  } catch {}
+  try {
+    const { data } = await supabase
+      .from("global_settings")
+      .select("value")
+      .eq("key", "user_favorites")
+      .maybeSingle();
+    if (data?.value && Array.isArray(data.value)) {
+      const filtered = data.value.filter((v: any) => v.id !== videoId);
+      await supabase.from("global_settings").upsert({ key: "user_favorites", value: filtered });
+    }
+  } catch {}
   return { success: true };
 }

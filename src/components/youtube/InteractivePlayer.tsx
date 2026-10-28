@@ -1,8 +1,13 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { TranscriptItem } from "@/types/youtube";
-import { useYouTube, SubtitleSettings, SUBTITLE_FONT_SIZE_CLASSES, SubtitleFontSize } from "@/context/YouTubeContext";
+import { TranscriptItem, TranslationData } from "@/types/youtube";
+import { 
+  useYouTube, 
+  SubtitleSettings, 
+  SUBTITLE_FONT_SIZE_CLASSES, 
+  SubtitleFontSize 
+} from "@/context/YouTubeContext";
 import { saveWordAction } from "@/app/youtube/actions";
 import { mergeTranscriptSentences, cleanGermanWord } from "@/lib/subtitleUtils";
 import { 
@@ -10,7 +15,6 @@ import {
   Pause, 
   RotateCcw, 
   RotateCw, 
-  Subtitles, 
   AlertCircle, 
   List, 
   Volume2, 
@@ -18,7 +22,6 @@ import {
   Sliders, 
   X,
   Bookmark,
-  Sparkles,
   Gauge,
   Maximize,
   Minimize,
@@ -51,14 +54,20 @@ export default function InteractivePlayer({
   onBackToCatalog,
   onNextVideo,
 }: InteractivePlayerProps) {
-  const { subtitleSettings, updateSubtitleSettings, refreshSavedWords } = useYouTube();
+  const { subtitleSettings, updateSubtitleSettings, refreshSavedWords, isFavorite, toggleFavorite } = useYouTube();
 
-  const mainContainerRef = useRef<HTMLDivElement>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<any>(null);
   const wasPlayingRef = useRef<boolean>(false);
   const resumeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const translationCacheRef = useRef<Map<string, { lemma: string; translation: string }>>(new Map());
+  const translationCacheRef = useRef<Map<string, TranslationData>>(new Map());
   const activeSideItemRef = useRef<HTMLDivElement>(null);
+
+  // Video Engine Mode: "native" (direct mp4/hls) or "iframe" (YouTube iframe fallback)
+  const [engineMode, setEngineMode] = useState<"native" | "iframe">("native");
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [isCheckingStream, setIsCheckingStream] = useState<boolean>(true);
 
   // Subtitles & Player state
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
@@ -72,42 +81,11 @@ export default function InteractivePlayer({
   const [isControlsVisible, setIsControlsVisible] = useState<boolean>(true);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const resetControlsTimeout = useCallback(() => {
-    setIsControlsVisible(true);
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-    if (isFullscreen) {
-      controlsTimeoutRef.current = setTimeout(() => {
-        setIsControlsVisible(false);
-      }, 2500);
-    }
-  }, [isFullscreen]);
+  // Mouse Cursor auto-hide (2 seconds of inactivity when playing)
+  const [isCursorIdle, setIsCursorIdle] = useState<boolean>(false);
+  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    if (!isFullscreen) {
-      setIsControlsVisible(true);
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-    } else {
-      resetControlsTimeout();
-    }
-    return () => {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-    };
-  }, [isFullscreen, resetControlsTimeout]);
-
-  // 0. Body scroll lock when video player is open
-  useEffect(() => {
-    const originalStyle = window.getComputedStyle(document.body).overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalStyle;
-    };
-  }, []);
+  const isFav = isFavorite(videoId);
 
   // Settings popover & refs
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -120,36 +98,24 @@ export default function InteractivePlayer({
   // Hidden controls bar toggle state
   const [isControlsHidden, setIsControlsHidden] = useState<boolean>(false);
 
-  // Close settings popover on click outside
-  useEffect(() => {
-    if (!isSettingsOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        settingsRef.current &&
-        !settingsRef.current.contains(e.target as Node) &&
-        settingsButtonRef.current &&
-        !settingsButtonRef.current.contains(e.target as Node)
-      ) {
-        setIsSettingsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isSettingsOpen]);
-
   // Hover & Pinned Word state
   const [hoveredWord, setHoveredWord] = useState<{
     word: string;
     lemma: string;
+    article: "der" | "die" | "das" | null;
+    wordClean: string;
+    pos: "noun" | "verb" | "adj" | "adv" | "other";
     translation: string;
     isLoading: boolean;
   } | null>(null);
+  const [hoveredWordIdx, setHoveredWordIdx] = useState<number | null>(null);
 
   const [pinnedWord, setPinnedWord] = useState<{
     word: string;
     lemma: string;
+    article: "der" | "die" | "das" | null;
+    wordClean: string;
+    pos: "noun" | "verb" | "adj" | "adv" | "other";
     translation: string;
     context: string;
     isSaved: boolean;
@@ -192,6 +158,80 @@ export default function InteractivePlayer({
     }
   }, [videoId, channelTitle, videoTitle]);
 
+  // Controls visibility timeout in fullscreen
+  const resetControlsTimeout = useCallback(() => {
+    setIsControlsVisible(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    if (isFullscreen) {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setIsControlsVisible(false);
+      }, 2500);
+    }
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    if (!isFullscreen) {
+      setIsControlsVisible(true);
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    } else {
+      resetControlsTimeout();
+    }
+    return () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, [isFullscreen, resetControlsTimeout]);
+
+  // Mouse move handler: controls visibility + cursor auto-hide after 2s of idle
+  const handleMouseMove = () => {
+    setIsCursorIdle(false);
+    resetControlsTimeout();
+
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+    }
+
+    idleTimerRef.current = setTimeout(() => {
+      if (isPlaying && !hoveredWord && !pinnedWord) {
+        setIsCursorIdle(true);
+      }
+    }, 2000);
+  };
+
+  // 0. Body scroll lock when video player is open
+  useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalStyle;
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, []);
+
+  // Close settings popover on click outside
+  useEffect(() => {
+    if (!isSettingsOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        settingsRef.current &&
+        !settingsRef.current.contains(e.target as Node) &&
+        settingsButtonRef.current &&
+        !settingsButtonRef.current.contains(e.target as Node)
+      ) {
+        setIsSettingsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isSettingsOpen]);
+
   // 1. Fetch & Merge Subtitles into full sentences
   useEffect(() => {
     let isCancelled = false;
@@ -206,15 +246,12 @@ export default function InteractivePlayer({
         if (isCancelled) return;
 
         if (resp.ok && Array.isArray(data.transcript) && data.transcript.length > 0) {
-          // Merge fragmented phrases into natural complete sentences
           const mergedSentences = mergeTranscriptSentences(data.transcript);
           setTranscript(Array.isArray(mergedSentences) ? mergedSentences : []);
           setTranscriptError(null);
         } else {
           setTranscript([]);
-          setTranscriptError(
-            data.error || "Субтитры недоступны для этого видео"
-          );
+          setTranscriptError(data.error || "Субтитры недоступны для этого видео");
         }
       } catch {
         if (!isCancelled) {
@@ -237,8 +274,48 @@ export default function InteractivePlayer({
     };
   }, [videoId]);
 
-  // 2. Initialize YouTube IFrame API & 50ms High-Frequency Sync
+  // 2. Fetch Native Video Stream or Fallback to IFrame
   useEffect(() => {
+    let isCancelled = false;
+    setIsCheckingStream(true);
+    setStreamUrl(null);
+
+    async function checkStream() {
+      try {
+        const res = await fetch(`/api/youtube/stream?videoId=${videoId}`);
+        if (!res.ok) throw new Error("Stream route error");
+        const data = await res.json();
+
+        if (isCancelled) return;
+
+        if (data.success && data.streamUrl) {
+          setStreamUrl(data.streamUrl);
+          setEngineMode("native");
+        } else {
+          setEngineMode("iframe");
+        }
+      } catch {
+        if (!isCancelled) {
+          setEngineMode("iframe");
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsCheckingStream(false);
+        }
+      }
+    }
+
+    checkStream();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [videoId]);
+
+  // 3. Initialize YouTube IFrame API (used if engineMode === "iframe")
+  useEffect(() => {
+    if (engineMode !== "iframe") return;
+
     let timer: NodeJS.Timeout;
 
     function initPlayer() {
@@ -260,7 +337,7 @@ export default function InteractivePlayer({
           disablekb: 1,
           modestbranding: 1,
           rel: 0,
-          cc_load_policy: 0, // Disable native YouTube CC so our custom overlay is used
+          cc_load_policy: 0,
           cc_lang_pref: "none",
           iv_load_policy: 3,
           fs: 0,
@@ -269,7 +346,6 @@ export default function InteractivePlayer({
         },
         events: {
           onReady: (event: any) => {
-            // Guarantee native YouTube CC captions are completely turned off/unloaded
             try {
               const p = event?.target || playerRef.current;
               if (p) {
@@ -286,26 +362,18 @@ export default function InteractivePlayer({
             } catch {}
           },
           onStateChange: (event: any) => {
-            // 1 = PLAYING, 2 = PAUSED, 0 = ENDED
             setIsPlaying(event.data === 1);
             if (event.data === 1) {
               try {
                 const p = event?.target || playerRef.current;
-                if (p) {
-                  if (typeof p.unloadModule === "function") {
-                    p.unloadModule("captions");
-                    p.unloadModule("cc");
-                  }
-                  if (typeof p.setOption === "function") {
-                    p.setOption("captions", "track", {});
-                  }
+                if (p && typeof p.unloadModule === "function") {
+                  p.unloadModule("captions");
+                  p.unloadModule("cc");
                 }
               } catch {}
             }
           },
           onError: (event: any) => {
-            // Codes 101/150: embedding blocked by copyright owner
-            // Codes 2/100: invalid video id or video removed
             if (event.data === 150 || event.data === 101 || event.data === 2 || event.data === 100) {
               setEmbedError(true);
             }
@@ -333,7 +401,6 @@ export default function InteractivePlayer({
         };
       }
 
-      // High-Frequency 50ms interval to eliminate subtitle desync
       timer = setInterval(() => {
         if (
           playerRef.current &&
@@ -355,9 +422,9 @@ export default function InteractivePlayer({
         } catch {}
       }
     };
-  }, [videoId]);
+  }, [videoId, engineMode]);
 
-  // 3. Fullscreen change listener
+  // 4. Safe Fullscreen Change Listener
   useEffect(() => {
     const handleFsChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
@@ -369,8 +436,8 @@ export default function InteractivePlayer({
   const toggleFullscreen = async () => {
     try {
       if (!document.fullscreenElement) {
-        if (mainContainerRef.current?.requestFullscreen) {
-          await mainContainerRef.current.requestFullscreen();
+        if (playerContainerRef.current?.requestFullscreen) {
+          await playerContainerRef.current.requestFullscreen();
         }
       } else {
         if (document.exitFullscreen) {
@@ -378,44 +445,73 @@ export default function InteractivePlayer({
         }
       }
     } catch (err) {
-      console.error("Fullscreen toggle error:", err);
+      console.warn("Fullscreen toggle non-critical handled:", err);
     }
   };
 
-  // Player Controls
+  // Player Controls (Unified Native <video> + IFrame)
   const handleTogglePlay = () => {
-    if (!playerRef.current) return;
-    try {
-      if (isPlaying) {
-        playerRef.current.pauseVideo();
+    if (engineMode === "native" && videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play().catch(() => {});
       } else {
-        playerRef.current.playVideo();
+        videoRef.current.pause();
       }
-    } catch {}
+      return;
+    }
+
+    if (playerRef.current) {
+      try {
+        if (isPlaying) {
+          playerRef.current.pauseVideo();
+        } else {
+          playerRef.current.playVideo();
+        }
+      } catch {}
+    }
   };
 
   const handleSeekRelative = (seconds: number) => {
-    if (!playerRef.current) return;
-    try {
-      const current = playerRef.current.getCurrentTime();
-      playerRef.current.seekTo(Math.max(0, current + seconds), true);
-    } catch {}
+    if (engineMode === "native" && videoRef.current) {
+      videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime + seconds);
+      return;
+    }
+
+    if (playerRef.current) {
+      try {
+        const current = playerRef.current.getCurrentTime();
+        playerRef.current.seekTo(Math.max(0, current + seconds), true);
+      } catch {}
+    }
   };
 
   const handleSeekTo = (seconds: number) => {
-    if (!playerRef.current) return;
-    try {
-      playerRef.current.seekTo(seconds, true);
-      playerRef.current.playVideo();
-    } catch {}
+    if (engineMode === "native" && videoRef.current) {
+      videoRef.current.currentTime = seconds;
+      videoRef.current.play().catch(() => {});
+      return;
+    }
+
+    if (playerRef.current) {
+      try {
+        playerRef.current.seekTo(seconds, true);
+        playerRef.current.playVideo();
+      } catch {}
+    }
   };
 
   const handleSpeedChange = (rate: number) => {
-    if (!playerRef.current) return;
-    try {
-      playerRef.current.setPlaybackRate(rate);
-      setPlaybackRate(rate);
-    } catch {}
+    setPlaybackRate(rate);
+    if (engineMode === "native" && videoRef.current) {
+      videoRef.current.playbackRate = rate;
+      return;
+    }
+
+    if (playerRef.current) {
+      try {
+        playerRef.current.setPlaybackRate(rate);
+      } catch {}
+    }
   };
 
   // Keyboard shortcuts (Space/K = Play/Pause, F = Fullscreen, Arrows = Seek)
@@ -447,7 +543,7 @@ export default function InteractivePlayer({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isPlaying]);
+  }, [isPlaying, engineMode]);
 
   // Safe transcript array guard
   const safeTranscript = Array.isArray(transcript) ? transcript : [];
@@ -469,7 +565,7 @@ export default function InteractivePlayer({
   const fetchContextualTranslation = async (
     word: string,
     sentence: string
-  ): Promise<{ lemma: string; translation: string }> => {
+  ): Promise<TranslationData> => {
     const cacheKey = `${word.toLowerCase()}_${sentence.slice(0, 30).toLowerCase()}`;
     if (translationCacheRef.current.has(cacheKey)) {
       return translationCacheRef.current.get(cacheKey)!;
@@ -482,14 +578,23 @@ export default function InteractivePlayer({
         body: JSON.stringify({ word, sentence }),
       });
       const data = await resp.json();
-      const result = {
+      const result: TranslationData = {
         lemma: data.lemma || word,
+        article: data.article || null,
+        wordClean: data.wordClean || word,
+        pos: data.pos || "other",
         translation: data.translation || "Перевод не найден",
       };
       translationCacheRef.current.set(cacheKey, result);
       return result;
     } catch {
-      return { lemma: word, translation: "Ошибка перевода" };
+      return {
+        lemma: word,
+        article: null,
+        wordClean: word,
+        pos: "other",
+        translation: "Ошибка перевода",
+      };
     }
   };
 
@@ -504,7 +609,9 @@ export default function InteractivePlayer({
 
     if (isPlaying) {
       wasPlayingRef.current = true;
-      if (playerRef.current) {
+      if (engineMode === "native" && videoRef.current) {
+        videoRef.current.pause();
+      } else if (playerRef.current) {
         try {
           playerRef.current.pauseVideo();
         } catch {}
@@ -512,7 +619,7 @@ export default function InteractivePlayer({
     }
   };
 
-  // Resume playback when cursor leaves the entire subtitle container (unless a word is pinned)
+  // Resume playback when cursor leaves the entire subtitle container
   const handleSubtitleContainerMouseLeave = () => {
     if (pinnedWord) return;
 
@@ -522,9 +629,13 @@ export default function InteractivePlayer({
     }
 
     setHoveredWord(null);
+    setHoveredWordIdx(null);
+
     if (wasPlayingRef.current) {
       wasPlayingRef.current = false;
-      if (playerRef.current) {
+      if (engineMode === "native" && videoRef.current) {
+        videoRef.current.play().catch(() => {});
+      } else if (playerRef.current) {
         try {
           playerRef.current.playVideo();
         } catch {}
@@ -533,17 +644,35 @@ export default function InteractivePlayer({
   };
 
   // Hover-to-Translate word
-  const handleMouseEnterWord = async (rawWord: string, sentence: string) => {
+  const handleMouseEnterWord = async (rawWord: string, sentence: string, idx: number) => {
     const cleaned = cleanGermanWord(rawWord);
     if (!cleaned || pinnedWord) return;
 
-    setHoveredWord({ word: cleaned, lemma: cleaned, translation: "", isLoading: true });
-    const { lemma, translation } = await fetchContextualTranslation(cleaned, sentence);
-    setHoveredWord({ word: cleaned, lemma, translation, isLoading: false });
+    setHoveredWordIdx(idx);
+    setHoveredWord({
+      word: cleaned,
+      lemma: cleaned,
+      article: null,
+      wordClean: cleaned,
+      pos: "other",
+      translation: "",
+      isLoading: true,
+    });
+
+    const data = await fetchContextualTranslation(cleaned, sentence);
+    setHoveredWord({
+      word: cleaned,
+      lemma: data.lemma,
+      article: data.article,
+      wordClean: data.wordClean,
+      pos: data.pos,
+      translation: data.translation,
+      isLoading: false,
+    });
   };
 
   const handleMouseLeaveWord = () => {
-    // Left word; hover card cleared or updated on next word or container leave
+    // Left single word
   };
 
   // Click on word pins the card
@@ -551,7 +680,9 @@ export default function InteractivePlayer({
     const cleaned = cleanGermanWord(rawWord);
     if (!cleaned) return;
 
-    if (playerRef.current) {
+    if (engineMode === "native" && videoRef.current) {
+      videoRef.current.pause();
+    } else if (playerRef.current) {
       try {
         playerRef.current.pauseVideo();
       } catch {}
@@ -564,19 +695,24 @@ export default function InteractivePlayer({
     }
 
     setHoveredWord(null);
-    const { lemma, translation } = await fetchContextualTranslation(cleaned, sentence);
+    setHoveredWordIdx(null);
+
+    const data = await fetchContextualTranslation(cleaned, sentence);
 
     setPinnedWord({
       word: cleaned,
-      lemma,
-      translation,
+      lemma: data.lemma,
+      article: data.article,
+      wordClean: data.wordClean,
+      pos: data.pos,
+      translation: data.translation,
       context: sentence,
       isSaved: false,
       isSaving: false,
     });
   };
 
-  // Save pinned word to Supabase
+  // Save pinned word to Supabase / LocalStorage
   const handleSavePinnedWord = async () => {
     if (!pinnedWord || pinnedWord.isSaving || pinnedWord.isSaved) return;
 
@@ -621,8 +757,11 @@ export default function InteractivePlayer({
   const handleResumePlayback = () => {
     setPinnedWord(null);
     setHoveredWord(null);
+    setHoveredWordIdx(null);
     wasPlayingRef.current = false;
-    if (playerRef.current) {
+    if (engineMode === "native" && videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    } else if (playerRef.current) {
       try {
         playerRef.current.playVideo();
       } catch {}
@@ -680,7 +819,7 @@ export default function InteractivePlayer({
         </button>
       </div>
 
-      {/* Speed & Subtitle Settings & Fullscreen & Hide Button */}
+      {/* Speed & Subtitle Settings & Favorite & Fullscreen & Hide Button */}
       <div className="flex items-center gap-1.5 sm:gap-2.5">
         {/* Speed Selector */}
         <div className="flex items-center gap-0.5 sm:gap-1 text-xs text-zinc-400 bg-zinc-900/80 p-0.5 sm:p-1 rounded-xl border border-zinc-800/80">
@@ -819,6 +958,26 @@ export default function InteractivePlayer({
           )}
         </div>
 
+        {/* Favorite Bookmark Button */}
+        <button
+          onClick={() =>
+            toggleFavorite({
+              id: videoId,
+              title: resolvedVideoTitle || videoTitle || "YouTube Video",
+              channel: resolvedChannelTitle || channelTitle || "YouTube",
+              thumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+              level: "B1",
+            })
+          }
+          className="p-1.5 sm:p-2 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl transition-colors cursor-pointer"
+          title={isFav ? "Удалить из избранного" : "Сохранить в избранное"}
+        >
+          <Bookmark
+            size={16}
+            className={isFav ? "fill-[#E50914] text-[#E50914]" : "text-zinc-400 hover:text-white"}
+          />
+        </button>
+
         {/* Fullscreen Toggle */}
         <button
           onClick={toggleFullscreen}
@@ -842,9 +1001,11 @@ export default function InteractivePlayer({
 
   return (
     <div
-      ref={mainContainerRef}
-      onMouseMove={resetControlsTimeout}
+      ref={playerContainerRef}
+      onMouseMove={handleMouseMove}
       className={`relative w-full ${
+        isCursorIdle ? "cursor-none" : "cursor-default"
+      } ${
         isFullscreen
           ? "fixed inset-0 z-[1000] bg-black p-0 flex flex-col justify-center select-none"
           : "flex flex-col lg:flex-row h-full gap-4 max-w-[1920px] w-full mx-auto overflow-hidden p-2 sm:p-4"
@@ -860,29 +1021,62 @@ export default function InteractivePlayer({
               : "aspect-video rounded-2xl bg-black overflow-hidden shadow-2xl border border-zinc-800/80"
           } group`}
         >
-          {/* Floating Back Button in top-left of video */}
-          {!isFullscreen && onBackToCatalog && (
-            <button
-              onClick={onBackToCatalog}
-              className="absolute top-3 left-3 z-40 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/75 hover:bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white backdrop-blur-md transition shadow-md cursor-pointer"
-            >
-              <ArrowLeft size={14} />
-              <span className="text-xs font-medium">Назад</span>
-            </button>
+          {/* Top Header Row: Back Button + Video Title side-by-side */}
+          <div className="absolute top-4 left-4 z-40 flex items-center gap-3 max-w-[70%] pointer-events-auto">
+            {onBackToCatalog && (
+              <button
+                onClick={onBackToCatalog}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/80 hover:bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white backdrop-blur-md transition shadow-lg shrink-0 cursor-pointer"
+              >
+                <ArrowLeft size={14} />
+                <span className="text-xs font-medium">Назад</span>
+              </button>
+            )}
+            <span className="text-xs font-medium text-zinc-300/90 truncate drop-shadow-md">
+              {resolvedVideoTitle || videoTitle}
+            </span>
+          </div>
+
+          {/* DUAL ENGINE: 1) Native HTML5 Video (zero YouTube chrome) or 2) YouTube IFrame fallback */}
+          {engineMode === "native" && streamUrl ? (
+            <video
+              ref={videoRef}
+              src={streamUrl}
+              autoPlay
+              playsInline
+              onTimeUpdate={() => {
+                if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
+              }}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onEnded={() => {
+                setIsPlaying(false);
+                if (onNextVideo) onNextVideo();
+              }}
+              onError={() => {
+                // If native stream fails to load/play, fallback cleanly to IFrame
+                setEngineMode("iframe");
+              }}
+              onClick={handleTogglePlay}
+              onDoubleClick={toggleFullscreen}
+              className="w-full h-full object-contain cursor-pointer select-none"
+            />
+          ) : (
+            <>
+              {/* YouTube IFrame Container - 100% original size (1:1, NO zoom, NO scale) */}
+              <div
+                id={`yt-player-${videoId}`}
+                className="w-full h-full block pointer-events-none select-none"
+              />
+
+              {/* Transparent Interactive Shield: intercepts clicks to toggle play/pause & double-click for fullscreen */}
+              <div
+                onClick={handleTogglePlay}
+                onDoubleClick={toggleFullscreen}
+                className="absolute inset-0 z-10 cursor-pointer bg-transparent"
+              />
+            </>
           )}
-
-          {/* YouTube IFrame Container - 100% original size (1:1, NO zoom, NO scale) */}
-          <div
-            id={`yt-player-${videoId}`}
-            className="w-full h-full block pointer-events-none select-none"
-          />
-
-          {/* Transparent Interactive Shield: intercepts clicks to toggle play/pause & double-click for fullscreen */}
-          <div
-            onClick={handleTogglePlay}
-            onDoubleClick={toggleFullscreen}
-            className="absolute inset-0 z-10 cursor-pointer bg-transparent"
-          />
 
           {/* Embed Error Overlay (Codes 150 / 101 / 2 / 100) */}
           {embedError && (
@@ -919,7 +1113,7 @@ export default function InteractivePlayer({
             </div>
           )}
 
-          {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER - above shield at z-30 */}
+          {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER - max 1 sentence (2 lines) */}
           <div
             onMouseEnter={handleSubtitleContainerMouseEnter}
             onMouseLeave={handleSubtitleContainerMouseLeave}
@@ -951,13 +1145,63 @@ export default function InteractivePlayer({
                   {activeSubtitle.text.split(/\s+/).filter(Boolean).map((word, idx) => (
                     <span
                       key={idx}
-                      onMouseEnter={() => handleMouseEnterWord(word, activeSubtitle.text)}
-                      onMouseLeave={handleMouseLeaveWord}
-                      onClick={() => handleClickWord(word, activeSubtitle.text)}
-                      className="cursor-pointer hover:bg-white/20 hover:text-red-400 rounded px-1.5 py-0.5 transition-colors duration-100 inline-block active:scale-95 select-none"
-                      title="Наведите для перевода или кликните для сохранения"
+                      className="relative inline-block"
                     >
-                      {word}
+                      <span
+                        onMouseEnter={() => handleMouseEnterWord(word, activeSubtitle.text, idx)}
+                        onMouseLeave={handleMouseLeaveWord}
+                        onClick={() => handleClickWord(word, activeSubtitle.text)}
+                        className="cursor-pointer hover:bg-white/20 hover:text-red-400 rounded px-1.5 py-0.5 transition-colors duration-100 inline-block active:scale-95 select-none"
+                      >
+                        {word}
+                      </span>
+
+                      {/* Adaptive Tooltip directly 8px above this hovered word */}
+                      {hoveredWord && hoveredWordIdx === idx && !pinnedWord && (
+                        <div
+                          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-auto w-max max-w-xs bg-[#181818]/95 backdrop-blur-md border border-zinc-700/80 rounded-xl px-3.5 py-2 shadow-2xl flex flex-col gap-1 text-left animate-in fade-in zoom-in-95 duration-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleClickWord(word, activeSubtitle.text);
+                          }}
+                        >
+                          <div className="flex items-center gap-1.5 text-xs">
+                            {hoveredWord.article && (
+                              <span
+                                className={`font-bold lowercase ${
+                                  hoveredWord.article === "der"
+                                    ? "text-blue-400"
+                                    : hoveredWord.article === "die"
+                                    ? "text-red-500"
+                                    : "text-emerald-400"
+                                }`}
+                              >
+                                {hoveredWord.article}
+                              </span>
+                            )}
+                            <span
+                              className={
+                                hoveredWord.article
+                                  ? "text-white font-medium"
+                                  : "text-zinc-400 font-medium"
+                              }
+                            >
+                              {hoveredWord.wordClean || hoveredWord.lemma}
+                            </span>
+                          </div>
+
+                          {hoveredWord.isLoading ? (
+                            <div className="flex items-center gap-1 text-zinc-400 text-xs py-0.5">
+                              <Loader2 className="w-3 h-3 animate-spin text-[#E50914]" />
+                              <span>Переводим...</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs sm:text-sm font-bold text-white capitalize">
+                              {hoveredWord.translation}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </span>
                   ))}
                 </div>
@@ -969,42 +1213,35 @@ export default function InteractivePlayer({
             </div>
           </div>
 
-          {/* HOVER TOOLTIP (COMPACT CARD OVER WORD) */}
-          {hoveredWord && !pinnedWord && (
-            <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-40 bg-[#181818]/95 backdrop-blur-md border border-zinc-700/80 rounded-xl px-4 py-2.5 shadow-2xl flex items-center gap-3 animate-in fade-in zoom-in-95 duration-100 pointer-events-auto">
-              <div>
-                {hoveredWord.lemma && (
-                  <span className="text-[10px] text-red-400 font-mono uppercase tracking-wider block font-semibold">
-                    {hoveredWord.lemma}
-                  </span>
-                )}
-                {hoveredWord.isLoading ? (
-                  <div className="flex items-center gap-1.5 text-zinc-400 text-xs py-0.5">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E50914]" />
-                    <span>Переводим...</span>
-                  </div>
-                ) : (
-                  <span className="text-sm sm:text-base font-bold text-white capitalize">
-                    {hoveredWord.translation}
-                  </span>
-                )}
-              </div>
-              <span className="text-[10px] text-zinc-400 bg-zinc-800 px-2 py-1 rounded">
-                Клик для фиксации
-              </span>
-            </div>
-          )}
-
           {/* PINNED WORD CARD */}
           {pinnedWord && (
             <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-50 bg-[#181818] border border-zinc-700 rounded-2xl p-4 sm:p-5 shadow-2xl max-w-md w-[92%] sm:w-auto flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  {pinnedWord.lemma && (
-                    <span className="text-[11px] text-red-400 font-mono font-semibold block mb-0.5">
-                      {pinnedWord.lemma}
+                  <div className="flex items-center gap-1.5 text-xs mb-0.5 font-mono">
+                    {pinnedWord.article && (
+                      <span
+                        className={`font-bold lowercase ${
+                          pinnedWord.article === "der"
+                            ? "text-blue-400"
+                            : pinnedWord.article === "die"
+                            ? "text-red-500"
+                            : "text-emerald-400"
+                        }`}
+                      >
+                        {pinnedWord.article}
+                      </span>
+                    )}
+                    <span
+                      className={
+                        pinnedWord.article
+                          ? "text-white font-medium"
+                          : "text-zinc-400 font-medium"
+                      }
+                    >
+                      {pinnedWord.wordClean || pinnedWord.lemma}
                     </span>
-                  )}
+                  </div>
                   <h4 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
                     {pinnedWord.word}
                   </h4>

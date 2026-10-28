@@ -30,4 +30,24 @@ export interface UserWord {
   created_at: string;
 }
 
+export interface UserFavorite {
+  id?: string;
+  user_id?: string;
+  video_id: string;
+  title: string;
+  channel_title: string;
+  thumbnail_url?: string;
+  duration?: string;
+  level?: string;
+  created_at?: string;
+}
+
+export interface TranslationData {
+  lemma: string;
+  article: "der" | "die" | "das" | null;
+  wordClean: string;
+  pos: "noun" | "verb" | "adj" | "adv" | "other";
+  translation: string;
+}
+
 export type YouTubePlayerState = -1 | 0 | 1 | 2 | 3 | 5; // UNSTARTED, ENDED, PLAYING, PAUSED, BUFFERING, CUED

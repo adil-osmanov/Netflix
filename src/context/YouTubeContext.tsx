@@ -1,12 +1,15 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { UserWord } from "@/types/youtube";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { UserWord, YouTubeRecommendedVideo } from "@/types/youtube";
 import { 
   getSavedWordsAction, 
   deleteSavedWordAction,
   deleteVideoWordsAction,
-  clearChannelDeckAction
+  clearChannelDeckAction,
+  getFavoritesAction,
+  toggleFavoriteAction,
+  removeFavoriteAction
 } from "@/app/youtube/actions";
 
 export type SubtitleFontSize = "sm" | "md" | "lg";
@@ -41,6 +44,12 @@ interface YouTubeContextType {
   clearChannelDeck: (channel: string) => Promise<void>;
   subtitleSettings: SubtitleSettings;
   updateSubtitleSettings: (newSettings: Partial<SubtitleSettings>) => void;
+  // Favorites system
+  favorites: YouTubeRecommendedVideo[];
+  isFavorite: (videoId: string) => boolean;
+  toggleFavorite: (video: YouTubeRecommendedVideo) => Promise<void>;
+  removeFavorite: (videoId: string) => Promise<void>;
+  refreshFavorites: () => Promise<void>;
 }
 
 const YouTubeContext = createContext<YouTubeContextType | undefined>(undefined);
@@ -50,8 +59,9 @@ export function YouTubeProvider({ children }: { children: React.ReactNode }) {
   const [savedWords, setSavedWords] = useState<UserWord[]>([]);
   const [isLoadingWords, setIsLoadingWords] = useState(false);
   const [subtitleSettings, setSubtitleSettings] = useState<SubtitleSettings>(DEFAULT_SETTINGS);
+  const [favorites, setFavorites] = useState<YouTubeRecommendedVideo[]>([]);
 
-  // Load subtitle settings from localStorage
+  // Load subtitle settings & favorites from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -60,6 +70,19 @@ export function YouTubeProvider({ children }: { children: React.ReactNode }) {
         setSubtitleSettings(JSON.parse(stored));
       }
     } catch {}
+
+    try {
+      const storedFavs = localStorage.getItem("netflix_favorites");
+      if (storedFavs) {
+        const parsed = JSON.parse(storedFavs);
+        if (Array.isArray(parsed)) {
+          setFavorites(parsed);
+        }
+      }
+    } catch {}
+
+    // Also fetch server favorites and merge
+    refreshFavorites();
   }, []);
 
   const updateSubtitleSettings = (newSettings: Partial<SubtitleSettings>) => {
@@ -114,6 +137,63 @@ export function YouTubeProvider({ children }: { children: React.ReactNode }) {
     setIsDictionaryOpen(false);
   };
 
+  // Favorites logic
+  const refreshFavorites = useCallback(async () => {
+    try {
+      const res = await getFavoritesAction();
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setFavorites((prev) => {
+          // Merge local and server favorites
+          const map = new Map<string, YouTubeRecommendedVideo>();
+          for (const v of prev) map.set(v.id, v);
+          for (const v of res.data) map.set(v.id, v);
+          const merged = Array.from(map.values());
+          try {
+            localStorage.setItem("netflix_favorites", JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+    } catch {}
+  }, []);
+
+  const isFavorite = useCallback(
+    (videoId: string) => {
+      return favorites.some((v) => v.id === videoId);
+    },
+    [favorites]
+  );
+
+  const toggleFavorite = async (video: YouTubeRecommendedVideo) => {
+    const exists = favorites.some((v) => v.id === video.id);
+    let updated: YouTubeRecommendedVideo[];
+    if (exists) {
+      updated = favorites.filter((v) => v.id !== video.id);
+    } else {
+      updated = [video, ...favorites.filter((v) => v.id !== video.id)];
+    }
+    setFavorites(updated);
+    try {
+      localStorage.setItem("netflix_favorites", JSON.stringify(updated));
+    } catch {}
+
+    // Call server action in background
+    try {
+      await toggleFavoriteAction(video);
+    } catch {}
+  };
+
+  const removeFavorite = async (videoId: string) => {
+    const updated = favorites.filter((v) => v.id !== videoId);
+    setFavorites(updated);
+    try {
+      localStorage.setItem("netflix_favorites", JSON.stringify(updated));
+    } catch {}
+    try {
+      await removeFavoriteAction(videoId);
+    } catch {}
+  };
+
   return (
     <YouTubeContext.Provider
       value={{
@@ -128,6 +208,11 @@ export function YouTubeProvider({ children }: { children: React.ReactNode }) {
         clearChannelDeck,
         subtitleSettings,
         updateSubtitleSettings,
+        favorites,
+        isFavorite,
+        toggleFavorite,
+        removeFavorite,
+        refreshFavorites,
       }}
     >
       {children}

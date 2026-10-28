@@ -10,13 +10,15 @@ import {
   Loader2, 
   Tv, 
   RotateCw,
-  Settings2
+  Settings2,
+  Bookmark
 } from "lucide-react";
 import { 
   RECOMMENDED_YOUTUBE_VIDEOS, 
   extractYouTubeId 
 } from "@/data/youtubeVideos";
 import { YouTubeRecommendedVideo } from "@/types/youtube";
+import { useYouTube } from "@/context/YouTubeContext";
 import InteractivePlayer from "@/components/youtube/InteractivePlayer";
 import VideoCard from "@/components/youtube/VideoCard";
 import ManageChannelsModal, { SubscribedChannel } from "@/components/youtube/ManageChannelsModal";
@@ -75,6 +77,8 @@ function isYouTubeShort(video: {
 }
 
 export default function YouTubeCatalogPage() {
+  const { favorites, removeFavorite } = useYouTube();
+
   // Search & Direct Watch
   const [searchInput, setSearchInput] = useState<string>("");
   const [inputError, setInputError] = useState<string | null>(null);
@@ -86,8 +90,8 @@ export default function YouTubeCatalogPage() {
     channel?: string;
   } | null>(null);
 
-  // Tabs: 'recommendations' | 'subscriptions'
-  const [activeTab, setActiveTab] = useState<"recommendations" | "subscriptions">("recommendations");
+  // Tabs: 'recommendations' | 'subscriptions' | 'favorites'
+  const [activeTab, setActiveTab] = useState<"recommendations" | "subscriptions" | "favorites">("recommendations");
 
   // Manage Channels Modal
   const [isManageModalOpen, setIsManageModalOpen] = useState<boolean>(false);
@@ -159,17 +163,24 @@ export default function YouTubeCatalogPage() {
                 const fresh = data.videos.filter(
                   (v: YouTubeRecommendedVideo) => !existingIds.has(v.id)
                 );
-                return [...prev, ...(fresh.length > 0 ? fresh : data.videos)];
+                return [...prev, ...fresh];
               });
               setRecPage(page);
             }
-            setHasMoreRec(true);
+            setHasMoreRec(Boolean(data.hasMore));
+          } else {
+            if (isReset) {
+              setRecommendations(RECOMMENDED_YOUTUBE_VIDEOS);
+            }
+            setHasMoreRec(false);
           }
+        } else {
+          if (isReset) setRecommendations(RECOMMENDED_YOUTUBE_VIDEOS);
         }
-      } catch (err) {
-        console.warn("Failed to load recommendations:", err);
+      } catch {
+        if (isReset) setRecommendations(RECOMMENDED_YOUTUBE_VIDEOS);
       } finally {
-        setIsLoadingRec(false);
+        if (isReset) setIsLoadingRec(false);
         setIsLoadingMoreRec(false);
       }
     },
@@ -178,19 +189,16 @@ export default function YouTubeCatalogPage() {
 
   // 2. Fetch Subscriptions from unified infinite feed API
   const loadSubscriptions = useCallback(
-    async (
-      currentSubs: SubscribedChannel[],
-      page: number,
-      isReset: boolean = false,
-      customSeed?: number
-    ) => {
-      if (currentSubs.length === 0) {
+    async (channels: SubscribedChannel[], page: number, isReset: boolean = false, customSeed?: number) => {
+      if (channels.length === 0) {
         setSubVideos([]);
+        setIsLoadingSubs(false);
+        setIsLoadingMoreSub(false);
         setHasMoreSub(false);
         return;
       }
-      const currentSeed = customSeed !== undefined ? customSeed : seed;
 
+      const currentSeed = customSeed !== undefined ? customSeed : seed;
       if (isReset) {
         setIsLoadingSubs(true);
       } else {
@@ -198,12 +206,13 @@ export default function YouTubeCatalogPage() {
       }
 
       try {
-        const channelIds = currentSubs.map((s) => s.id).join(",");
+        const channelIds = channels.map((c) => c.id).join(",");
         const resp = await fetch(
-          `/api/youtube/feed?tab=subscriptions&channelIds=${encodeURIComponent(
+          `/api/youtube/feed?tab=subscriptions&channels=${encodeURIComponent(
             channelIds
           )}&page=${page}&limit=16&seed=${currentSeed}`
         );
+
         if (resp.ok) {
           const data = await resp.json();
           if (Array.isArray(data.videos) && data.videos.length > 0) {
@@ -216,34 +225,39 @@ export default function YouTubeCatalogPage() {
                 const fresh = data.videos.filter(
                   (v: YouTubeRecommendedVideo) => !existingIds.has(v.id)
                 );
-                return [...prev, ...(fresh.length > 0 ? fresh : data.videos)];
+                return [...prev, ...fresh];
               });
               setSubPage(page);
             }
-            setHasMoreSub(true);
+            setHasMoreSub(Boolean(data.hasMore));
+          } else {
+            setHasMoreSub(false);
           }
         }
-      } catch (err) {
-        console.warn("Failed to load subscriptions:", err);
+      } catch {
       } finally {
-        setIsLoadingSubs(false);
+        if (isReset) setIsLoadingSubs(false);
         setIsLoadingMoreSub(false);
       }
     },
     [seed]
   );
 
-  // Initial loads
+  // Initial Load: Recommendations
   useEffect(() => {
     loadRecommendations(1, true);
   }, [loadRecommendations]);
 
+  // Initial Load / Subscriptions change
   useEffect(() => {
-    loadSubscriptions(subscriptions, 1, true);
-  }, [subscriptions, loadSubscriptions]);
+    if (activeTab === "subscriptions") {
+      loadSubscriptions(subscriptions, 1, true);
+    }
+  }, [subscriptions, activeTab, loadSubscriptions]);
 
-  // Infinite Scroll Observer for continuous endless pagination
+  // Infinite Scroll IntersectionObserver
   useEffect(() => {
+    if (activeTab === "favorites") return;
     const target = loadMoreTriggerRef.current;
     if (!target) return;
 
@@ -255,7 +269,7 @@ export default function YouTubeCatalogPage() {
             if (!isLoadingMoreRec && !isLoadingRec && hasMoreRec) {
               loadRecommendations(recPage + 1, false);
             }
-          } else {
+          } else if (activeTab === "subscriptions") {
             if (!isLoadingMoreSub && !isLoadingSubs && hasMoreSub) {
               loadSubscriptions(subscriptions, subPage + 1, false);
             }
@@ -298,7 +312,7 @@ export default function YouTubeCatalogPage() {
       setSubPage(1);
       setHasMoreSub(true);
       await loadSubscriptions(subscriptions, 1, true, newSeed);
-    } else {
+    } else if (activeTab === "recommendations") {
       setRecPage(1);
       setHasMoreRec(true);
       await loadRecommendations(1, true, newSeed);
@@ -337,7 +351,7 @@ export default function YouTubeCatalogPage() {
     setSubVideos((prev) => prev.filter((v) => v.channelId !== channelId));
   };
 
-  // Filter recommendations & subscriptions based on search query
+  // Filter recommendations, subscriptions & favorites based on search query
   const query = searchInput.trim().toLowerCase();
   const isSearchQuery = query.length > 0 && !extractYouTubeId(searchInput.trim());
 
@@ -363,8 +377,22 @@ export default function YouTubeCatalogPage() {
       : subVideos
   ).filter((v) => !isYouTubeShort(v));
 
+  const filteredFavorites = (
+    isSearchQuery
+      ? favorites.filter(
+          (v) =>
+            v.title.toLowerCase().includes(query) ||
+            v.channel.toLowerCase().includes(query)
+        )
+      : favorites
+  );
+
   const currentVideos =
-    activeTab === "recommendations" ? filteredRecommendations : filteredSubVideos;
+    activeTab === "recommendations"
+      ? filteredRecommendations
+      : activeTab === "subscriptions"
+      ? filteredSubVideos
+      : filteredFavorites;
 
   // Handle Next Video callback for player
   const handleNextVideo = () => {
@@ -426,7 +454,7 @@ export default function YouTubeCatalogPage() {
       {/* Netflix-style Tabs Switcher & Actions */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
-          {/* Left: Tab Buttons + Refresh Icon */}
+          {/* Left: 3 Tab Buttons + Refresh Icon */}
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => setActiveTab("recommendations")}
@@ -459,15 +487,37 @@ export default function YouTubeCatalogPage() {
               </span>
             </button>
 
-            {/* Refresh feed button */}
             <button
-              onClick={handleRefreshFeed}
-              disabled={isRefreshing}
-              className="p-2 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors cursor-pointer ml-1"
-              title="Обновить ленту"
+              onClick={() => setActiveTab("favorites")}
+              className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                activeTab === "favorites"
+                  ? "bg-[#E50914] text-white shadow-lg shadow-red-950/40"
+                  : "bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800"
+              }`}
             >
-              <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#E50914]" : ""}`} />
+              <span>Избранное</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                  activeTab === "favorites"
+                    ? "bg-white/20 text-white"
+                    : "bg-zinc-800 text-zinc-300"
+                }`}
+              >
+                {favorites.length}
+              </span>
             </button>
+
+            {/* Refresh feed button (for recommendations & subscriptions) */}
+            {activeTab !== "favorites" && (
+              <button
+                onClick={handleRefreshFeed}
+                disabled={isRefreshing}
+                className="p-2 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors cursor-pointer ml-1"
+                title="Обновить ленту"
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#E50914]" : ""}`} />
+              </button>
+            )}
           </div>
 
           {/* Right: Channel Management & Add Channel ONLY rendered on subscriptions tab */}
@@ -506,11 +556,19 @@ export default function YouTubeCatalogPage() {
         ) : currentVideos.length === 0 ? (
           /* Empty State */
           <div className="py-20 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl text-center flex flex-col items-center justify-center p-8 gap-3 max-w-lg mx-auto">
-            <Tv className="w-10 h-10 text-zinc-600" />
-            <h3 className="text-base font-bold text-white">Видео не найдены</h3>
+            {activeTab === "favorites" ? (
+              <Bookmark className="w-10 h-10 text-zinc-600" />
+            ) : (
+              <Tv className="w-10 h-10 text-zinc-600" />
+            )}
+            <h3 className="text-base font-bold text-white">
+              {activeTab === "favorites" ? "В избранном пока пусто" : "Видео не найдены"}
+            </h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
               {isSearchQuery
                 ? `По запросу «${searchInput}» ничего не найдено.`
+                : activeTab === "favorites"
+                ? "В избранном пока нет сохраненных видео. Нажмите на значок закладки на любой карточке, чтобы добавить видео сюда."
                 : activeTab === "subscriptions"
                 ? "В ваших подписках пока нет доступных длинных видео."
                 : "В каталоге пока нет видео по выбранным критериям."}
@@ -539,22 +597,29 @@ export default function YouTubeCatalogPage() {
                       channel: video.channel,
                     })
                   }
+                  onRemoveFavorite={
+                    activeTab === "favorites"
+                      ? () => removeFavorite(video.id)
+                      : undefined
+                  }
                 />
               ))}
             </div>
 
             {/* Infinite Scroll Trigger Target */}
-            <div
-              ref={loadMoreTriggerRef}
-              className="h-20 w-full flex items-center justify-center mt-6 pointer-events-none"
-            >
-              {(isLoadingMoreRec || isLoadingMoreSub) && (
-                <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm">
-                  <Loader2 className="w-5 h-5 animate-spin text-[#E50914]" />
-                  <span>Загрузка новых видео...</span>
-                </div>
-              )}
-            </div>
+            {activeTab !== "favorites" && (
+              <div
+                ref={loadMoreTriggerRef}
+                className="h-20 w-full flex items-center justify-center mt-6 pointer-events-none"
+              >
+                {(isLoadingMoreRec || isLoadingMoreSub) && (
+                  <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm">
+                    <Loader2 className="w-5 h-5 animate-spin text-[#E50914]" />
+                    <span>Загрузка новых видео...</span>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
