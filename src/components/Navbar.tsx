@@ -44,7 +44,7 @@ function NavbarContent() {
 
   return (
     <nav className={`fixed top-0 left-0 w-full z-50 transition-colors duration-500 ${isScrolled || showSearch ? 'bg-[#141414]' : 'bg-gradient-to-b from-black/80 to-transparent'}`}>
-      <div className="w-full flex items-center justify-between px-4 md:px-14 py-4 md:py-5">
+      <div className="w-full flex items-center justify-between px-4 pl-20 md:px-14 md:pl-20 py-4 md:py-5">
         {/* LEFT SIDE */}
         <div className="flex items-center">
           <button 

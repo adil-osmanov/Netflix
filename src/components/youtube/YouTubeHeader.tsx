@@ -11,7 +11,7 @@ export default function YouTubeHeader() {
   const wordsCount = savedWords.length;
 
   return (
-    <header className="fixed top-0 left-0 w-full z-40 bg-[#141414]/95 backdrop-blur-md border-b border-zinc-800/80 px-4 md:px-10 py-3.5 flex items-center justify-between">
+    <header className="fixed top-0 left-0 w-full z-40 bg-[#141414]/95 backdrop-blur-md border-b border-zinc-800/80 px-4 pl-20 md:px-10 md:pl-20 py-3.5 flex items-center justify-between">
       {/* Слева */}
       <div className="flex items-center">
         <Link

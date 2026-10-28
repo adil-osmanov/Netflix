@@ -2,11 +2,25 @@
   "name": "tmp_next",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "mac:dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron electron/main.js\"",
+    "mac:build": "electron-builder --mac --universal"
+  },
+  "build": {
+    "appId": "com.netflix.learning",
+    "productName": "Netflix Learning",
+    "mac": {
+      "category": "public.app-category.education",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    }
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
@@ -24,9 +38,13 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^10.0.6",
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^9.5.1"
   }
 }
