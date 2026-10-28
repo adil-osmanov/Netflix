@@ -37,6 +37,8 @@ const CHANNEL_ALIASES: Record<string, string> = {
 const channelVideosCache = new Map<string, { videos: YouTubeRecommendedVideo[]; time: number }>();
 const CACHE_TTL_MS = 25 * 60 * 1000; // 25 minutes
 
+const YOUTUBE_ID_REGEX = /^[a-zA-Z0-9_-]{11}$/;
+
 function normalizeChannelId(id: string): string {
   return CHANNEL_ALIASES[id] || id;
 }
@@ -108,7 +110,7 @@ async function fetchVideosForChannel(
         const vr = item?.richItemRenderer?.content?.videoRenderer;
 
         const id = lockup?.contentId || vr?.videoId;
-        if (!id || id.length !== 11) continue;
+        if (!id || !YOUTUBE_ID_REGEX.test(id)) continue;
 
         const rawTitle =
           lockup?.metadata?.lockupMetadataViewModel?.title?.content ||
@@ -172,7 +174,7 @@ async function fetchVideosForChannel(
           const titleMatch = entry.match(/<title>([^<]+)<\/title>/);
           const id = idMatch ? idMatch[1].trim() : "";
           const rawTitle = titleMatch ? titleMatch[1].trim() : "";
-          if (id && id.length === 11 && !/\b(shorts?)\b/i.test(rawTitle)) {
+          if (id && YOUTUBE_ID_REGEX.test(id) && !/\b(shorts?)\b/i.test(rawTitle)) {
             results.push({
               id,
               title: rawTitle.replace(/&amp;/g, "&").replace(/&quot;/g, '"'),
@@ -253,6 +255,7 @@ export async function GET(request: NextRequest) {
     const seen = new Set<string>();
     const deduplicated: YouTubeRecommendedVideo[] = [];
     for (const v of baseVideos) {
+      if (!v.id || !YOUTUBE_ID_REGEX.test(v.id)) continue;
       if (!seen.has(v.id)) {
         seen.add(v.id);
         deduplicated.push(v);

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Play } from "lucide-react";
 import { YouTubeRecommendedVideo } from "@/types/youtube";
 
@@ -10,6 +10,10 @@ interface VideoCardProps {
 }
 
 export default function VideoCard({ video, onClick }: VideoCardProps) {
+  const [thumbSrc, setThumbSrc] = useState(
+    `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`
+  );
+
   return (
     <div
       onClick={onClick}
@@ -18,7 +22,12 @@ export default function VideoCard({ video, onClick }: VideoCardProps) {
       {/* 1. Thumbnail Container with Duration & Difficulty Badges */}
       <div className="relative aspect-video w-full bg-zinc-950 overflow-hidden">
         <img
-          src={video.thumbnailUrl}
+          src={thumbSrc}
+          onError={() => {
+            if (!thumbSrc.includes("mqdefault")) {
+              setThumbSrc(`https://i.ytimg.com/vi/${video.id}/mqdefault.jpg`);
+            }
+          }}
           alt={video.title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           loading="lazy"

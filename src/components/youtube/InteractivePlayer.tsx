@@ -359,22 +359,26 @@ export default function InteractivePlayer({
 
   // 3. Fullscreen change listener
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
     };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    };
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
 
-  const toggleFullscreen = () => {
-    if (!mainContainerRef.current) return;
-    if (!document.fullscreenElement) {
-      mainContainerRef.current.requestFullscreen?.().catch(() => {});
-    } else {
-      document.exitFullscreen?.().catch(() => {});
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        if (mainContainerRef.current?.requestFullscreen) {
+          await mainContainerRef.current.requestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.error("Fullscreen toggle error:", err);
     }
   };
 
@@ -853,24 +857,24 @@ export default function InteractivePlayer({
           className={`relative w-full ${
             isFullscreen
               ? "h-full flex-1 bg-black overflow-hidden"
-              : "flex-1 flex items-center justify-center bg-black rounded-2xl overflow-hidden shadow-2xl border border-zinc-800/80 aspect-video max-h-full"
+              : "aspect-video rounded-2xl bg-black overflow-hidden shadow-2xl border border-zinc-800/80"
           } group`}
         >
           {/* Floating Back Button in top-left of video */}
           {!isFullscreen && onBackToCatalog && (
             <button
               onClick={onBackToCatalog}
-              className="absolute top-4 left-4 z-40 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/70 hover:bg-black border border-white/10 text-white backdrop-blur-md transition cursor-pointer shadow-lg"
+              className="absolute top-3 left-3 z-40 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/75 hover:bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white backdrop-blur-md transition shadow-md cursor-pointer"
             >
-              <ArrowLeft size={16} />
-              <span className="text-xs font-medium">Назад к списку</span>
+              <ArrowLeft size={14} />
+              <span className="text-xs font-medium">Назад</span>
             </button>
           )}
 
-          {/* YouTube IFrame Container - 1:1 crisp display (NO scale zoom) */}
+          {/* YouTube IFrame Container - 100% original size (1:1, NO zoom, NO scale) */}
           <div
             id={`yt-player-${videoId}`}
-            className="w-full h-full pointer-events-none select-none origin-center"
+            className="w-full h-full block pointer-events-none select-none"
           />
 
           {/* Transparent Interactive Shield: intercepts clicks to toggle play/pause & double-click for fullscreen */}
@@ -878,7 +882,6 @@ export default function InteractivePlayer({
             onClick={handleTogglePlay}
             onDoubleClick={toggleFullscreen}
             className="absolute inset-0 z-10 cursor-pointer bg-transparent"
-            title={isPlaying ? "Пауза (клик) / На весь экран (двойной клик)" : "Воспроизвести (клик) / На весь экран (двойной клик)"}
           />
 
           {/* Embed Error Overlay (Codes 150 / 101 / 2 / 100) */}
