@@ -82,6 +82,56 @@ function normalizeCasing(
   };
 }
 
+async function fetchLLMTranslation(
+  word: string,
+  sentence: string
+): Promise<TranslationResult | null> {
+  const prompt = `Ты context-aware переводчик с немецкого на русский.
+Определи значение слова "${word}" строго в контексте предложения: "${sentence}".
+Учитывай часть речи: если слово написано со строчной буквы в середине фразы ("mache"), это форма глагола (machen = делать), а не редкое существительное.
+Верни строго JSON:
+{
+  "translation": "точный перевод на русский в данном контексте (1-2 слова)",
+  "lemma": "начальная форма слова (инфинитив глагола или существительное с артиклем со строчной буквы: der/die/das)",
+  "pos": "verb" | "noun" | "adj" | "adv" | "other"
+}`;
+
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          response_format: { type: "json_object" },
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.1,
+        }),
+        signal: AbortSignal.timeout(3000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const content = JSON.parse(data.choices?.[0]?.message?.content || "{}");
+        if (content.translation) {
+          const artMatch = content.lemma?.match(/^(der|die|das)\s+/i);
+          return {
+            lemma: content.lemma || word,
+            article: (artMatch ? artMatch[1].toLowerCase() : null) as any,
+            cleanWord: word,
+            wordClean: word,
+            pos: content.pos || "other",
+            translation: content.translation.toLowerCase().trim(),
+          };
+        }
+      }
+    } catch {}
+  }
+  return null;
+}
+
 async function analyzeGermanMorphology(
   cleanWord: string,
   sentence: string
@@ -94,6 +144,47 @@ async function analyzeGermanMorphology(
   let detectedArticle: "der" | "die" | "das" | null = null;
   let detectedPos: "noun" | "verb" | "adj" | "adv" | "other" = "other";
   let baseLemma = cleanWord;
+  const isLowercase = /^[a-zäöüß]/.test(cleanWord);
+
+  // Common verb inflection overrides (e.g. mache -> machen)
+  const commonVerbs: Record<string, string> = {
+    mache: "machen",
+    machst: "machen",
+    macht: "machen",
+    machte: "machen",
+    gemacht: "machen",
+    gehe: "gehen",
+    gehst: "gehen",
+    geht: "gehen",
+    ging: "gehen",
+    gegangen: "gehen",
+    sehe: "sehen",
+    siehst: "sehen",
+    sieht: "sehen",
+    sah: "sehen",
+    gesehen: "sehen",
+    habe: "haben",
+    hast: "haben",
+    hat: "haben",
+    hatte: "haben",
+    gehabt: "haben",
+    bin: "sein",
+    bist: "sein",
+    ist: "sein",
+    sind: "sein",
+    war: "sein",
+    gewesen: "sein",
+  };
+
+  const lowerWord = cleanWord.toLowerCase();
+  if (isLowercase && commonVerbs[lowerWord]) {
+    return {
+      lemma: commonVerbs[lowerWord],
+      article: null,
+      wordClean: lowerWord,
+      pos: "verb",
+    };
+  }
 
   // 1. Check Wiktionary for exact POS and gender
   try {
@@ -109,21 +200,30 @@ async function analyzeGermanMorphology(
       const page: any = Object.values(data?.query?.pages || {})[0];
       const extract: string = page?.extract || "";
 
-      if (
-        extract.includes("Substantiv, m") ||
-        extract.includes("männliches Substantiv")
+      // If word is lowercase in sentence, prioritize verb form over rare homonym nouns (e.g. die Mache)
+      if (isLowercase && (extract.includes("Verb") || extract.includes("Konjugierte Form"))) {
+        detectedPos = "verb";
+        const verbMatch = extract.match(
+          /(?:Form|Präteritum|Partizip II)\s+(?:des Verbs|von)\s+([a-zäöüß]+)/
+        );
+        if (verbMatch && verbMatch[1]) {
+          baseLemma = verbMatch[1].toLowerCase();
+        }
+      } else if (
+        !isLowercase &&
+        (extract.includes("Substantiv, m") || extract.includes("männliches Substantiv"))
       ) {
         detectedPos = "noun";
         detectedArticle = "der";
       } else if (
-        extract.includes("Substantiv, f") ||
-        extract.includes("weibliches Substantiv")
+        !isLowercase &&
+        (extract.includes("Substantiv, f") || extract.includes("weibliches Substantiv"))
       ) {
         detectedPos = "noun";
         detectedArticle = "die";
       } else if (
-        extract.includes("Substantiv, n") ||
-        extract.includes("sächliches Substantiv")
+        !isLowercase &&
+        (extract.includes("Substantiv, n") || extract.includes("sächliches Substantiv"))
       ) {
         detectedPos = "noun";
         detectedArticle = "das";
@@ -147,7 +247,6 @@ async function analyzeGermanMorphology(
   if (!detectedArticle && sentence) {
     const sLower = sentence.toLowerCase();
     const wLower = cleanWord.toLowerCase();
-    // Regex matching article immediately before the word
     if (new RegExp(`\\b(der|dem|den|des|ein|einem|einen|eines)\\s+${wLower}\\b`, "i").test(sLower)) {
       detectedArticle = "der";
       detectedPos = "noun";
@@ -168,15 +267,13 @@ async function analyzeGermanMorphology(
       detectedArticle = suffixArt;
       detectedPos = "noun";
     } else {
-      // Default common German noun fallback
       detectedArticle = "das";
       detectedPos = "noun";
     }
   }
 
-  if (!isCapitalizedInRaw && detectedPos === "other") {
-    // Suffix rules for verbs/adjectives
-    if (cleanWord.endsWith("en") || cleanWord.endsWith("ern") || cleanWord.endsWith("eln")) {
+  if (isLowercase && detectedPos === "other") {
+    if (cleanWord.endsWith("en") || cleanWord.endsWith("ern") || cleanWord.endsWith("eln") || cleanWord.endsWith("e") || cleanWord.endsWith("t")) {
       detectedPos = "verb";
     } else if (cleanWord.endsWith("ig") || cleanWord.endsWith("lich") || cleanWord.endsWith("isch") || cleanWord.endsWith("bar")) {
       detectedPos = "adj";
@@ -189,7 +286,7 @@ async function analyzeGermanMorphology(
   };
 }
 
-async function fetchGoogleTranslation(word: string): Promise<string> {
+async function fetchGoogleTranslation(word: string, isVerb: boolean): Promise<string> {
   const gUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=de&tl=ru&dt=t&dt=bd&q=${encodeURIComponent(
     word
   )}`;
@@ -201,13 +298,22 @@ async function fetchGoogleTranslation(word: string): Promise<string> {
     });
     if (gResp.ok) {
       const gData = await gResp.json();
-      // Primary dictionary term if available
+
+      // If word is a verb, prioritize verb definition in dictionary terms to prevent false nouns (e.g. mache -> обман)
       if (gData[1] && Array.isArray(gData[1]) && gData[1].length > 0) {
+        if (isVerb) {
+          const verbEntry = gData[1].find((item: any) => item[0] === "verb");
+          if (verbEntry && Array.isArray(verbEntry[1]) && verbEntry[1].length > 0) {
+            return verbEntry[1][0].toLowerCase().trim();
+          }
+        }
+
         const primaryTerms = gData[1][0]?.[1];
         if (Array.isArray(primaryTerms) && primaryTerms.length > 0) {
           return primaryTerms[0].toLowerCase().trim();
         }
       }
+
       const direct = gData[0]?.[0]?.[0];
       if (direct) {
         return direct.trim().toLowerCase();
@@ -233,13 +339,18 @@ export async function getContextualTranslation(
     };
   }
 
-  // Run morphology detection and translation concurrently
-  const [morph, translationRaw] = await Promise.all([
-    analyzeGermanMorphology(clean, sentence),
-    fetchGoogleTranslation(clean),
-  ]);
+  // 1. Try LLM translation with full sentence context first
+  const llmResult = await fetchLLMTranslation(clean, sentence);
+  if (llmResult) {
+    return llmResult;
+  }
 
-  // Clean translation of any excessive punctuation or capitalization
+  // 2. Fallback to contextual morphology + Google Translate
+  const isLowercaseInSentence = /^[a-zäöüß]/.test(clean);
+  const morph = await analyzeGermanMorphology(clean, sentence);
+  const isVerb = morph.pos === "verb" || (isLowercaseInSentence && morph.pos !== "noun");
+
+  const translationRaw = await fetchGoogleTranslation(clean, isVerb);
   const translation = translationRaw.toLowerCase().replace(/^[«"'\s]+|[»"'\s]+$/g, "");
 
   return {

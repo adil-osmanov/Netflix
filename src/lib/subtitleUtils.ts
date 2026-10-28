@@ -85,7 +85,8 @@ export function mergeTranscriptSentences(rawItems: TranscriptItem[]): Transcript
         const sentenceText = currentWords.join(" ").trim();
         const fraction = (w + 1) / words.length;
         const currentEnd = item.start + item.duration * fraction;
-        const subDuration = Number(Math.max(0.6, currentEnd - subStart).toFixed(2));
+        const rawDur = currentEnd - subStart;
+        const subDuration = Number((rawDur < 1.5 ? Math.max(rawDur, 1.8) : rawDur).toFixed(2));
 
         if (sentenceText) {
           results.push({

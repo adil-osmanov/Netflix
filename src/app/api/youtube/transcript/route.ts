@@ -40,6 +40,64 @@ function cleanSubtitleText(rawText: string): string {
 }
 
 /**
+ * Modern JSON3 parser for YouTube timedtext (fmt=json3)
+ * Groups words and calculates exact start and duration boundaries:
+ * start = firstWord.tOffsetMs / 1000;
+ * duration = ((lastWord.tOffsetMs + lastWord.dDurationMs) - firstWord.tOffsetMs) / 1000;
+ * If duration < 1.5, expands to Math.max(duration, 1.8)
+ */
+function parseTimedTextJson3(data: any): TranscriptItem[] {
+  if (!data || !Array.isArray(data.events)) return [];
+  const items: TranscriptItem[] = [];
+
+  for (const ev of data.events) {
+    if (!ev.segs || !Array.isArray(ev.segs)) continue;
+
+    const baseEventStart = typeof ev.tStartMs === "number" ? ev.tStartMs : 0;
+    const baseEventDuration = typeof ev.dDurationMs === "number" ? ev.dDurationMs : 2000;
+
+    // Filter valid word tokens
+    const validWords = ev.segs
+      .filter((s: any) => typeof s.utf8 === "string" && s.utf8.trim().length > 0)
+      .map((s: any) => ({
+        text: s.utf8.trim(),
+        tOffsetMs: typeof s.tOffsetMs === "number" ? baseEventStart + s.tOffsetMs : baseEventStart,
+        dDurationMs: typeof s.dDurationMs === "number" ? s.dDurationMs : 300,
+      }));
+
+    if (validWords.length === 0) continue;
+
+    const fullRawText = ev.segs.map((s: any) => s.utf8 || "").join("");
+    const clean = cleanSubtitleText(fullRawText);
+    if (!clean) continue;
+
+    const firstWord = validWords[0];
+    const lastWord = validWords[validWords.length - 1];
+
+    const start = firstWord.tOffsetMs / 1000;
+    let duration =
+      (lastWord.tOffsetMs + lastWord.dDurationMs - firstWord.tOffsetMs) / 1000;
+
+    if (!duration || duration <= 0) {
+      duration = baseEventDuration / 1000;
+    }
+
+    // Устранение пропусков: если длительность фразы меньше 1.5 секунды, расширяем до Math.max(duration, 1.8)
+    if (duration < 1.5) {
+      duration = Math.max(duration, 1.8);
+    }
+
+    items.push({
+      text: clean,
+      start: Number(start.toFixed(2)),
+      duration: Number(duration.toFixed(2)),
+    });
+  }
+
+  return items;
+}
+
+/**
  * Universal XML parser for YouTube timedtext formats:
  * Format 3: <p t="7550" d="1015">Text</p> (milliseconds)
  * Format 1: <text start="7.55" dur="1.01">Text</text> (seconds)
@@ -55,10 +113,12 @@ function parseTimedTextXml(xml: string): TranscriptItem[] {
       const durMs = parseInt(match[2], 10);
       const clean = cleanSubtitleText(match[3]);
       if (clean && durMs >= 200) {
+        let duration = durMs / 1000;
+        if (duration < 1.5) duration = Math.max(duration, 1.8);
         items.push({
           text: clean,
           start: Number((startMs / 1000).toFixed(2)),
-          duration: Number((durMs / 1000).toFixed(2)),
+          duration: Number(duration.toFixed(2)),
         });
       }
     }
@@ -73,10 +133,12 @@ function parseTimedTextXml(xml: string): TranscriptItem[] {
       const dur = parseFloat(match[2]);
       const clean = cleanSubtitleText(match[3]);
       if (clean && dur >= 0.2) {
+        let duration = dur;
+        if (duration < 1.5) duration = Math.max(duration, 1.8);
         items.push({
           text: clean,
           start: Number(start.toFixed(2)),
-          duration: Number(dur.toFixed(2)),
+          duration: Number(duration.toFixed(2)),
         });
       }
     }
@@ -109,12 +171,13 @@ function parseVttOrSrtToTranscript(content: string): TranscriptItem[] {
   function flush() {
     if (currentTextLines.length > 0 && currentEnd > currentStart) {
       const clean = cleanSubtitleText(currentTextLines.join(" "));
-      const duration = Number((currentEnd - currentStart).toFixed(2));
+      let duration = Number((currentEnd - currentStart).toFixed(2));
+      if (duration < 1.5) duration = Math.max(duration, 1.8);
       if (clean && duration >= 0.2) {
         items.push({
           text: clean,
           start: Number(currentStart.toFixed(2)),
-          duration,
+          duration: Number(duration.toFixed(2)),
         });
       }
     }
@@ -225,16 +288,34 @@ async function fetchViaInnerTube(videoId: string): Promise<TranscriptItem[]> {
     throw new Error("Немецкие субтитры не найдены");
   }
 
-  const subRes = await fetch(selectedTrack.baseUrl, {
+  let subUrl = selectedTrack.baseUrl;
+  if (!subUrl.includes("fmt=")) {
+    subUrl += "&fmt=json3";
+  }
+
+  const subRes = await fetch(subUrl, {
     headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
   });
 
   if (!subRes.ok) {
-    throw new Error(`Failed to download subtitle XML (status: ${subRes.status})`);
+    throw new Error(`Failed to download subtitle (status: ${subRes.status})`);
   }
 
-  const xmlText = await subRes.text();
-  const parsed = parseTimedTextXml(xmlText);
+  const rawSubText = await subRes.text();
+  let parsed: TranscriptItem[] = [];
+
+  try {
+    const jsonData = JSON.parse(rawSubText);
+    parsed = parseTimedTextJson3(jsonData);
+  } catch {
+    // Fallback if returned format is XML
+    parsed = parseTimedTextXml(rawSubText);
+  }
+
+  if (parsed.length === 0) {
+    // Retry with plain XML if json3 returned nothing
+    parsed = parseTimedTextXml(rawSubText);
+  }
 
   if (parsed.length === 0) {
     throw new Error("Пустой файл субтитров");

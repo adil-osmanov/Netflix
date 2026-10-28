@@ -82,6 +82,15 @@ export default function InteractivePlayer({
   const [currentSubtitle, setCurrentSubtitle] = useState<TranscriptItem | null>(null);
   const currentSubtitleRef = useRef<TranscriptItem | null>(null);
 
+  // Subtitle visibility toggle (Hotkey C)
+  const [subtitlesVisible, setSubtitlesVisible] = useState<boolean>(true);
+
+  // Subtitle timing offset calibration in seconds (Hotkeys [ / ] and G / H)
+  const [subOffset, setSubOffset] = useState<number>(0);
+  const subOffsetRef = useRef<number>(0);
+  const [offsetNotice, setOffsetNotice] = useState<string | null>(null);
+  const offsetNoticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Netflix-style Top Vignette fade delay (2 seconds retention after resuming)
   const [showTopVignette, setShowTopVignette] = useState<boolean>(false);
   const vignetteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -447,24 +456,42 @@ export default function InteractivePlayer({
     return timeSyncRef.current.ytTime + elapsed;
   }, [isPlaying]);
 
+  // Микро-калибровка смещения времени (+/- 100мс)
+  const triggerOffsetChange = useCallback((delta: number) => {
+    setSubOffset((prev) => {
+      const next = Number((prev + delta).toFixed(2));
+      subOffsetRef.current = next;
+      const sign = next > 0 ? "+" : "";
+      const text = `Смещение субтитров: ${sign}${next.toFixed(1)}s`;
+
+      setOffsetNotice(text);
+      if (offsetNoticeTimeoutRef.current) clearTimeout(offsetNoticeTimeoutRef.current);
+      offsetNoticeTimeoutRef.current = setTimeout(() => {
+        setOffsetNotice(null);
+      }, 1000);
+
+      return next;
+    });
+  }, []);
+
   // Бесшовное удержание фразы (Устранение дыр и мигания: при паузах до 2.0 сек не гасим субтитр)
   const updateCurrentSubtitle = useCallback(
     (time: number) => {
       if (!transcript || transcript.length === 0) return;
 
-      // Ищем текущий активный субтитр
-      const index = transcript.findIndex((item, i) => {
-        const nextItem = transcript[i + 1];
-        const end =
+      // Ищем активный субтитр с учетом удержания
+      const activeItem = transcript.find((item, index) => {
+        const nextItem = transcript[index + 1];
+        const endTime =
           nextItem && nextItem.start - item.start < 2.0
             ? nextItem.start
             : item.start + item.duration;
-        return time >= item.start && time < end;
+        return time >= item.start && time < endTime;
       });
 
-      if (index !== -1 && transcript[index] !== currentSubtitleRef.current) {
-        currentSubtitleRef.current = transcript[index];
-        setCurrentSubtitle(transcript[index]);
+      if (activeItem && activeItem.text !== currentSubtitleRef.current?.text) {
+        currentSubtitleRef.current = activeItem;
+        setCurrentSubtitle(activeItem);
       }
     },
     [transcript]
@@ -480,7 +507,8 @@ export default function InteractivePlayer({
           const actual = videoRef.current.currentTime || 0;
           timeSyncRef.current = { ytTime: actual, perfTime: now };
           setCurrentTime(actual);
-          updateCurrentSubtitle(actual + 0.1);
+          const effectiveTime = actual + 0.1 + subOffsetRef.current;
+          updateCurrentSubtitle(effectiveTime);
         } else if (playerRef.current && typeof playerRef.current.getCurrentTime === "function") {
           // Опрашиваем реальный плеер YouTube раз в 200мс для калибровки
           if (now - lastPoll > 200) {
@@ -491,10 +519,11 @@ export default function InteractivePlayer({
             } catch {}
           }
 
-          // Расчет времени с упреждением 100мс на реакцию слуха/глаза
+          // Расчет времени с упреждением 100мс на реакцию слуха/глаза и калибровкой смещения
           const preciseTime = getHighPrecisionTime() + 0.1;
+          const effectiveTime = preciseTime + subOffsetRef.current;
           setCurrentTime(getHighPrecisionTime());
-          updateCurrentSubtitle(preciseTime);
+          updateCurrentSubtitle(effectiveTime);
         }
       }
       animId = requestAnimationFrame(loop);
@@ -566,13 +595,13 @@ export default function InteractivePlayer({
 
     setCurrentTime(nextTime);
     timeSyncRef.current = { ytTime: nextTime, perfTime: performance.now() };
-    updateCurrentSubtitle(nextTime + 0.1);
+    updateCurrentSubtitle(nextTime + 0.1 + subOffsetRef.current);
   };
 
   const handleSeekTo = (seconds: number) => {
     setCurrentTime(seconds);
     timeSyncRef.current = { ytTime: seconds, perfTime: performance.now() };
-    updateCurrentSubtitle(seconds + 0.1);
+    updateCurrentSubtitle(seconds + 0.1 + subOffsetRef.current);
 
     if (engineMode === "native" && videoRef.current) {
       videoRef.current.currentTime = seconds;
@@ -602,7 +631,7 @@ export default function InteractivePlayer({
     }
   };
 
-  // Keyboard shortcuts (Space/K = Play/Pause, F = Fullscreen, Arrows = Seek)
+  // Keyboard shortcuts (Space/K = Play/Pause, F = Fullscreen, C = Subtitles, [/] / G/H = Subtitle Offset, Arrows = Seek)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
@@ -618,6 +647,29 @@ export default function InteractivePlayer({
       } else if (e.key === " " || e.key === "k" || e.key === "K") {
         e.preventDefault();
         handleTogglePlay();
+      } else if (e.key === "c" || e.key === "C" || e.key === "с" || e.key === "С") {
+        e.preventDefault();
+        setSubtitlesVisible((prev) => !prev);
+      } else if (
+        e.key === "[" ||
+        e.key === "g" ||
+        e.key === "G" ||
+        e.key === "п" ||
+        e.key === "П" ||
+        e.code === "BracketLeft"
+      ) {
+        e.preventDefault();
+        triggerOffsetChange(-0.1);
+      } else if (
+        e.key === "]" ||
+        e.key === "h" ||
+        e.key === "H" ||
+        e.key === "р" ||
+        e.key === "Р" ||
+        e.code === "BracketRight"
+      ) {
+        e.preventDefault();
+        triggerOffsetChange(0.1);
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         handleSeekRelative(-5);
@@ -631,7 +683,7 @@ export default function InteractivePlayer({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isPlaying, engineMode, safeTranscript]);
+  }, [isPlaying, engineMode, safeTranscript, triggerOffsetChange]);
 
   // Active dialogue index for right column
   const activeSubtitleIndex = useMemo(() => {
@@ -844,23 +896,35 @@ export default function InteractivePlayer({
           ))}
         </div>
 
-        {/* Subtitle Settings Trigger & Anchored Popover */}
-        <div className="relative">
+        {/* Subtitle Visibility Toggle Button & Anchored Popover */}
+        <div className="relative flex items-center">
+          <button
+            onClick={() => setSubtitlesVisible((prev) => !prev)}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-l-xl text-xs sm:text-sm font-semibold transition-all border cursor-pointer ${
+              subtitlesVisible
+                ? "bg-zinc-900 border-red-500/50 text-red-500 shadow"
+                : "bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border-zinc-700/80"
+            }`}
+            title={subtitlesVisible ? "Выключить субтитры (C)" : "Включить субтитры (C)"}
+          >
+            <Sliders className={`w-3.5 h-3.5 ${subtitlesVisible ? "text-red-500" : "text-zinc-400"}`} />
+            <span className="hidden sm:inline">Субтитры</span>
+          </button>
+
           <button
             ref={settingsButtonRef}
             onClick={(e) => {
               e.stopPropagation();
               setIsSettingsOpen((prev) => !prev);
             }}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all border cursor-pointer ${
+            className={`px-1.5 sm:px-2 py-1.5 rounded-r-xl border border-l-0 text-xs transition-all cursor-pointer ${
               isSettingsOpen
                 ? "bg-zinc-800 text-white border-zinc-600 shadow"
-                : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700/80"
+                : "bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border-zinc-700/80"
             }`}
             title="Параметры субтитров"
           >
-            <Sliders className="w-3.5 h-3.5 text-[#E50914]" />
-            <span className="hidden sm:inline">Субтитры</span>
+            ▾
           </button>
 
           {isSettingsOpen && (
@@ -1119,77 +1183,86 @@ export default function InteractivePlayer({
             </div>
           )}
 
-          {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER - Persistent on Pause, max 1 sentence */}
-          <div
-            onMouseEnter={handleSubtitleContainerMouseEnter}
-            onMouseLeave={handleSubtitleContainerMouseLeave}
-            className={`absolute ${subtitleSettings.bottomOffset} left-1/2 -translate-x-1/2 z-30 w-11/12 max-w-4xl text-center pointer-events-auto transition-all duration-150`}
-          >
-            {/* Masking Plate for Hardsubs (overflow-visible to prevent clipping tooltip) */}
-            <div
-              className="relative z-20 mx-auto max-w-4xl px-6 py-3 rounded-2xl bg-black/90 border border-white/10 shadow-2xl overflow-visible backdrop-blur-md transition-all duration-150"
-              style={{
-                backgroundColor: `rgba(0, 0, 0, ${bgOpacityValue})`,
-                backdropFilter: subtitleSettings.backdropOpacity > 20 ? "blur(4px)" : "none",
-              }}
-            >
-              {isLoadingTranscript ? (
-                <div className="flex items-center justify-center gap-2 py-1 text-zinc-400 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin text-[#E50914]" />
-                  <span>Загрузка субтитров...</span>
-                </div>
-              ) : transcriptError ? (
-                <div className="flex items-center justify-center gap-2 text-zinc-400 text-xs sm:text-sm py-1">
-                  <span>Субтитры недоступны для этого видео</span>
-                </div>
-              ) : currentSubtitle && typeof currentSubtitle.text === "string" ? (
-                <div
-                  className={`flex flex-wrap justify-center items-center gap-y-1 text-center font-medium drop-shadow-md ${
-                    SUBTITLE_FONT_SIZE_CLASSES[subtitleSettings.fontSize as SubtitleFontSize] || SUBTITLE_FONT_SIZE_CLASSES.md
-                  }`}
-                >
-                  {currentSubtitle.text.split(/\s+/).filter(Boolean).map((word, idx) => {
-                    const cleanWord = cleanGermanWord(word);
-                    const cleanedLower = cleanWord.toLowerCase();
-                    const isJustSaved = justSavedWords.has(cleanedLower);
-                    const isHovered = hoveredWord && hoveredWordIdx === idx;
-                    const translation = isHovered ? hoveredWord.translation : null;
-
-                    return (
-                      <span
-                        key={idx}
-                        className="relative inline-block mx-1"
-                      >
-                        <button
-                          type="button"
-                          onMouseEnter={() => handleMouseEnterWord(word, currentSubtitle.text, idx)}
-                          onClick={() => handleClickWord(word, currentSubtitle.text)}
-                          className={`hover:text-red-400 transition-colors cursor-pointer select-none ${
-                            isJustSaved ? "text-emerald-400 font-bold" : "text-white"
-                          }`}
-                        >
-                          {word}
-                        </button>
-
-                        {/* Ультра-компактный матовый тултип: ТОЛЬКО русский перевод */}
-                        {isHovered && (translation || hoveredWord.isLoading) && (
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
-                            <div className="px-3 py-1.5 rounded-lg bg-zinc-900/95 border border-white/15 text-xs font-medium text-white shadow-xl backdrop-blur-md whitespace-nowrap">
-                              {hoveredWord.isLoading ? "..." : translation}
-                            </div>
-                          </div>
-                        )}
-                      </span>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-zinc-500 text-sm sm:text-base italic py-1">
-                  ... (пауза в речи) ...
-                </p>
-              )}
+          {/* Индикатор микро-калибровки смещения субтитров на лету */}
+          {offsetNotice && (
+            <div className="absolute top-4 right-4 z-40 px-3.5 py-1.5 rounded-xl bg-zinc-950/90 border border-white/20 text-xs font-mono font-bold text-white shadow-2xl backdrop-blur-md animate-in fade-in duration-100">
+              {offsetNotice}
             </div>
-          </div>
+          )}
+
+          {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER - Persistent on Pause, max 1 sentence */}
+          {subtitlesVisible && (
+            <div
+              onMouseEnter={handleSubtitleContainerMouseEnter}
+              onMouseLeave={handleSubtitleContainerMouseLeave}
+              className={`absolute ${subtitleSettings.bottomOffset} left-1/2 -translate-x-1/2 z-30 w-11/12 max-w-4xl text-center pointer-events-auto transition-all duration-150`}
+            >
+              {/* Masking Plate for Hardsubs (overflow-visible to prevent clipping tooltip) */}
+              <div
+                className="relative z-20 mx-auto max-w-4xl px-6 py-3 rounded-2xl bg-black/90 border border-white/10 shadow-2xl overflow-visible backdrop-blur-md transition-all duration-150"
+                style={{
+                  backgroundColor: `rgba(0, 0, 0, ${bgOpacityValue})`,
+                  backdropFilter: subtitleSettings.backdropOpacity > 20 ? "blur(4px)" : "none",
+                }}
+              >
+                {isLoadingTranscript ? (
+                  <div className="flex items-center justify-center gap-2 py-1 text-zinc-400 text-sm">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#E50914]" />
+                    <span>Загрузка субтитров...</span>
+                  </div>
+                ) : transcriptError ? (
+                  <div className="flex items-center justify-center gap-2 text-zinc-400 text-xs sm:text-sm py-1">
+                    <span>Субтитры недоступны для этого видео</span>
+                  </div>
+                ) : currentSubtitle && typeof currentSubtitle.text === "string" ? (
+                  <div
+                    className={`flex flex-wrap justify-center items-center gap-y-1 text-center font-medium drop-shadow-md ${
+                      SUBTITLE_FONT_SIZE_CLASSES[subtitleSettings.fontSize as SubtitleFontSize] || SUBTITLE_FONT_SIZE_CLASSES.md
+                    }`}
+                  >
+                    {currentSubtitle.text.split(/\s+/).filter(Boolean).map((word, idx) => {
+                      const cleanWord = cleanGermanWord(word);
+                      const cleanedLower = cleanWord.toLowerCase();
+                      const isJustSaved = justSavedWords.has(cleanedLower);
+                      const isHovered = hoveredWord && hoveredWordIdx === idx;
+                      const translation = isHovered ? hoveredWord.translation : null;
+
+                      return (
+                        <span
+                          key={idx}
+                          className="relative inline-block mx-1"
+                        >
+                          <button
+                            type="button"
+                            onMouseEnter={() => handleMouseEnterWord(word, currentSubtitle.text, idx)}
+                            onClick={() => handleClickWord(word, currentSubtitle.text)}
+                            className={`hover:text-red-400 transition-colors cursor-pointer select-none ${
+                              isJustSaved ? "text-emerald-400 font-bold" : "text-white"
+                            }`}
+                          >
+                            {word}
+                          </button>
+
+                          {/* Ультра-компактный матовый тултип: ТОЛЬКО русский перевод */}
+                          {isHovered && (translation || hoveredWord.isLoading) && (
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                              <div className="px-3 py-1.5 rounded-lg bg-zinc-900/95 border border-white/15 text-xs font-medium text-white shadow-xl backdrop-blur-md whitespace-nowrap">
+                                {hoveredWord.isLoading ? "..." : translation}
+                              </div>
+                            </div>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-zinc-500 text-sm sm:text-base italic py-1">
+                    ... (пауза в речи) ...
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Fullscreen Controls Bar (Rendered inside video container when fullscreen) */}
           {isFullscreen && renderControls(true)}
