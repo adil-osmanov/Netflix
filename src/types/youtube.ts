@@ -46,6 +46,7 @@ export interface TranslationData {
   lemma: string;
   article: "der" | "die" | "das" | null;
   wordClean: string;
+  cleanWord?: string;
   pos: "noun" | "verb" | "adj" | "adv" | "other";
   translation: string;
 }

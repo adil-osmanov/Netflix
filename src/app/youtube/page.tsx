@@ -93,6 +93,9 @@ export default function YouTubeCatalogPage() {
   // Tabs: 'recommendations' | 'subscriptions' | 'favorites'
   const [activeTab, setActiveTab] = useState<"recommendations" | "subscriptions" | "favorites">("recommendations");
 
+  // Difficulty Level Filter: 'all' | 'B1' | 'B2'
+  const [selectedLevel, setSelectedLevel] = useState<"all" | "B1" | "B2">("all");
+
   // Manage Channels Modal
   const [isManageModalOpen, setIsManageModalOpen] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -351,9 +354,21 @@ export default function YouTubeCatalogPage() {
     setSubVideos((prev) => prev.filter((v) => v.channelId !== channelId));
   };
 
-  // Filter recommendations, subscriptions & favorites based on search query
+  // Filter recommendations, subscriptions & favorites based on search query and level
   const query = searchInput.trim().toLowerCase();
   const isSearchQuery = query.length > 0 && !extractYouTubeId(searchInput.trim());
+
+  function matchesLevel(level: string | undefined, filter: "all" | "B1" | "B2"): boolean {
+    if (filter === "all") return true;
+    const l = (level || "B1").toUpperCase();
+    if (filter === "B1") {
+      return l === "B1" || l === "A2" || l === "A1";
+    }
+    if (filter === "B2") {
+      return l === "B2" || l === "C1" || l === "C2";
+    }
+    return true;
+  }
 
   const filteredRecommendations = (
     isSearchQuery
@@ -365,7 +380,9 @@ export default function YouTubeCatalogPage() {
             v.level.toLowerCase().includes(query)
         )
       : recommendations
-  ).filter((v) => !isYouTubeShort(v));
+  )
+    .filter((v) => !isYouTubeShort(v))
+    .filter((v) => matchesLevel(v.level, selectedLevel));
 
   const filteredSubVideos = (
     isSearchQuery
@@ -375,7 +392,9 @@ export default function YouTubeCatalogPage() {
             v.channel.toLowerCase().includes(query)
         )
       : subVideos
-  ).filter((v) => !isYouTubeShort(v));
+  )
+    .filter((v) => !isYouTubeShort(v))
+    .filter((v) => matchesLevel(v.level, selectedLevel));
 
   const filteredFavorites = (
     isSearchQuery
@@ -385,7 +404,7 @@ export default function YouTubeCatalogPage() {
             v.channel.toLowerCase().includes(query)
         )
       : favorites
-  );
+  ).filter((v) => matchesLevel(v.level, selectedLevel));
 
   const currentVideos =
     activeTab === "recommendations"
@@ -518,6 +537,24 @@ export default function YouTubeCatalogPage() {
                 <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#E50914]" : ""}`} />
               </button>
             )}
+
+            {/* Level Filter Chips: [ Все уровни ] [ B1 ] [ B2 ] */}
+            <div className="flex items-center gap-1.5 ml-1 sm:ml-2 pl-2 sm:pl-3 border-l border-zinc-800">
+              {[
+                { id: "all", label: "Все уровни" },
+                { id: "B1", label: "B1" },
+                { id: "B2", label: "B2" },
+              ].map((chip) => (
+                <button
+                  key={chip.id}
+                  onClick={() => setSelectedLevel(chip.id as "all" | "B1" | "B2")}
+                  data-active={selectedLevel === chip.id}
+                  className="px-3 py-1 text-xs rounded-full border border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-white data-[active=true]:bg-zinc-200 data-[active=true]:text-black font-medium transition cursor-pointer"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Right: Channel Management & Add Channel ONLY rendered on subscriptions tab */}

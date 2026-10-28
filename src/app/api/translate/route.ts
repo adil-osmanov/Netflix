@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export interface TranslationResult {
   lemma: string;
   article: "der" | "die" | "das" | null;
+  cleanWord: string;
   wordClean: string;
   pos: "noun" | "verb" | "adj" | "adv" | "other";
   translation: string;
@@ -225,6 +226,7 @@ export async function getContextualTranslation(
     return {
       lemma: word,
       article: null,
+      cleanWord: word,
       wordClean: word,
       pos: "other",
       translation: "",
@@ -243,6 +245,7 @@ export async function getContextualTranslation(
   return {
     lemma: morph.lemma,
     article: morph.article,
+    cleanWord: morph.wordClean,
     wordClean: morph.wordClean,
     pos: morph.pos,
     translation,

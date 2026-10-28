@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { TranscriptItem, TranslationData } from "@/types/youtube";
 import { 
   useYouTube, 
@@ -54,27 +54,35 @@ export default function InteractivePlayer({
   onBackToCatalog,
   onNextVideo,
 }: InteractivePlayerProps) {
-  const { subtitleSettings, updateSubtitleSettings, refreshSavedWords, isFavorite, toggleFavorite } = useYouTube();
+  const { 
+    subtitleSettings, 
+    updateSubtitleSettings, 
+    savedWords,
+    refreshSavedWords, 
+    isFavorite, 
+    toggleFavorite 
+  } = useYouTube();
 
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<any>(null);
   const wasPlayingRef = useRef<boolean>(false);
-  const resumeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const translationCacheRef = useRef<Map<string, TranslationData>>(new Map());
   const activeSideItemRef = useRef<HTMLDivElement>(null);
 
   // Video Engine Mode: "native" (direct mp4/hls) or "iframe" (YouTube iframe fallback)
   const [engineMode, setEngineMode] = useState<"native" | "iframe">("native");
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
-  const [isCheckingStream, setIsCheckingStream] = useState<boolean>(true);
 
   // Subtitles & Player state
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
   const [isLoadingTranscript, setIsLoadingTranscript] = useState<boolean>(true);
   const [transcriptError, setTranscriptError] = useState<string | null>(null);
 
+  // High-precision current time and persistent subtitle state
   const [currentTime, setCurrentTime] = useState<number>(0);
+  const [currentSubtitle, setCurrentSubtitle] = useState<TranscriptItem | null>(null);
+
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -98,11 +106,12 @@ export default function InteractivePlayer({
   // Hidden controls bar toggle state
   const [isControlsHidden, setIsControlsHidden] = useState<boolean>(false);
 
-  // Hover & Pinned Word state
+  // Hover Word state strictly for floating tooltip
   const [hoveredWord, setHoveredWord] = useState<{
     word: string;
     lemma: string;
     article: "der" | "die" | "das" | null;
+    cleanWord: string;
     wordClean: string;
     pos: "noun" | "verb" | "adj" | "adv" | "other";
     translation: string;
@@ -110,17 +119,13 @@ export default function InteractivePlayer({
   } | null>(null);
   const [hoveredWordIdx, setHoveredWordIdx] = useState<number | null>(null);
 
-  const [pinnedWord, setPinnedWord] = useState<{
-    word: string;
-    lemma: string;
-    article: "der" | "die" | "das" | null;
-    wordClean: string;
-    pos: "noun" | "verb" | "adj" | "adv" | "other";
-    translation: string;
-    context: string;
-    isSaved: boolean;
-    isSaving: boolean;
-  } | null>(null);
+  // Set of words recently clicked for 1.5s visual feedback
+  const [justSavedWords, setJustSavedWords] = useState<Set<string>>(new Set());
+
+  // Cached Set of saved words in lowercase
+  const savedWordsSet = useMemo(() => {
+    return new Set(savedWords.map((w) => w.word.toLowerCase()));
+  }, [savedWords]);
 
   // Automatic channel and video resolution via oEmbed when metadata is missing
   const [resolvedChannelTitle, setResolvedChannelTitle] = useState<string>(
@@ -197,13 +202,13 @@ export default function InteractivePlayer({
     }
 
     idleTimerRef.current = setTimeout(() => {
-      if (isPlaying && !hoveredWord && !pinnedWord) {
+      if (isPlaying && !hoveredWord) {
         setIsCursorIdle(true);
       }
     }, 2000);
   };
 
-  // 0. Body scroll lock when video player is open
+  // Body scroll lock when video player is open
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = "hidden";
@@ -237,6 +242,7 @@ export default function InteractivePlayer({
     let isCancelled = false;
     setIsLoadingTranscript(true);
     setTranscriptError(null);
+    setCurrentSubtitle(null);
 
     async function loadTranscript() {
       try {
@@ -247,7 +253,11 @@ export default function InteractivePlayer({
 
         if (resp.ok && Array.isArray(data.transcript) && data.transcript.length > 0) {
           const mergedSentences = mergeTranscriptSentences(data.transcript);
-          setTranscript(Array.isArray(mergedSentences) ? mergedSentences : []);
+          const safeMerged = Array.isArray(mergedSentences) ? mergedSentences : [];
+          setTranscript(safeMerged);
+          if (safeMerged.length > 0) {
+            setCurrentSubtitle(safeMerged[0]);
+          }
           setTranscriptError(null);
         } else {
           setTranscript([]);
@@ -274,10 +284,12 @@ export default function InteractivePlayer({
     };
   }, [videoId]);
 
+  // Safe transcript array guard
+  const safeTranscript = useMemo(() => (Array.isArray(transcript) ? transcript : []), [transcript]);
+
   // 2. Fetch Native Video Stream or Fallback to IFrame
   useEffect(() => {
     let isCancelled = false;
-    setIsCheckingStream(true);
     setStreamUrl(null);
 
     async function checkStream() {
@@ -298,10 +310,6 @@ export default function InteractivePlayer({
         if (!isCancelled) {
           setEngineMode("iframe");
         }
-      } finally {
-        if (!isCancelled) {
-          setIsCheckingStream(false);
-        }
       }
     }
 
@@ -315,8 +323,6 @@ export default function InteractivePlayer({
   // 3. Initialize YouTube IFrame API (used if engineMode === "iframe")
   useEffect(() => {
     if (engineMode !== "iframe") return;
-
-    let timer: NodeJS.Timeout;
 
     function initPlayer() {
       if (!window.YT || !window.YT.Player) return;
@@ -400,22 +406,9 @@ export default function InteractivePlayer({
           initPlayer();
         };
       }
-
-      timer = setInterval(() => {
-        if (
-          playerRef.current &&
-          typeof playerRef.current.getCurrentTime === "function"
-        ) {
-          try {
-            const time = playerRef.current.getCurrentTime();
-            setCurrentTime(time);
-          } catch {}
-        }
-      }, 50);
     }
 
     return () => {
-      clearInterval(timer);
       if (playerRef.current) {
         try {
           playerRef.current.destroy();
@@ -424,7 +417,43 @@ export default function InteractivePlayer({
     };
   }, [videoId, engineMode]);
 
-  // 4. Safe Fullscreen Change Listener
+  // 4. High-precision requestAnimationFrame Timing Sync (Second-for-second)
+  useEffect(() => {
+    let animId: number;
+
+    const syncTime = () => {
+      if (isPlaying) {
+        if (engineMode === "native" && videoRef.current) {
+          setCurrentTime(videoRef.current.currentTime);
+        } else if (playerRef.current && typeof playerRef.current.getCurrentTime === "function") {
+          try {
+            const time = playerRef.current.getCurrentTime();
+            setCurrentTime(time);
+          } catch {}
+        }
+      }
+      animId = requestAnimationFrame(syncTime);
+    };
+
+    animId = requestAnimationFrame(syncTime);
+    return () => cancelAnimationFrame(animId);
+  }, [isPlaying, engineMode]);
+
+  // 5. Update active subtitle strictly when playing (NEVER cleared on pause)
+  useEffect(() => {
+    if (isPlaying && safeTranscript.length > 0) {
+      const found = safeTranscript.find(
+        (item) =>
+          currentTime >= item.start &&
+          currentTime <= item.start + (item.duration || 0) + 0.15
+      );
+      if (found && found.text !== currentSubtitle?.text) {
+        setCurrentSubtitle(found);
+      }
+    }
+  }, [currentTime, isPlaying, safeTranscript, currentSubtitle]);
+
+  // 6. Safe Fullscreen Change Listener
   useEffect(() => {
     const handleFsChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
@@ -472,20 +501,32 @@ export default function InteractivePlayer({
   };
 
   const handleSeekRelative = (seconds: number) => {
+    let nextTime = 0;
     if (engineMode === "native" && videoRef.current) {
-      videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime + seconds);
-      return;
-    }
-
-    if (playerRef.current) {
+      nextTime = Math.max(0, videoRef.current.currentTime + seconds);
+      videoRef.current.currentTime = nextTime;
+    } else if (playerRef.current) {
       try {
         const current = playerRef.current.getCurrentTime();
-        playerRef.current.seekTo(Math.max(0, current + seconds), true);
+        nextTime = Math.max(0, current + seconds);
+        playerRef.current.seekTo(nextTime, true);
       } catch {}
     }
+
+    setCurrentTime(nextTime);
+    const found = safeTranscript.find(
+      (item) => nextTime >= item.start && nextTime <= item.start + (item.duration || 0) + 0.15
+    );
+    if (found) setCurrentSubtitle(found);
   };
 
   const handleSeekTo = (seconds: number) => {
+    setCurrentTime(seconds);
+    const found = safeTranscript.find(
+      (item) => seconds >= item.start && seconds <= item.start + (item.duration || 0) + 0.15
+    );
+    if (found) setCurrentSubtitle(found);
+
     if (engineMode === "native" && videoRef.current) {
       videoRef.current.currentTime = seconds;
       videoRef.current.play().catch(() => {});
@@ -543,16 +584,17 @@ export default function InteractivePlayer({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isPlaying, engineMode]);
+  }, [isPlaying, engineMode, safeTranscript]);
 
-  // Safe transcript array guard
-  const safeTranscript = Array.isArray(transcript) ? transcript : [];
-
-  // Strict active subtitle calculation: start <= currentTime < start + duration
-  const activeSubtitleIndex = safeTranscript.findIndex(
-    (item) => item && typeof item.start === "number" && currentTime >= item.start && currentTime < (item.start + (item.duration || 0))
-  );
-  const activeSubtitle = activeSubtitleIndex !== -1 ? safeTranscript[activeSubtitleIndex] : null;
+  // Active dialogue index for right column
+  const activeSubtitleIndex = useMemo(() => {
+    if (!currentSubtitle) return -1;
+    return safeTranscript.findIndex(
+      (item) =>
+        item.text === currentSubtitle.text ||
+        (currentTime >= item.start && currentTime <= item.start + (item.duration || 0) + 0.15)
+    );
+  }, [safeTranscript, currentSubtitle, currentTime]);
 
   // Auto-scroll side list to active sentence
   useEffect(() => {
@@ -581,7 +623,8 @@ export default function InteractivePlayer({
       const result: TranslationData = {
         lemma: data.lemma || word,
         article: data.article || null,
-        wordClean: data.wordClean || word,
+        cleanWord: data.cleanWord || data.wordClean || word,
+        wordClean: data.wordClean || data.cleanWord || word,
         pos: data.pos || "other",
         translation: data.translation || "Перевод не найден",
       };
@@ -591,6 +634,7 @@ export default function InteractivePlayer({
       return {
         lemma: word,
         article: null,
+        cleanWord: word,
         wordClean: word,
         pos: "other",
         translation: "Ошибка перевода",
@@ -598,15 +642,8 @@ export default function InteractivePlayer({
     }
   };
 
-  // Pause video when cursor enters anywhere inside the subtitle container
+  // Pause video on subtitle hover (without clearing currentSubtitle)
   const handleSubtitleContainerMouseEnter = () => {
-    if (pinnedWord) return;
-
-    if (resumeTimeoutRef.current) {
-      clearTimeout(resumeTimeoutRef.current);
-      resumeTimeoutRef.current = null;
-    }
-
     if (isPlaying) {
       wasPlayingRef.current = true;
       if (engineMode === "native" && videoRef.current) {
@@ -619,15 +656,8 @@ export default function InteractivePlayer({
     }
   };
 
-  // Resume playback when cursor leaves the entire subtitle container
+  // Resume playback when cursor leaves the subtitle container
   const handleSubtitleContainerMouseLeave = () => {
-    if (pinnedWord) return;
-
-    if (resumeTimeoutRef.current) {
-      clearTimeout(resumeTimeoutRef.current);
-      resumeTimeoutRef.current = null;
-    }
-
     setHoveredWord(null);
     setHoveredWordIdx(null);
 
@@ -643,16 +673,17 @@ export default function InteractivePlayer({
     }
   };
 
-  // Hover-to-Translate word
+  // Hover-to-Translate word: completely non-blocking, fast and fluid
   const handleMouseEnterWord = async (rawWord: string, sentence: string, idx: number) => {
     const cleaned = cleanGermanWord(rawWord);
-    if (!cleaned || pinnedWord) return;
+    if (!cleaned) return;
 
     setHoveredWordIdx(idx);
     setHoveredWord({
       word: cleaned,
       lemma: cleaned,
       article: null,
+      cleanWord: cleaned,
       wordClean: cleaned,
       pos: "other",
       translation: "",
@@ -660,86 +691,53 @@ export default function InteractivePlayer({
     });
 
     const data = await fetchContextualTranslation(cleaned, sentence);
-    setHoveredWord({
-      word: cleaned,
-      lemma: data.lemma,
-      article: data.article,
-      wordClean: data.wordClean,
-      pos: data.pos,
-      translation: data.translation,
-      isLoading: false,
+    // Ensure we are still hovering this exact word
+    setHoveredWord((prev) => {
+      if (!prev || prev.word !== cleaned) return prev;
+      return {
+        word: cleaned,
+        lemma: data.lemma,
+        article: data.article,
+        cleanWord: data.cleanWord || data.wordClean || cleaned,
+        wordClean: data.wordClean || data.cleanWord || cleaned,
+        pos: data.pos,
+        translation: data.translation,
+        isLoading: false,
+      };
     });
   };
 
-  const handleMouseLeaveWord = () => {
-    // Left single word
-  };
-
-  // Click on word pins the card
+  // Click on word: saves to dictionary, gives 1.5s checkmark feedback, DOES NOT break hover
   const handleClickWord = async (rawWord: string, sentence: string) => {
     const cleaned = cleanGermanWord(rawWord);
     if (!cleaned) return;
 
-    if (engineMode === "native" && videoRef.current) {
-      videoRef.current.pause();
-    } else if (playerRef.current) {
-      try {
-        playerRef.current.pauseVideo();
-      } catch {}
-    }
-    wasPlayingRef.current = false;
+    // Show instant checkmark feedback
+    setJustSavedWords((prev) => new Set(prev).add(cleaned.toLowerCase()));
+    setTimeout(() => {
+      setJustSavedWords((prev) => {
+        const next = new Set(prev);
+        next.delete(cleaned.toLowerCase());
+        return next;
+      });
+    }, 1500);
 
-    if (resumeTimeoutRef.current) {
-      clearTimeout(resumeTimeoutRef.current);
-      resumeTimeoutRef.current = null;
-    }
-
-    setHoveredWord(null);
-    setHoveredWordIdx(null);
-
-    const data = await fetchContextualTranslation(cleaned, sentence);
-
-    setPinnedWord({
-      word: cleaned,
-      lemma: data.lemma,
-      article: data.article,
-      wordClean: data.wordClean,
-      pos: data.pos,
-      translation: data.translation,
-      context: sentence,
-      isSaved: false,
-      isSaving: false,
-    });
-  };
-
-  // Save pinned word to Supabase / LocalStorage
-  const handleSavePinnedWord = async () => {
-    if (!pinnedWord || pinnedWord.isSaving || pinnedWord.isSaved) return;
-
-    setPinnedWord((prev) => (prev ? { ...prev, isSaving: true } : null));
+    const translationData = await fetchContextualTranslation(cleaned, sentence);
 
     try {
-      const res = await saveWordAction({
-        word: pinnedWord.word,
-        lemma: pinnedWord.lemma,
-        translation: pinnedWord.translation,
-        sentence: pinnedWord.context,
+      await saveWordAction({
+        word: cleaned,
+        lemma: translationData.lemma,
+        translation: translationData.translation,
+        sentence: sentence,
         channel_title: resolvedChannelTitle || channelTitle || "Общее",
         video_title: resolvedVideoTitle || videoTitle || "Немецкое видео",
         source: "youtube",
         video_id: videoId,
       });
-
-      if (res.success) {
-        setPinnedWord((prev) => (prev ? { ...prev, isSaved: true, isSaving: false } : null));
-        refreshSavedWords();
-      } else {
-        alert(res.error || "Не удалось сохранить слово");
-        setPinnedWord((prev) => (prev ? { ...prev, isSaving: false } : null));
-      }
-    } catch (e: any) {
-      alert("Ошибка сохранения: " + e.message);
-      setPinnedWord((prev) => (prev ? { ...prev, isSaving: false } : null));
+      refreshSavedWords();
+    } catch (e) {
+      console.error("Save word error:", e);
     }
   };
 
@@ -752,20 +750,6 @@ export default function InteractivePlayer({
       u.rate = 0.85;
       window.speechSynthesis.speak(u);
     } catch {}
-  };
-
-  const handleResumePlayback = () => {
-    setPinnedWord(null);
-    setHoveredWord(null);
-    setHoveredWordIdx(null);
-    wasPlayingRef.current = false;
-    if (engineMode === "native" && videoRef.current) {
-      videoRef.current.play().catch(() => {});
-    } else if (playerRef.current) {
-      try {
-        playerRef.current.playVideo();
-      } catch {}
-    }
   };
 
   const bgOpacityValue = (subtitleSettings.backdropOpacity / 100).toFixed(2);
@@ -1021,21 +1005,16 @@ export default function InteractivePlayer({
               : "aspect-video rounded-2xl bg-black overflow-hidden shadow-2xl border border-zinc-800/80"
           } group`}
         >
-          {/* Top Header Row: Back Button + Video Title side-by-side */}
-          <div className="absolute top-4 left-4 z-40 flex items-center gap-3 max-w-[70%] pointer-events-auto">
-            {onBackToCatalog && (
-              <button
-                onClick={onBackToCatalog}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/80 hover:bg-zinc-900 border border-white/10 text-zinc-300 hover:text-white backdrop-blur-md transition shadow-lg shrink-0 cursor-pointer"
-              >
-                <ArrowLeft size={14} />
-                <span className="text-xs font-medium">Назад</span>
-              </button>
-            )}
-            <span className="text-xs font-medium text-zinc-300/90 truncate drop-shadow-md">
-              {resolvedVideoTitle || videoTitle}
-            </span>
-          </div>
+          {/* Top-Left: Minimal Round Arrow Back Button WITHOUT any text */}
+          {onBackToCatalog && (
+            <button
+              onClick={onBackToCatalog}
+              aria-label="Назад"
+              className="absolute top-4 left-4 z-40 w-9 h-9 rounded-full bg-black/70 hover:bg-zinc-800 border border-white/10 text-zinc-300 hover:text-white flex items-center justify-center backdrop-blur-md transition shadow-lg group cursor-pointer pointer-events-auto"
+            >
+              <ArrowLeft className="group-hover:-translate-x-0.5 transition-transform" size={18} />
+            </button>
+          )}
 
           {/* DUAL ENGINE: 1) Native HTML5 Video (zero YouTube chrome) or 2) YouTube IFrame fallback */}
           {engineMode === "native" && streamUrl ? (
@@ -1054,7 +1033,6 @@ export default function InteractivePlayer({
                 if (onNextVideo) onNextVideo();
               }}
               onError={() => {
-                // If native stream fails to load/play, fallback cleanly to IFrame
                 setEngineMode("iframe");
               }}
               onClick={handleTogglePlay}
@@ -1113,7 +1091,7 @@ export default function InteractivePlayer({
             </div>
           )}
 
-          {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER - max 1 sentence (2 lines) */}
+          {/* OVERLAY SUBTITLES INSIDE VIDEO CONTAINER - Persistent on Pause, max 1 sentence (2 lines) */}
           <div
             onMouseEnter={handleSubtitleContainerMouseEnter}
             onMouseLeave={handleSubtitleContainerMouseLeave}
@@ -1136,74 +1114,120 @@ export default function InteractivePlayer({
                 <div className="flex items-center justify-center gap-2 text-zinc-400 text-xs sm:text-sm py-1">
                   <span>Субтитры недоступны для этого видео</span>
                 </div>
-              ) : activeSubtitle && typeof activeSubtitle.text === "string" ? (
+              ) : currentSubtitle && typeof currentSubtitle.text === "string" ? (
                 <div
                   className={`line-clamp-2 text-center leading-snug flex flex-wrap justify-center items-center gap-x-2 gap-y-1 font-sans font-semibold text-white tracking-normal drop-shadow-md ${
                     SUBTITLE_FONT_SIZE_CLASSES[subtitleSettings.fontSize as SubtitleFontSize] || SUBTITLE_FONT_SIZE_CLASSES.md
                   }`}
                 >
-                  {activeSubtitle.text.split(/\s+/).filter(Boolean).map((word, idx) => (
-                    <span
-                      key={idx}
-                      className="relative inline-block"
-                    >
+                  {currentSubtitle.text.split(/\s+/).filter(Boolean).map((word, idx) => {
+                    const cleaned = cleanGermanWord(word).toLowerCase();
+                    const isWordSaved = savedWordsSet.has(cleaned);
+                    const isJustSaved = justSavedWords.has(cleaned);
+
+                    return (
                       <span
-                        onMouseEnter={() => handleMouseEnterWord(word, activeSubtitle.text, idx)}
-                        onMouseLeave={handleMouseLeaveWord}
-                        onClick={() => handleClickWord(word, activeSubtitle.text)}
-                        className="cursor-pointer hover:bg-white/20 hover:text-red-400 rounded px-1.5 py-0.5 transition-colors duration-100 inline-block active:scale-95 select-none"
+                        key={idx}
+                        className="relative inline-block"
                       >
-                        {word}
-                      </span>
-
-                      {/* Adaptive Tooltip directly 8px above this hovered word */}
-                      {hoveredWord && hoveredWordIdx === idx && !pinnedWord && (
-                        <div
-                          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-auto w-max max-w-xs bg-[#181818]/95 backdrop-blur-md border border-zinc-700/80 rounded-xl px-3.5 py-2 shadow-2xl flex flex-col gap-1 text-left animate-in fade-in zoom-in-95 duration-100"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleClickWord(word, activeSubtitle.text);
-                          }}
+                        <span
+                          onMouseEnter={() => handleMouseEnterWord(word, currentSubtitle.text, idx)}
+                          onClick={() => handleClickWord(word, currentSubtitle.text)}
+                          className="cursor-pointer hover:bg-white/20 hover:text-red-400 rounded px-1.5 py-0.5 transition-colors duration-100 inline-block active:scale-95 select-none"
                         >
-                          <div className="flex items-center gap-1.5 text-xs">
-                            {hoveredWord.article && (
-                              <span
-                                className={`font-bold lowercase ${
-                                  hoveredWord.article === "der"
-                                    ? "text-blue-400"
-                                    : hoveredWord.article === "die"
-                                    ? "text-red-500"
-                                    : "text-emerald-400"
-                                }`}
-                              >
-                                {hoveredWord.article}
-                              </span>
-                            )}
-                            <span
-                              className={
-                                hoveredWord.article
-                                  ? "text-white font-medium"
-                                  : "text-zinc-400 font-medium"
-                              }
-                            >
-                              {hoveredWord.wordClean || hoveredWord.lemma}
-                            </span>
-                          </div>
+                          {word}
+                        </span>
 
-                          {hoveredWord.isLoading ? (
-                            <div className="flex items-center gap-1 text-zinc-400 text-xs py-0.5">
-                              <Loader2 className="w-3 h-3 animate-spin text-[#E50914]" />
-                              <span>Переводим...</span>
+                        {/* Adaptive Tooltip directly 8px above this hovered word */}
+                        {hoveredWord && hoveredWordIdx === idx && (
+                          <div
+                            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-auto w-max max-w-xs bg-[#141414]/95 backdrop-blur-xl border border-zinc-700/80 rounded-xl px-3.5 py-2.5 shadow-2xl flex flex-col gap-1.5 text-left animate-in fade-in zoom-in-95 duration-100"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleClickWord(word, currentSubtitle.text);
+                            }}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-1.5">
+                                {hoveredWord.article && (
+                                  <span
+                                    className={`font-bold lowercase text-xs sm:text-sm ${
+                                      hoveredWord.article === "der"
+                                        ? "text-blue-400"
+                                        : hoveredWord.article === "die"
+                                        ? "text-red-500"
+                                        : "text-emerald-400"
+                                    }`}
+                                  >
+                                    {hoveredWord.article}
+                                  </span>
+                                )}
+                                <span
+                                  className={`font-semibold text-xs sm:text-sm ${
+                                    hoveredWord.article ? "text-white" : "text-zinc-300"
+                                  }`}
+                                >
+                                  {hoveredWord.cleanWord || hoveredWord.wordClean || hoveredWord.lemma}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSpeak(hoveredWord.cleanWord || hoveredWord.wordClean || hoveredWord.word);
+                                  }}
+                                  title="Озвучить"
+                                  className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+                                >
+                                  <Volume2 size={13} />
+                                </button>
+
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleClickWord(word, currentSubtitle.text);
+                                  }}
+                                  title={isWordSaved ? "Сохранено в словарь" : "Сохранить в словарь"}
+                                  className={`p-1 rounded transition cursor-pointer flex items-center gap-1 text-[11px] font-bold ${
+                                    isJustSaved
+                                      ? "text-emerald-400 bg-emerald-950/60"
+                                      : isWordSaved
+                                      ? "text-emerald-400 hover:text-emerald-300"
+                                      : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                                  }`}
+                                >
+                                  {isJustSaved || isWordSaved ? (
+                                    <Check size={13} className="text-emerald-400 stroke-[3]" />
+                                  ) : (
+                                    <Bookmark size={13} />
+                                  )}
+                                </button>
+                              </div>
                             </div>
-                          ) : (
-                            <span className="text-xs sm:text-sm font-bold text-white capitalize">
-                              {hoveredWord.translation}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </span>
-                  ))}
+
+                            {hoveredWord.isLoading ? (
+                              <div className="flex items-center gap-1.5 text-zinc-400 text-xs py-0.5">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E50914]" />
+                                <span>Переводим...</span>
+                              </div>
+                            ) : (
+                              <div className="text-sm sm:text-base font-sans font-bold text-white capitalize leading-tight">
+                                {hoveredWord.translation}
+                              </div>
+                            )}
+
+                            {isJustSaved && (
+                              <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1 pt-0.5">
+                                <Check size={11} className="stroke-[3]" />
+                                <span>Сохранено в словарь</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </span>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-zinc-500 text-sm sm:text-base italic py-1">
@@ -1212,110 +1236,6 @@ export default function InteractivePlayer({
               )}
             </div>
           </div>
-
-          {/* PINNED WORD CARD */}
-          {pinnedWord && (
-            <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-50 bg-[#181818] border border-zinc-700 rounded-2xl p-4 sm:p-5 shadow-2xl max-w-md w-[92%] sm:w-auto flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs mb-0.5 font-mono">
-                    {pinnedWord.article && (
-                      <span
-                        className={`font-bold lowercase ${
-                          pinnedWord.article === "der"
-                            ? "text-blue-400"
-                            : pinnedWord.article === "die"
-                            ? "text-red-500"
-                            : "text-emerald-400"
-                        }`}
-                      >
-                        {pinnedWord.article}
-                      </span>
-                    )}
-                    <span
-                      className={
-                        pinnedWord.article
-                          ? "text-white font-medium"
-                          : "text-zinc-400 font-medium"
-                      }
-                    >
-                      {pinnedWord.wordClean || pinnedWord.lemma}
-                    </span>
-                  </div>
-                  <h4 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
-                    {pinnedWord.word}
-                  </h4>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => handleSpeak(pinnedWord.word)}
-                    title="Озвучить"
-                    className="p-2 rounded-full bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors"
-                  >
-                    <Volume2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={handleResumePlayback}
-                    title="Закрыть и продолжить просмотр"
-                    className="p-2 rounded-full bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Translation Box */}
-              <div className="bg-zinc-900/90 rounded-xl px-4 py-2.5 border border-zinc-800">
-                <span className="text-[10px] text-zinc-500 uppercase tracking-wider block mb-0.5 font-semibold">
-                  Точный контекстный перевод
-                </span>
-                <p className="text-base sm:text-lg font-bold text-white capitalize">
-                  {pinnedWord.translation}
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 pt-1">
-                <button
-                  onClick={handleSavePinnedWord}
-                  disabled={pinnedWord.isSaving || pinnedWord.isSaved}
-                  className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                    pinnedWord.isSaved
-                      ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/40"
-                      : pinnedWord.isSaving
-                      ? "bg-zinc-800 text-zinc-400 cursor-not-allowed"
-                      : "bg-[#E50914] hover:bg-[#b80710] text-white shadow-lg shadow-red-900/30 active:scale-95"
-                  }`}
-                >
-                  {pinnedWord.isSaving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Сохранение...</span>
-                    </>
-                  ) : pinnedWord.isSaved ? (
-                    <>
-                      <Check className="w-4 h-4 stroke-[3]" />
-                      <span>В словаре</span>
-                    </>
-                  ) : (
-                    <>
-                      <Bookmark className="w-4 h-4" />
-                      <span>Сохранить в словарь</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  onClick={handleResumePlayback}
-                  className="py-2.5 px-3.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-xs sm:text-sm transition-colors flex items-center gap-1.5"
-                >
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Продолжить</span>
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Fullscreen Controls Bar (Rendered inside video container when fullscreen) */}
           {isFullscreen && renderControls(true)}
