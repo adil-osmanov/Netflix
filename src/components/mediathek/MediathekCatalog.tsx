@@ -20,24 +20,22 @@ export interface MediathekMediaItem {
   id: string;
   title: string;
   topic: string;
-  description?: string;
   channel: string;
   duration: number; // in minutes
   url_website: string;
-  url_subtitles?: string;
   posterUrl: string;
   thumbnailUrl?: string;
   level: "B1" | "B2";
   date: string;
 }
 
-type CategoryType = "ALL" | "films" | "doku" | "series";
-type LevelType = "ALL" | "B1" | "B2";
+export type CategoryType = "all" | "films" | "docs" | "series";
+export type LevelType = "ALL" | "B1" | "B2";
 
 const CATEGORIES: { id: CategoryType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: "ALL", label: "Все", icon: Sparkles },
+  { id: "all", label: "Все", icon: Sparkles },
   { id: "films", label: "Фильмы", icon: Film },
-  { id: "doku", label: "Документальные фильмы", icon: Compass },
+  { id: "docs", label: "Документальные фильмы", icon: Compass },
   { id: "series", label: "Сериалы", icon: Tv },
 ];
 
@@ -53,7 +51,7 @@ export default function MediathekCatalog() {
   const [items, setItems] = useState<MediathekMediaItem[]>([]);
   const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set());
 
-  const [category, setCategory] = useState<CategoryType>("ALL");
+  const [category, setCategory] = useState<CategoryType>("all");
   const [level, setLevel] = useState<LevelType>("ALL");
   const [searchInput, setSearchInput] = useState<string>("");
   const [activeQuery, setActiveQuery] = useState<string>("");
@@ -63,69 +61,138 @@ export default function MediathekCatalog() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1000000) + 1);
 
+  const activeRequestIdRef = useRef<number>(0);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-  const fetchItems = useCallback(async (currentOffset: number, isInitial: boolean = false) => {
-    if (isInitial) {
-      setIsLoading(true);
-      setError(null);
-    } else {
-      setIsLoadingMore(true);
-    }
+  // Мгновенный запрос медиа-элементов
+  const fetchMediaItems = useCallback(
+    async ({
+      newCategory,
+      newLevel,
+      newQuery,
+      newOffset = 0,
+      reset = false,
+    }: {
+      newCategory?: CategoryType;
+      newLevel?: LevelType;
+      newQuery?: string;
+      newOffset?: number;
+      reset?: boolean;
+    } = {}) => {
+      const catToUse = newCategory !== undefined ? newCategory : category;
+      const lvlToUse = newLevel !== undefined ? newLevel : level;
+      const queryToUse = newQuery !== undefined ? newQuery : activeQuery;
 
-    try {
-      const res = await fetch("/api/mediathek", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          offset: currentOffset,
-          size: 30,
-          level,
-          category,
-          query: activeQuery,
-          seed,
-        }),
-      });
+      const requestId = ++activeRequestIdRef.current;
 
-      if (!res.ok) {
-        throw new Error(`Ошибка загрузки: ${res.status}`);
+      if (reset) {
+        setIsLoading(true);
+        setError(null);
+      } else {
+        setIsLoadingMore(true);
       }
 
-      const data = await res.json();
-      const newItems: MediathekMediaItem[] = (data.items || []).filter(
-        (it: MediathekMediaItem) => Boolean(it.posterUrl || it.thumbnailUrl)
-      );
+      try {
+        const res = await fetch("/api/mediathek", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            offset: newOffset,
+            size: 28,
+            category: catToUse,
+            level: lvlToUse,
+            query: queryToUse,
+          }),
+        });
 
-      setItems((prev) => (isInitial ? newItems : [...prev, ...newItems]));
-      setHasMore(Boolean(data.hasMore && newItems.length > 0));
-      setOffset(currentOffset + newItems.length);
-    } catch (err: any) {
-      console.error("Error loading Mediathek items:", err);
-      setError("Не удалось связаться с медиатекой. Проверьте интернет или повторите запрос.");
-    } finally {
-      setIsLoading(false);
-      setIsLoadingMore(false);
-    }
-  }, [category, level, activeQuery, seed]);
+        if (!res.ok) {
+          throw new Error(`Ошибка загрузки: ${res.status}`);
+        }
 
-  const handleRefresh = () => {
-    const newSeed = Math.floor(Math.random() * 1000000) + 1;
-    setSeed(newSeed);
+        const data = await res.json();
+        if (requestId !== activeRequestIdRef.current) return;
+
+        const newItems: MediathekMediaItem[] = (data.items || []).filter(
+          (it: MediathekMediaItem) => Boolean(it.posterUrl || it.thumbnailUrl)
+        );
+
+        setItems((prev) => (reset ? newItems : [...prev, ...newItems]));
+        setHasMore(Boolean(data.hasMore && newItems.length > 0));
+        setOffset(newOffset + 45);
+      } catch (err: any) {
+        if (requestId === activeRequestIdRef.current) {
+          console.error("Error loading Mediathek items:", err);
+          setError("Не удалось связаться с медиатекой. Проверьте интернет или повторите запрос.");
+        }
+      } finally {
+        if (requestId === activeRequestIdRef.current) {
+          setIsLoading(false);
+          setIsLoadingMore(false);
+        }
+      }
+    },
+    [category, level, activeQuery]
+  );
+
+  // Первоначальная загрузка
+  useEffect(() => {
+    fetchMediaItems({ newCategory: "all", newLevel: "ALL", newOffset: 0, reset: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Мгновенная реакция при смене категории
+  const handleCategoryChange = (newCat: CategoryType) => {
+    if (newCat === category) return;
+    setCategory(newCat);
     setItems([]);
     setBrokenIds(new Set());
     setOffset(0);
     setHasMore(true);
+    fetchMediaItems({ newCategory: newCat, newOffset: 0, reset: true });
   };
 
-  // Initial load or when filters change
-  useEffect(() => {
+  // Мгновенная реакция при смене уровня
+  const handleLevelChange = (newLevel: LevelType) => {
+    if (newLevel === level) return;
+    setLevel(newLevel);
+    setItems([]);
+    setBrokenIds(new Set());
     setOffset(0);
     setHasMore(true);
-    fetchItems(0, true);
-  }, [category, level, activeQuery, fetchItems]);
+    fetchMediaItems({ newLevel, newOffset: 0, reset: true });
+  };
+
+  // Принудительное обновление
+  const handleRefresh = () => {
+    setItems([]);
+    setBrokenIds(new Set());
+    setOffset(0);
+    setHasMore(true);
+    fetchMediaItems({ newOffset: 0, reset: true });
+  };
+
+  // Поиск
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = searchInput.trim();
+    setActiveQuery(trimmed);
+    setItems([]);
+    setBrokenIds(new Set());
+    setOffset(0);
+    setHasMore(true);
+    fetchMediaItems({ newQuery: trimmed, newOffset: 0, reset: true });
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput("");
+    setActiveQuery("");
+    setItems([]);
+    setBrokenIds(new Set());
+    setOffset(0);
+    setHasMore(true);
+    fetchMediaItems({ newQuery: "", newOffset: 0, reset: true });
+  };
 
   // Infinite scroll observer
   useEffect(() => {
@@ -138,7 +205,7 @@ export default function MediathekCatalog() {
     observerRef.current = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !isLoading && !isLoadingMore) {
-          fetchItems(offset, false);
+          fetchMediaItems({ newOffset: offset, reset: false });
         }
       },
       { rootMargin: "300px" }
@@ -153,12 +220,7 @@ export default function MediathekCatalog() {
         observerRef.current.disconnect();
       }
     };
-  }, [fetchItems, hasMore, isLoading, isLoadingMore, offset]);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setActiveQuery(searchInput.trim());
-  };
+  }, [fetchMediaItems, hasMore, isLoading, isLoadingMore, offset]);
 
   const handleCardClick = (url: string) => {
     window.location.href = url;
@@ -178,7 +240,7 @@ export default function MediathekCatalog() {
     });
   };
 
-  // Filter out any broken posters and deduplicate
+  // Устранение дублей серий и пустых обложек
   const seenTitles = new Set<string>();
   const displayedItems = items
     .filter((it) => (it.posterUrl || it.thumbnailUrl) && !brokenIds.has(it.id))
@@ -196,7 +258,7 @@ export default function MediathekCatalog() {
 
   return (
     <div className="w-full">
-      {/* Search Header for Mediathek */}
+      {/* Поисковая строка для медиатек */}
       <div className="max-w-3xl mx-auto mb-6">
         <form
           onSubmit={handleSearchSubmit}
@@ -213,10 +275,7 @@ export default function MediathekCatalog() {
           {searchInput && (
             <button
               type="button"
-              onClick={() => {
-                setSearchInput("");
-                setActiveQuery("");
-              }}
+              onClick={handleClearSearch}
               className="text-zinc-500 hover:text-white p-0.5 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
@@ -231,10 +290,10 @@ export default function MediathekCatalog() {
         </form>
       </div>
 
-      {/* Filter Controls: Categories & Level Chips */}
+      {/* Панель фильтров: Категории и Уровни */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
-          {/* Strict Categories: [ Все ] [ Фильмы ] [ Документальные фильмы ] [ Сериалы ] + ↻ */}
+          {/* Строгий список категорий: [ Все ] [ Фильмы ] [ Документальные фильмы ] [ Сериалы ] + ↻ */}
           <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
             {CATEGORIES.map((cat) => {
               const Icon = cat.icon;
@@ -242,7 +301,7 @@ export default function MediathekCatalog() {
               return (
                 <button
                   key={cat.id}
-                  onClick={() => setCategory(cat.id)}
+                  onClick={() => handleCategoryChange(cat.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all cursor-pointer ${
                     isActive
                       ? "bg-red-600 text-white font-semibold shadow-lg shadow-red-950/40"
@@ -266,18 +325,18 @@ export default function MediathekCatalog() {
             </button>
           </div>
 
-          {/* Level Switcher (Right side) */}
+          {/* Переключатель уровня (B1 / B2) */}
           <div className="flex items-center gap-1.5 bg-zinc-900/90 p-1 rounded-full border border-zinc-800">
             {LEVELS.map((lvl) => {
               const isActive = level === lvl.id;
               return (
                 <button
                   key={lvl.id}
-                  onClick={() => setLevel(lvl.id)}
+                  onClick={() => handleLevelChange(lvl.id)}
                   title={lvl.desc}
                   className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     isActive
-                      ? "bg-white text-black shadow"
+                      ? "bg-white text-black shadow font-bold"
                       : "text-zinc-400 hover:text-white"
                   }`}
                 >
@@ -289,13 +348,13 @@ export default function MediathekCatalog() {
         </div>
       </div>
 
-      {/* Error state */}
+      {/* Ошибка */}
       {error && (
         <div className="max-w-md mx-auto my-12 p-6 rounded-2xl bg-zinc-900/90 border border-red-500/30 text-center space-y-4">
           <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
           <p className="text-sm text-zinc-300">{error}</p>
           <button
-            onClick={() => fetchItems(0, true)}
+            onClick={() => fetchMediaItems({ newOffset: 0, reset: true })}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-600 hover:bg-red-700 text-xs font-bold text-white transition-colors cursor-pointer"
           >
             <RotateCw className="w-3.5 h-3.5" />
@@ -304,7 +363,7 @@ export default function MediathekCatalog() {
         </div>
       )}
 
-      {/* Initial Loading Skeleton */}
+      {/* Скелетон во время загрузки первой пачки */}
       {isLoading && (
         <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -317,18 +376,18 @@ export default function MediathekCatalog() {
         </div>
       )}
 
-      {/* Empty State */}
+      {/* Пустое состояние */}
       {!isLoading && !error && displayedItems.length === 0 && (
         <div className="max-w-md mx-auto my-16 text-center space-y-3">
           <Film className="w-10 h-10 text-zinc-600 mx-auto" />
           <h3 className="text-base font-bold text-white">Передачи не найдены</h3>
           <p className="text-xs text-zinc-400">
-            Попробуйте обновить ленту или выбрать другую категорию.
+            Попробуйте выбрать другую категорию или обновить ленту.
           </p>
         </div>
       )}
 
-      {/* Grid of Mediathek Cards - ONLY with verified real posters */}
+      {/* Сетка карточек медиатеки */}
       {!isLoading && displayedItems.length > 0 && (
         <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {displayedItems.map((item) => {
@@ -348,13 +407,12 @@ export default function MediathekCatalog() {
                 }}
                 className="group relative flex flex-col cursor-pointer text-left select-none"
               >
-                {/* 1. Preview 16:9 */}
+                {/* 1. Превью 16:9 с наложением */}
                 <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800">
                   <img
                     src={item.posterUrl || item.thumbnailUrl}
                     alt={item.title}
                     onError={() => {
-                      // Remove card from DOM if poster fails
                       setBrokenIds((prev) => new Set(prev).add(item.id));
                     }}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -367,15 +425,17 @@ export default function MediathekCatalog() {
                   </span>
 
                   {/* Бейдж B1 / B2 */}
-                  <span className={`absolute top-2 left-14 px-2 py-0.5 rounded text-[10px] font-bold backdrop-blur-md ${
-                    item.level === "B1"
-                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                      : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
-                  }`}>
+                  <span
+                    className={`absolute top-2 left-14 px-2 py-0.5 rounded text-[10px] font-bold backdrop-blur-md ${
+                      item.level === "B1"
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                        : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
+                    }`}
+                  >
                     {item.level}
                   </span>
 
-                  {/* Кнопка В избранное */}
+                  {/* Кнопка «В избранное» */}
                   <button
                     type="button"
                     onClick={(e) => handleToggleFavorite(e, item)}
@@ -392,7 +452,7 @@ export default function MediathekCatalog() {
                     />
                   </button>
 
-                  {/* Center Play Button on Hover */}
+                  {/* Кнопка воспроизведения по центру при наведении */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="w-12 h-12 bg-red-600/90 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-lg translate-y-2 group-hover:translate-y-0">
                       <Play className="w-5 h-5 fill-current ml-0.5" />
@@ -405,7 +465,7 @@ export default function MediathekCatalog() {
                   </span>
                 </div>
 
-                {/* 2. Text Below Preview (Title and Channel only) */}
+                {/* 2. Чистое название ролика под постером */}
                 <h3 className="mt-2 text-sm font-medium text-zinc-100 line-clamp-2 group-hover:text-white transition-colors leading-snug">
                   {item.title}
                 </h3>
@@ -418,7 +478,7 @@ export default function MediathekCatalog() {
         </div>
       )}
 
-      {/* Infinite Scroll Trigger */}
+      {/* Триггер бесконечной ленты */}
       <div ref={loadMoreRef} className="h-16 flex items-center justify-center my-6">
         {isLoadingMore && (
           <div className="flex items-center gap-2 text-xs text-zinc-400">

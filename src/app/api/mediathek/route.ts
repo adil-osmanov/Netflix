@@ -3,29 +3,13 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Белый список проверенных премиальных программ с идеальным визуалом и дикцией
-const CURATED_DOCS = [
-  'Terra X',
-  'ZDFinfo',
-  'Arte Doku',
-  'WDR die story',
-  'ZDFzoom',
-  'Planet Wissen'
-];
-
-const CURATED_FILMS = [
-  'Film im Ersten',
-  'ZDF Fernsehfilm der Woche',
-  'Arte Kino',
-  'Spielfilm'
-];
-
-// Черный список: ток-шоу, архивные беседы, региональные хроники
-const BLACKLIST_REGEX = /(zeitzeugen|talkshow|talk|gottesdienst|regional|magazin|nachrichten|wetter|sport|presseclub|landesschau|aktuell|markt|service)/i;
+// Черный список: новости, политика, ток-шоу, мыло, региональные сводки
+const TRASH_REGEX = /(tagesschau|heute-journal|heute journal|nachrichten|wetter|presseclub|talkshow|talk|maischberger|markus lanz|hart aber fair|illner|kölner treff|ndr talk show|riverboat|landesschau|abendschau|aktuell|markt|service|gottesdienst|audiodeskription|hörfassung|rote rosen|sturm der liebe|in aller freundschaft|berlin direkt|morgenmagazin|mittagsmagazin)/i;
 
 const ogImageCache = new Map<string, string>();
 
-async function fetchFastOgImage(url: string): Promise<string | null> {
+// Быстрый парсер постеров из og:image (таймаут 1.2 сек)
+async function fetchFastPoster(url: string): Promise<string | null> {
   if (!url || !url.startsWith('http')) return null;
   if (ogImageCache.has(url)) {
     return ogImageCache.get(url)!;
@@ -33,14 +17,14 @@ async function fetchFastOgImage(url: string): Promise<string | null> {
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1200); // Строгий таймаут 1.2 сек
+    const timeout = setTimeout(() => controller.abort(), 1200);
 
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       },
-      next: { revalidate: 86400 } // Кэш на 24 часа
+      next: { revalidate: 86400 }
     });
     clearTimeout(timeout);
 
@@ -50,7 +34,7 @@ async function fetchFastOgImage(url: string): Promise<string | null> {
       html.match(/<meta\s+(?:property|name)=["'](?:og:image|twitter:image)["']\s+content=["']([^"']+)["']/i) ||
       html.match(/<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["'](?:og:image|twitter:image)["']/i);
 
-    let poster = match ? match[1] : null;
+    let poster = match && match[1] ? match[1].trim() : null;
 
     if (!poster) {
       // Fallback for ZDF & ARD embedded images in page
@@ -66,8 +50,12 @@ async function fetchFastOgImage(url: string): Promise<string | null> {
     }
 
     if (poster && poster.startsWith('http')) {
-      ogImageCache.set(url, poster);
-      return poster;
+      // Исключаем стандартные дефолтные логотипы каналов вместо постеров
+      const lower = poster.toLowerCase();
+      if (!lower.includes('default') && !lower.includes('placeholder')) {
+        ogImageCache.set(url, poster);
+        return poster;
+      }
     }
     return null;
   } catch {
@@ -77,26 +65,28 @@ async function fetchFastOgImage(url: string): Promise<string | null> {
 
 export async function POST(req: Request) {
   try {
-    const { offset = 0, size = 30, category = 'ALL', level = 'ALL', query = '' } = await req.json();
+    const { offset = 0, size = 28, category = 'all', level = 'ALL', query = '' } = await req.json();
 
     const queries: Array<{ fields: string[]; query: string }> = [];
 
-    if (query) {
-      queries.push({ fields: ['title', 'topic'], query });
-    } else if (category === 'doku' || category === 'docs') {
-      // Ротация конкретной топовой передачи вместо кучи слов через пробел
-      const topic = CURATED_DOCS[Math.floor(Math.random() * CURATED_DOCS.length)];
-      queries.push({ fields: ['topic'], query: topic });
-    } else if (category === 'films') {
-      const filmTopic = CURATED_FILMS[Math.floor(Math.random() * CURATED_FILMS.length)];
-      queries.push({ fields: ['topic'], query: filmTopic });
-    } else if (category === 'series') {
-      queries.push({ fields: ['topic'], query: 'Serie' });
+    if (query && query.trim()) {
+      queries.push({ fields: ['title', 'topic'], query: query.trim() });
     } else {
-      // Для вкладки «Все» берем топовый познавательный контент
-      const allPool = [...CURATED_DOCS, ...CURATED_FILMS];
-      const randomSelected = allPool[Math.floor(Math.random() * allPool.length)];
-      queries.push({ fields: ['topic'], query: randomSelected });
+      // Широкие категориальные запросы
+      switch (category) {
+        case 'films':
+          queries.push({ fields: ['topic', 'title'], query: 'Spielfilm Film' });
+          break;
+        case 'docs':
+          queries.push({ fields: ['topic', 'title'], query: 'Dokumentation Doku' });
+          break;
+        case 'series':
+          queries.push({ fields: ['topic', 'title'], query: 'Serie' });
+          break;
+        default: // 'all'
+          queries.push({ fields: ['topic', 'title'], query: 'Film Dokumentation Doku Serie' });
+          break;
+      }
     }
 
     const payload = {
@@ -104,8 +94,8 @@ export async function POST(req: Request) {
       sortBy: 'timestamp',
       sortOrder: 'desc',
       future: false,
-      offset: query ? offset : Math.floor(Math.random() * 15) * 10 + offset, // Случайный сдвиг для разнообразия
-      size: 40,
+      offset,
+      size: 45, // Запрашиваем с запасом под фильтрацию
     };
 
     const response = await fetch('https://mediathekviewweb.de/api/query', {
@@ -114,32 +104,36 @@ export async function POST(req: Request) {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) throw new Error('API Mediathek error');
+    if (!response.ok) throw new Error('Mediathek API error');
     const data = await response.json();
     const rawResults = data.result?.results || [];
 
-    // Фильтруем мусор и ток-шоу
+    // 1. Первичная фильтрация: субтитры, хронометраж и черный список шлака
     const cleaned = rawResults.filter((item: any) => {
-      const isSubtitled = Boolean(
+      const hasSubtitles = Boolean(
         (item.url_subtitles && item.url_subtitles.length > 5) ||
         (item.url_subtitle && item.url_subtitle.length > 5)
       );
-      const isLongEnough = item.duration >= 900; // от 15 минут
-      const isNotTrash = !BLACKLIST_REGEX.test(`${item.topic} ${item.title}`);
-      return isSubtitled && isLongEnough && isNotTrash;
+
+      // Фильмы и доки должны быть полноценными: от 20 минут (1200 сек)
+      const minDuration = category === 'films' ? 2400 : 1200;
+      const isLongEnough = typeof item.duration === 'number' && item.duration >= minDuration;
+
+      const fullText = `${item.topic} ${item.title}`;
+      const isTrash = TRASH_REGEX.test(fullText);
+
+      return hasSubtitles && isLongEnough && !isTrash;
     });
 
-    // Параллельный сбор превью с жестким лимитом
+    // 2. Параллельный сбор реальных обложек
     const enriched = await Promise.all(
-      cleaned.slice(0, size).map(async (item: any) => {
-        let poster = await fetchFastOgImage(item.url_website);
+      cleaned.map(async (item: any) => {
+        const poster = await fetchFastPoster(item.url_website);
 
-        // Если страница не отдала постер, исключаем полностью
-        if (!poster) {
-          return null; // Нет нормальной обложки -> исключаем полностью
-        }
+        // ЖЕЛЕЗНЫЙ ФИЛЬТР: нет качественной обложки — ролик не попадает в приложение
+        if (!poster) return null;
 
-        const isB1 = item.duration < 1800 || /einfach|alltag|wissen/i.test(`${item.topic} ${item.title}`);
+        const isB1 = item.duration < 2100 || /einfach|alltag|wissen|reise/i.test(`${item.topic} ${item.title}`);
 
         return {
           id: item.id || `${item.timestamp}-${item.title.slice(0, 15)}`,
@@ -156,24 +150,29 @@ export async function POST(req: Request) {
       })
     );
 
-    // Удаляем null (без картинок) и дубликаты по названию
+    // 3. Отсекаем пустые и устраняем дубликаты серий/фильмов на одной странице
     const validItems = enriched.filter(Boolean);
     const uniqueMap = new Map();
     validItems.forEach((it: any) => {
-      const simpleTitle = it.title.split('-')[0].trim().toLowerCase();
-      if (!uniqueMap.has(simpleTitle)) {
-        uniqueMap.set(simpleTitle, it);
+      // Нормализуем название, отсекая номера серий и знаки
+      const cleanTitle = it.title.replace(/\s*\(S\d+.*\)/gi, '').split('-')[0].trim().toLowerCase();
+      if (!uniqueMap.has(cleanTitle)) {
+        uniqueMap.set(cleanTitle, it);
       }
     });
 
-    const finalItems = Array.from(uniqueMap.values());
+    const finalItems = Array.from(uniqueMap.values()).slice(0, size);
+
+    const filteredByLevel = level === 'ALL'
+      ? finalItems
+      : finalItems.filter((i: any) => i.level === level);
 
     return NextResponse.json({
-      items: level === 'ALL' ? finalItems : finalItems.filter((i: any) => i.level === level),
-      hasMore: rawResults.length >= size,
+      items: filteredByLevel,
+      hasMore: rawResults.length >= 45,
     });
   } catch (error) {
-    console.error('Mediathek route error:', error);
+    console.error('Mediathek API route error:', error);
     return NextResponse.json({ items: [], hasMore: false }, { status: 500 });
   }
 }
