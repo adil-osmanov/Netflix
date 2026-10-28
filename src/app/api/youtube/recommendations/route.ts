@@ -70,8 +70,9 @@ async function fetchChannelVideos(channelId: string, channelName: string, level:
         if (v.isVertical) return false;
         const text = (v.title + " " + v.description).toLowerCase();
         if (
-          /\b(shorts?|tiktok|reels?)\b/i.test(text) ||
-          /#(shorts?|tiktok|reels?)/i.test(text)
+          /\b(shorts?|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(text) ||
+          /#(shorts?|tiktok|reels?)/i.test(text) ||
+          text.includes("🔴")
         ) {
           return false;
         }

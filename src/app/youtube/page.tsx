@@ -2,47 +2,42 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
-  Play, 
   Search, 
-  Plus, 
   X, 
   AlertCircle, 
   Loader2, 
-  Tv, 
   RotateCw,
-  Settings2,
-  Bookmark
+  Video
 } from "lucide-react";
 import { 
   RECOMMENDED_YOUTUBE_VIDEOS, 
   extractYouTubeId 
 } from "@/data/youtubeVideos";
 import { YouTubeRecommendedVideo } from "@/types/youtube";
-import { useYouTube } from "@/context/YouTubeContext";
 import VideoCard from "@/components/youtube/VideoCard";
-import ManageChannelsModal, { SubscribedChannel } from "@/components/youtube/ManageChannelsModal";
-
-const CHANNELS_FILTER = [
-  { id: "ALL", name: "Все каналы" },
-  { id: "Easy German", name: "Easy German" },
-  { id: "Galileo", name: "Galileo" },
-  { id: "Simplicissimus", name: "Simplicissimus" },
-  { id: "Quarks", name: "Quarks" },
-  { id: "DW Deutsch lernen", name: "DW Deutsch lernen" },
-];
-
-const DEFAULT_SUBSCRIPTIONS: SubscribedChannel[] = [
-  { id: "UCbxb2fqe9oNgglAoYqsYOtQ", name: "Easy German" },
-  { id: "UCxUWIEL-USsiPak0Qy6_vVg", name: "DW Deutsch lernen" },
-  { id: "UCZHpIFMfoJJ_1QxNGLJTzyA", name: "MrWissen2go" },
-  { id: "UCUuab1dctZzN5ZmRmQnTzkg", name: "WDR Doku" },
-];
 
 /**
- * 100% Strict YouTube Shorts Filter:
- * - /shorts/ in url or id
- * - #shorts, #short, shorts, Short, Shorts in title or description
- * - duration < 90 seconds
+ * Helper to parse duration to total seconds (e.g. "12:34", "14 мин")
+ */
+function parseDurationToSeconds(durationStr?: string): number | null {
+  if (!durationStr) return null;
+  const minMatch = durationStr.match(/(\d+)\s*(?:мин|min)/i);
+  if (minMatch) {
+    return parseInt(minMatch[1], 10) * 60;
+  }
+  const parts = durationStr.split(":").map(Number);
+  if (parts.some(isNaN)) return null;
+  if (parts.length === 2) {
+    return parts[0] * 60 + parts[1];
+  }
+  if (parts.length === 3) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+  return null;
+}
+
+/**
+ * Filter out YouTube Shorts, live streams and videos outside 5–25 minutes:
  */
 function isYouTubeShort(video: {
   title?: string;
@@ -61,23 +56,24 @@ function isYouTubeShort(video: {
 
   // Keywords and hashtag patterns
   if (
-    /\b(shorts?|tiktok|reels?)\b/i.test(title) ||
+    /\b(shorts?|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(title) ||
     /#(shorts?|tiktok|reels?)/i.test(title) ||
-    /\b(shorts?|tiktok|reels?)\b/i.test(desc) ||
-    /#(shorts?|tiktok|reels?)/i.test(desc)
+    /\b(shorts?|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(desc) ||
+    /#(shorts?|tiktok|reels?)/i.test(desc) ||
+    title.includes("🔴")
   ) {
     return true;
   }
 
-  if (video.duration && video.duration < 90) {
+  // Strict 5 to 25 minutes duration filter (300 to 1500 seconds)
+  if (video.duration && (video.duration < 300 || video.duration > 1500)) {
     return true;
   }
 
   if (video.durationText) {
-    const parts = video.durationText.split(":").map(Number);
-    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-      const totalSec = parts[0] * 60 + parts[1];
-      if (totalSec < 90) return true;
+    const sec = parseDurationToSeconds(video.durationText);
+    if (sec !== null && (sec < 300 || sec > 1500)) {
+      return true;
     }
   }
 
@@ -85,38 +81,20 @@ function isYouTubeShort(video: {
 }
 
 export default function YouTubeCatalogPage() {
-  const { favorites, removeFavorite } = useYouTube();
-
   // Search & Direct Watch
   const [searchInput, setSearchInput] = useState<string>("");
   const [inputError, setInputError] = useState<string | null>(null);
 
-  // Tabs: 'recommendations' | 'subscriptions' | 'favorites'
-  const [activeTab, setActiveTab] = useState<"recommendations" | "subscriptions" | "favorites">("recommendations");
-
   // Difficulty Level Filter: 'ALL' | 'B1' | 'B2'
   const [selectedLevel, setSelectedLevel] = useState<"ALL" | "B1" | "B2">("ALL");
 
-  // Channel Filter: 'ALL' | channel name
-  const [selectedChannel, setSelectedChannel] = useState<string>("ALL");
-
-  // Manage Channels Modal
-  const [isManageModalOpen, setIsManageModalOpen] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
-  // Random seed generated on initial load (randomizes order on every F5 / Cmd+R)
+  // Random seed generated on initial load (randomizes order on every load / refresh)
   const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1000000) + 1);
 
   // Infinite Scroll Trigger Ref
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
-
-  // Subscriptions state
-  const [subscriptions, setSubscriptions] = useState<SubscribedChannel[]>(DEFAULT_SUBSCRIPTIONS);
-  const [subVideos, setSubVideos] = useState<YouTubeRecommendedVideo[]>([]);
-  const [subPage, setSubPage] = useState<number>(1);
-  const [hasMoreSub, setHasMoreSub] = useState<boolean>(true);
-  const [isLoadingSubs, setIsLoadingSubs] = useState<boolean>(false);
-  const [isLoadingMoreSub, setIsLoadingMoreSub] = useState<boolean>(false);
 
   // Recommendations state
   const [recommendations, setRecommendations] = useState<YouTubeRecommendedVideo[]>([]);
@@ -125,26 +103,7 @@ export default function YouTubeCatalogPage() {
   const [isLoadingRec, setIsLoadingRec] = useState<boolean>(false);
   const [isLoadingMoreRec, setIsLoadingMoreRec] = useState<boolean>(false);
 
-  // Load subscriptions from localStorage on mount
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const stored = localStorage.getItem("yt_de_subscriptions");
-      if (stored) {
-        setSubscriptions(JSON.parse(stored));
-      }
-    } catch {}
-  }, []);
-
-  // Save subscriptions to localStorage
-  const saveSubscriptions = (subs: SubscribedChannel[]) => {
-    setSubscriptions(subs);
-    try {
-      localStorage.setItem("yt_de_subscriptions", JSON.stringify(subs));
-    } catch {}
-  };
-
-  // 1. Fetch Recommendations from unified infinite feed API
+  // Fetch Recommendations from unified feed API
   const loadRecommendations = useCallback(
     async (page: number, isReset: boolean = false, customSeed?: number) => {
       const currentSeed = customSeed !== undefined ? customSeed : seed;
@@ -194,77 +153,13 @@ export default function YouTubeCatalogPage() {
     [seed]
   );
 
-  // 2. Fetch Subscriptions from unified infinite feed API
-  const loadSubscriptions = useCallback(
-    async (channels: SubscribedChannel[], page: number, isReset: boolean = false, customSeed?: number) => {
-      if (channels.length === 0) {
-        setSubVideos([]);
-        setIsLoadingSubs(false);
-        setIsLoadingMoreSub(false);
-        setHasMoreSub(false);
-        return;
-      }
-
-      const currentSeed = customSeed !== undefined ? customSeed : seed;
-      if (isReset) {
-        setIsLoadingSubs(true);
-      } else {
-        setIsLoadingMoreSub(true);
-      }
-
-      try {
-        const channelIds = channels.map((c) => c.id).join(",");
-        const resp = await fetch(
-          `/api/youtube/feed?tab=subscriptions&channels=${encodeURIComponent(
-            channelIds
-          )}&page=${page}&limit=16&seed=${currentSeed}`
-        );
-
-        if (resp.ok) {
-          const data = await resp.json();
-          if (Array.isArray(data.videos) && data.videos.length > 0) {
-            if (isReset) {
-              setSubVideos(data.videos);
-              setSubPage(1);
-            } else {
-              setSubVideos((prev) => {
-                const existingIds = new Set(prev.map((v) => v.id));
-                const fresh = data.videos.filter(
-                  (v: YouTubeRecommendedVideo) => !existingIds.has(v.id)
-                );
-                return [...prev, ...fresh];
-              });
-              setSubPage(page);
-            }
-            setHasMoreSub(Boolean(data.hasMore));
-          } else {
-            setHasMoreSub(false);
-          }
-        }
-      } catch {
-      } finally {
-        if (isReset) setIsLoadingSubs(false);
-        setIsLoadingMoreSub(false);
-      }
-    },
-    [seed]
-  );
-
   // Initial Load: Recommendations
   useEffect(() => {
     loadRecommendations(1, true);
   }, [loadRecommendations]);
 
-  // Initial Load / Subscriptions change
-  useEffect(() => {
-    if (activeTab === "subscriptions") {
-      loadSubscriptions(subscriptions, 1, true);
-    }
-  }, [subscriptions, activeTab, loadSubscriptions]);
-
   // Infinite Scroll IntersectionObserver
   useEffect(() => {
-    if (activeTab === "favorites") return;
     const target = loadMoreTriggerRef.current;
     if (!target) return;
 
@@ -272,14 +167,8 @@ export default function YouTubeCatalogPage() {
       (entries) => {
         const [entry] = entries;
         if (entry.isIntersecting) {
-          if (activeTab === "recommendations") {
-            if (!isLoadingMoreRec && !isLoadingRec && hasMoreRec) {
-              loadRecommendations(recPage + 1, false);
-            }
-          } else if (activeTab === "subscriptions") {
-            if (!isLoadingMoreSub && !isLoadingSubs && hasMoreSub) {
-              loadSubscriptions(subscriptions, subPage + 1, false);
-            }
+          if (!isLoadingMoreRec && !isLoadingRec && hasMoreRec) {
+            loadRecommendations(recPage + 1, false);
           }
         }
       },
@@ -295,39 +184,25 @@ export default function YouTubeCatalogPage() {
       observer.disconnect();
     };
   }, [
-    activeTab,
     recPage,
     hasMoreRec,
     isLoadingMoreRec,
     isLoadingRec,
     loadRecommendations,
-    subPage,
-    hasMoreSub,
-    isLoadingMoreSub,
-    isLoadingSubs,
-    loadSubscriptions,
-    subscriptions,
   ]);
 
-  // Handle Refresh feed button (<RotateCw />)
+  // Handle Refresh feed button (Shuffles recommendations with a fresh seed)
   const handleRefreshFeed = async () => {
     setIsRefreshing(true);
     const newSeed = Date.now();
     setSeed(newSeed);
-
-    if (activeTab === "subscriptions") {
-      setSubPage(1);
-      setHasMoreSub(true);
-      await loadSubscriptions(subscriptions, 1, true, newSeed);
-    } else if (activeTab === "recommendations") {
-      setRecPage(1);
-      setHasMoreRec(true);
-      await loadRecommendations(1, true, newSeed);
-    }
+    setRecPage(1);
+    setHasMoreRec(true);
+    await loadRecommendations(1, true, newSeed);
     setIsRefreshing(false);
   };
 
-  // Handle Search / Direct Watch (Opens YouTube in a new tab)
+  // Handle Search / Direct Watch (Seamless navigation inside same Chrome App window)
   const handleSearchOrWatch = (e: React.FormEvent) => {
     e.preventDefault();
     setInputError(null);
@@ -337,66 +212,41 @@ export default function YouTubeCatalogPage() {
 
     const directId = extractYouTubeId(trimmed);
     if (directId) {
-      window.open(`https://www.youtube.com/watch?v=${directId}`, "_blank", "noopener,noreferrer");
+      window.location.href = `https://www.youtube.com/watch?v=${directId}`;
       return;
     }
   };
 
-  // Channel management callbacks
-  const handleAddChannel = (channel: SubscribedChannel) => {
-    const updated = [...subscriptions.filter((s) => s.id !== channel.id), channel];
-    saveSubscriptions(updated);
-  };
-
-  const handleRemoveChannel = (channelId: string) => {
-    const updated = subscriptions.filter((s) => s.id !== channelId);
-    saveSubscriptions(updated);
-    setSubVideos((prev) => prev.filter((v) => v.channelId !== channelId));
-  };
-
-  // Base list of videos depending on activeTab
-  const baseVideos =
-    activeTab === "recommendations"
-      ? recommendations
-      : activeTab === "subscriptions"
-      ? subVideos
-      : favorites;
-
-  // Filter videos based on search query, difficulty level and channel
+  // Filter recommendations based on search query and difficulty level
   const query = searchInput.trim().toLowerCase();
   const isSearchQuery = query.length > 0 && !extractYouTubeId(searchInput.trim());
 
-  const currentVideos = baseVideos.filter((video) => {
-    // 0. Filter out YouTube Shorts
+  const currentVideos = recommendations.filter((video) => {
+    // 0. Filter out Shorts, streams and durations outside 5–25 min
     if (isYouTubeShort(video)) return false;
 
     // 1. Поиск
-    const matchesSearch = !isSearchQuery || 
-      video.title.toLowerCase().includes(query) || 
+    const matchesSearch =
+      !isSearchQuery ||
+      video.title.toLowerCase().includes(query) ||
       video.channel.toLowerCase().includes(query) ||
       (video.description || "").toLowerCase().includes(query);
 
     // 2. Уровень B1 / B2
     const l = (video.level || "B1").toUpperCase();
     const isB2 = l.startsWith("B2") || l === "C1" || l === "C2";
-    const matchesLevel = 
-      selectedLevel === 'ALL' || 
-      (selectedLevel === 'B1' && !isB2) || 
-      (selectedLevel === 'B2' && isB2);
+    const matchesLevel =
+      selectedLevel === "ALL" ||
+      (selectedLevel === "B1" && !isB2) ||
+      (selectedLevel === "B2" && isB2);
 
-    // 3. Канал
-    const matchesChannel = 
-      selectedChannel === 'ALL' || 
-      video.channel.toLowerCase().trim() === selectedChannel.toLowerCase().trim() ||
-      video.channel.toLowerCase().includes(selectedChannel.toLowerCase().trim());
-
-    return matchesSearch && matchesLevel && matchesChannel;
+    return matchesSearch && matchesLevel;
   });
 
   return (
     <div className="min-h-screen bg-[#141414] text-white pb-24 px-4 md:px-12 pt-4">
       {/* Top Controls: Centered Clean Search Bar */}
-      <div className="max-w-3xl mx-auto mb-8 pt-2">
+      <div className="max-w-3xl mx-auto mb-6 pt-2">
         <form
           onSubmit={handleSearchOrWatch}
           className="relative bg-zinc-900/90 border border-zinc-800 rounded-full px-4 py-2.5 flex items-center gap-2.5 focus-within:border-zinc-500 transition-all shadow-xl"
@@ -437,105 +287,12 @@ export default function YouTubeCatalogPage() {
         )}
       </div>
 
-      {/* Netflix-style Tabs Switcher & Actions */}
+      {/* Simplified Controls: Level Chips + Refresh Button */}
       <div className="max-w-7xl mx-auto mb-8">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
-          {/* Left: 3 Tab Buttons + Refresh Icon */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => setActiveTab("recommendations")}
-              className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                activeTab === "recommendations"
-                  ? "bg-[#E50914] text-white shadow-lg shadow-red-950/40"
-                  : "bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800"
-              }`}
-            >
-              Рекомендации B1–B2
-            </button>
-
-            <button
-              onClick={() => setActiveTab("subscriptions")}
-              className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === "subscriptions"
-                  ? "bg-[#E50914] text-white shadow-lg shadow-red-950/40"
-                  : "bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800"
-              }`}
-            >
-              <span>Мои подписки</span>
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                  activeTab === "subscriptions"
-                    ? "bg-white/20 text-white"
-                    : "bg-zinc-800 text-zinc-300"
-                }`}
-              >
-                {subscriptions.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("favorites")}
-              className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === "favorites"
-                  ? "bg-[#E50914] text-white shadow-lg shadow-red-950/40"
-                  : "bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800"
-              }`}
-            >
-              <span>Избранное</span>
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                  activeTab === "favorites"
-                    ? "bg-white/20 text-white"
-                    : "bg-zinc-800 text-zinc-300"
-                }`}
-              >
-                {favorites.length}
-              </span>
-            </button>
-
-            {/* Refresh feed button (for recommendations & subscriptions) */}
-            {activeTab !== "favorites" && (
-              <button
-                onClick={handleRefreshFeed}
-                disabled={isRefreshing}
-                className="p-2 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors cursor-pointer ml-1"
-                title="Обновить ленту"
-              >
-                <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#E50914]" : ""}`} />
-              </button>
-            )}
-          </div>
-
-          {/* Right: Channel Management & Add Channel ONLY rendered on subscriptions tab */}
-          {activeTab === "subscriptions" && (
-            <div className="flex items-center gap-2 animate-in fade-in duration-200">
-              <button
-                onClick={() => setIsManageModalOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-xs font-semibold text-zinc-300 hover:text-white transition-all cursor-pointer"
-                title="Настроить немецкие каналы"
-              >
-                <Settings2 size={13} className="text-zinc-400" />
-                <span className="hidden sm:inline">Каналы ({subscriptions.length})</span>
-              </button>
-
-              <button
-                onClick={() => setIsManageModalOpen(true)}
-                className="flex items-center px-3.5 py-2 rounded-full bg-[#E50914] hover:bg-[#b80710] text-xs font-bold text-white transition-all shadow-md cursor-pointer active:scale-95"
-              >
-                <Plus size={14} className="mr-1.5" />
-                <span>Добавить канал</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Filters Bar: Difficulty Levels & Channels Ribbon */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-3">
-          {/* Level Filter Chips */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-zinc-400 font-medium mr-0.5">Уровень:</span>
+        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {[
-              { id: "ALL", label: "Все уровни" },
+              { id: "ALL", label: "Рекомендации B1–B2" },
               { id: "B1", label: "B1 (Средний)" },
               { id: "B2", label: "B2 (Продвинутый)" },
             ].map((chip) => {
@@ -544,37 +301,26 @@ export default function YouTubeCatalogPage() {
                 <button
                   key={chip.id}
                   onClick={() => setSelectedLevel(chip.id as "ALL" | "B1" | "B2")}
-                  className={`px-3.5 py-1.5 rounded-full text-xs transition cursor-pointer ${
+                  className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                     isActive
-                      ? "bg-white text-black font-semibold shadow-md"
-                      : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
+                      ? "bg-white text-black shadow-lg shadow-white/10"
+                      : "bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800"
                   }`}
                 >
                   {chip.label}
                 </button>
               );
             })}
-          </div>
 
-          {/* Horizontal Channel Ribbon */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-            <span className="text-xs text-zinc-400 font-medium mr-0.5 flex-shrink-0">Канал:</span>
-            {CHANNELS_FILTER.map((ch) => {
-              const isActive = selectedChannel === ch.id;
-              return (
-                <button
-                  key={ch.id}
-                  onClick={() => setSelectedChannel(ch.id)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
-                    isActive
-                      ? "bg-white text-black font-semibold shadow-md"
-                      : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
-                  }`}
-                >
-                  {ch.name}
-                </button>
-              );
-            })}
+            {/* Refresh feed button */}
+            <button
+              onClick={handleRefreshFeed}
+              disabled={isRefreshing}
+              className="p-2.5 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors cursor-pointer ml-1"
+              title="Обновить рекомендации"
+            >
+              <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#E50914]" : ""}`} />
+            </button>
           </div>
         </div>
       </div>
@@ -582,8 +328,7 @@ export default function YouTubeCatalogPage() {
       {/* Main Video Feed Area */}
       <div className="max-w-7xl mx-auto">
         {/* Loading State on initial fetch */}
-        {((activeTab === "subscriptions" && isLoadingSubs && subVideos.length === 0) ||
-          (activeTab === "recommendations" && isLoadingRec && recommendations.length === 0)) ? (
+        {isLoadingRec && recommendations.length === 0 ? (
           <div className="py-24 flex flex-col items-center justify-center gap-3 text-zinc-400">
             <Loader2 className="w-8 h-8 animate-spin text-[#E50914]" />
             <span className="text-sm font-medium">Загрузка свежих видео из немецких каналов...</span>
@@ -591,75 +336,41 @@ export default function YouTubeCatalogPage() {
         ) : currentVideos.length === 0 ? (
           /* Empty State */
           <div className="py-20 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl text-center flex flex-col items-center justify-center p-8 gap-3 max-w-lg mx-auto">
-            {activeTab === "favorites" ? (
-              <Bookmark className="w-10 h-10 text-zinc-600" />
-            ) : (
-              <Tv className="w-10 h-10 text-zinc-600" />
-            )}
-            <h3 className="text-base font-bold text-white">
-              {activeTab === "favorites" ? "В избранном пока пусто" : "Видео не найдены"}
-            </h3>
+            <Video className="w-10 h-10 text-zinc-600" />
+            <h3 className="text-base font-bold text-white">Видео не найдены</h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
               {isSearchQuery
                 ? `По запросу «${searchInput}» ничего не найдено.`
-                : activeTab === "favorites"
-                ? "В избранном пока нет сохраненных видео. Нажмите на значок закладки на любой карточке, чтобы добавить видео сюда."
-                : activeTab === "subscriptions"
-                ? "В ваших подписках пока нет доступных длинных видео."
                 : "В каталоге пока нет видео по выбранным критериям."}
             </p>
-            {activeTab === "subscriptions" && (
-              <button
-                onClick={() => setIsManageModalOpen(true)}
-                className="mt-2 px-4 py-2 rounded-xl bg-[#E50914] text-white text-xs font-bold hover:bg-[#b80710] transition-colors cursor-pointer"
-              >
-                Добавить немецкий YouTube-канал
-              </button>
-            )}
           </div>
         ) : (
-          /* Video Grid (Strictly non-Shorts, opens direct YouTube in new tab) */
+          /* Video Grid (Strictly non-Shorts, 5–25 min, opens in same window) */
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
               {currentVideos.map((video) => (
                 <VideoCard
                   key={video.id}
                   video={video}
-                  onRemoveFavorite={
-                    activeTab === "favorites"
-                      ? () => removeFavorite(video.id)
-                      : undefined
-                  }
                 />
               ))}
             </div>
 
             {/* Infinite Scroll Trigger Target */}
-            {activeTab !== "favorites" && (
-              <div
-                ref={loadMoreTriggerRef}
-                className="h-20 w-full flex items-center justify-center mt-6 pointer-events-none"
-              >
-                {(isLoadingMoreRec || isLoadingMoreSub) && (
-                  <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm">
-                    <Loader2 className="w-5 h-5 animate-spin text-[#E50914]" />
-                    <span>Загрузка новых видео...</span>
-                  </div>
-                )}
-              </div>
-            )}
+            <div
+              ref={loadMoreTriggerRef}
+              className="h-20 w-full flex items-center justify-center mt-6 pointer-events-none"
+            >
+              {isLoadingMoreRec && (
+                <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm">
+                  <Loader2 className="w-5 h-5 animate-spin text-[#E50914]" />
+                  <span>Загрузка новых видео...</span>
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
-
-      {/* Manage Channels Modal */}
-      <ManageChannelsModal
-        isOpen={isManageModalOpen}
-        onClose={() => setIsManageModalOpen(false)}
-        channels={subscriptions}
-        onAddChannel={handleAddChannel}
-        onRemoveChannel={handleRemoveChannel}
-      />
     </div>
   );
 }

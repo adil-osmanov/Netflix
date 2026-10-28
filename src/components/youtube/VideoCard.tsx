@@ -34,15 +34,25 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
     }
   };
 
+  const handleOpenVideo = (youtubeId: string) => {
+    window.location.href = `https://www.youtube.com/watch?v=${youtubeId}`;
+  };
+
   const level = (video.level || "B1").toUpperCase();
   const isB2 = level.startsWith("B2") || level === "C1" || level === "C2";
 
   return (
-    <a
-      href={`https://www.youtube.com/watch?v=${videoId}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group relative flex flex-col rounded-xl overflow-hidden bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-red-950/20"
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => handleOpenVideo(videoId)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleOpenVideo(videoId);
+        }
+      }}
+      className="group relative flex flex-col rounded-xl overflow-hidden bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-red-950/20 cursor-pointer text-left select-none"
     >
       {/* 1. Preview thumbnail */}
       <div className="relative aspect-video w-full bg-zinc-950 overflow-hidden">
@@ -125,6 +135,6 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
           )}
         </div>
       </div>
-    </a>
+    </div>
   );
 }

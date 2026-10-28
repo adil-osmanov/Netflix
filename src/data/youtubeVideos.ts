@@ -8,6 +8,7 @@ export interface ChannelInfo {
 }
 
 export const CORE_CHANNELS: Record<string, ChannelInfo> = {
+  // B1 (Четкая речь, повседневная лексика)
   "Easy German": {
     id: "UCbxb2fqe9oNgglAoYqsYOtQ",
     name: "Easy German",
@@ -20,28 +21,36 @@ export const CORE_CHANNELS: Record<string, ChannelInfo> = {
     handle: "@dwdeutschlernen",
     defaultLevel: "B1",
   },
-  "MrWissen2go": {
-    id: "UCZHpIFMfoJJ_1QxNGLJTzyA",
-    name: "MrWissen2go",
-    handle: "@MrWissen2go",
-    defaultLevel: "B2",
-  },
-  "WDR Doku": {
-    id: "UCUuab1dctZzN5ZmRmQnTzkg",
-    name: "WDR Doku",
-    handle: "@WDRDoku",
-    defaultLevel: "B2",
-  },
   "SWR Handwerkskunst": {
     id: "UC4-a6QWRyBlzTFGdS-T_wfw",
     name: "SWR Handwerkskunst",
     handle: "@Handwerkskunst",
     defaultLevel: "B1",
   },
+  "WDR Doku": {
+    id: "UCUuab1dctZzN5ZmRmQnTzkg",
+    name: "WDR Doku",
+    handle: "@WDRDoku",
+    defaultLevel: "B1",
+  },
+
+  // B2 (Продвинутый кругозор, технологии, аналитика)
+  "Galileo": {
+    id: "UC1XrG1M_hw8103zO2x-oivg",
+    name: "Galileo",
+    handle: "@Galileo",
+    defaultLevel: "B2",
+  },
   "Simplicissimus": {
     id: "UCKGMHVipEvuZudhHD05FOYA",
     name: "Simplicissimus",
     handle: "@Simplicissimus",
+    defaultLevel: "B2",
+  },
+  "MrWissen2go": {
+    id: "UCZHpIFMfoJJ_1QxNGLJTzyA",
+    name: "MrWissen2go",
+    handle: "@MrWissen2go",
     defaultLevel: "B2",
   },
   "Quarks": {
@@ -50,17 +59,17 @@ export const CORE_CHANNELS: Record<string, ChannelInfo> = {
     handle: "@Quarks",
     defaultLevel: "B2",
   },
-  "Galileo": {
-    id: "UC3dc11Xl5Iq_K4e5j-WdO_A",
-    name: "Galileo",
-    handle: "@Galileo",
-    defaultLevel: "B1",
+  "NDR Doku": {
+    id: "UCTPAHk1b-h-WGQn9cfGlw2Q",
+    name: "NDR Doku",
+    handle: "@NDRDoku",
+    defaultLevel: "B2",
   },
-  "Deutsch mit Marija": {
-    id: "UCCAI6jmeW5hWz2-jaLPqLUQ",
-    name: "Deutsch mit Marija",
-    handle: "@DeutschmitMarija",
-    defaultLevel: "B1",
+  "Terra X": {
+    id: "UCA3mpqm67CpJ13YfA8qAnow",
+    name: "Terra X",
+    handle: "@TerraXHistory",
+    defaultLevel: "B2",
   },
 };
 
@@ -306,12 +315,12 @@ export const RECOMMENDED_YOUTUBE_VIDEOS: YouTubeRecommendedVideo[] = [
     durationText: "13 мин",
   },
 
-  // 9. Galileo (B1/B2)
+  // 9. Galileo (B2)
   {
     id: "bUo0h_1Z1o0",
     title: "Wie entsteht eigentlich ein Döner? | Galileo",
     channel: "Galileo",
-    level: "B1",
+    level: "B2",
     thumbnailUrl: "https://i.ytimg.com/vi/bUo0h_1Z1o0/hqdefault.jpg",
     description: "Galileo blickt hinter die Kulissen der Dönerproduktion in Deutschland.",
     durationText: "14 мин",
@@ -324,6 +333,28 @@ export const RECOMMENDED_YOUTUBE_VIDEOS: YouTubeRecommendedVideo[] = [
     thumbnailUrl: "https://i.ytimg.com/vi/gN7T23Y74OQ/hqdefault.jpg",
     description: "Galileo testet kulinarische Meisterwerke und exklusive Gerichte.",
     durationText: "16 мин",
+  },
+
+  // 10. Terra X (B2)
+  {
+    id: "5At8hsfPHqU",
+    title: "Wie das Römische Reich wirklich unterging | Terra X History",
+    channel: "Terra X",
+    level: "B2",
+    thumbnailUrl: "https://i.ytimg.com/vi/5At8hsfPHqU/hqdefault.jpg",
+    description: "Spannende historische Analyse der Ursachen für den Niedergang des Römischen Reiches.",
+    durationText: "15 мин",
+  },
+
+  // 11. NDR Doku (B2)
+  {
+    id: "J4HcLwVv4W4",
+    title: "Leben auf dem Land: Alltag im Norden | NDR Doku",
+    channel: "NDR Doku",
+    level: "B2",
+    thumbnailUrl: "https://i.ytimg.com/vi/J4HcLwVv4W4/hqdefault.jpg",
+    description: "Authentische Einblicke in das Leben und Arbeiten im ländlichen Norddeutschland.",
+    durationText: "22 мин",
   },
 ];
 

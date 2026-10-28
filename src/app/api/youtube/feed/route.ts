@@ -5,18 +5,19 @@ import { YouTubeRecommendedVideo } from "@/types/youtube";
 export const dynamic = "force-dynamic";
 
 export const POOL_CHANNELS = [
+  // B1 (Четкая речь, повседневная лексика)
   { id: "UCbxb2fqe9oNgglAoYqsYOtQ", name: "Easy German", level: "B1" as const },
   { id: "UCxUWIEL-USsiPak0Qy6_vVg", name: "DW Deutsch lernen", level: "B1" as const },
-  { id: "UCZHpIFMfoJJ_1QxNGLJTzyA", name: "MrWissen2go", level: "B2" as const },
-  { id: "UCUuab1dctZzN5ZmRmQnTzkg", name: "WDR Doku", level: "B2" as const },
-  { id: "UC1XrG1M_hw8103zO2x-oivg", name: "Galileo", level: "B1" as const },
   { id: "UC4-a6QWRyBlzTFGdS-T_wfw", name: "SWR Handwerkskunst", level: "B1" as const },
+  { id: "UCUuab1dctZzN5ZmRmQnTzkg", name: "WDR Doku", level: "B1" as const },
+
+  // B2 (Продвинутый кругозор, технологии, аналитика)
+  { id: "UC1XrG1M_hw8103zO2x-oivg", name: "Galileo", level: "B2" as const },
   { id: "UCKGMHVipEvuZudhHD05FOYA", name: "Simplicissimus", level: "B2" as const },
+  { id: "UCZHpIFMfoJJ_1QxNGLJTzyA", name: "MrWissen2go", level: "B2" as const },
   { id: "UC1Y7onDsPyfP-lu--SXF-ew", name: "Quarks", level: "B2" as const },
-  { id: "UCCAI6jmeW5hWz2-jaLPqLUQ", name: "Deutsch mit Marija", level: "B1" as const },
   { id: "UCTPAHk1b-h-WGQn9cfGlw2Q", name: "NDR Doku", level: "B2" as const },
-  { id: "UCLLibJTCy3sXjHLVaDimnpQ", name: "ARTE de", level: "B2" as const },
-  { id: "UCwRH985XgMYXQ6NxXDo8npw", name: "Kurzgesagt DE", level: "B2" as const },
+  { id: "UCA3mpqm67CpJ13YfA8qAnow", name: "Terra X", level: "B2" as const },
 ];
 
 const CHANNEL_ALIASES: Record<string, string> = {
@@ -28,9 +29,8 @@ const CHANNEL_ALIASES: Record<string, string> = {
   "UC8mRz2I5-V-7WzH8b8Qp21w": "UC4-a6QWRyBlzTFGdS-T_wfw",
   "UCMtqU5b4l5Tq8d451g7fMog": "UCKGMHVipEvuZudhHD05FOYA",
   "UCRFsmP3Qh7eGZf-1H_E-Uaw": "UC1Y7onDsPyfP-lu--SXF-ew",
-  "UCc_qY7ZqX4W3JgE_aX1ZqYw": "UCCAI6jmeW5hWz2-jaLPqLUQ",
   "UCjZPAU1t_w_qB3lQ4bY3D_w": "UCTPAHk1b-h-WGQn9cfGlw2Q",
-  "UCG984VD6xzkJmUkeepBF6gA": "UCLLibJTCy3sXjHLVaDimnpQ",
+  "UCP8e6wK18jJNdJpKkeQDlsA": "UCA3mpqm67CpJ13YfA8qAnow",
 };
 
 // In-memory cache for channel videos
@@ -41,6 +41,23 @@ const YOUTUBE_ID_REGEX = /^[a-zA-Z0-9_-]{11}$/;
 
 function normalizeChannelId(id: string): string {
   return CHANNEL_ALIASES[id] || id;
+}
+
+function parseDurationToSeconds(durationStr: string): number | null {
+  if (!durationStr) return null;
+  const minMatch = durationStr.match(/(\d+)\s*(?:мин|min)/i);
+  if (minMatch) {
+    return parseInt(minMatch[1], 10) * 60;
+  }
+  const parts = durationStr.split(":").map(Number);
+  if (parts.some(isNaN)) return null;
+  if (parts.length === 2) {
+    return parts[0] * 60 + parts[1];
+  }
+  if (parts.length === 3) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+  return null;
 }
 
 function seededRandom(seed: number) {
@@ -117,11 +134,14 @@ async function fetchVideosForChannel(
           vr?.title?.runs?.[0]?.text ||
           "";
 
-        // Exclude shorts
+        // Exclude shorts and live streams
         if (
           lockup?.contentType === "LOCKUP_CONTENT_TYPE_SHORTS" ||
+          lockup?.contentType === "LOCKUP_CONTENT_TYPE_LIVE" ||
           /\b(shorts?|tiktok|reels?)\b/i.test(rawTitle) ||
-          /#(shorts?|tiktok|reels?)/i.test(rawTitle)
+          /#(shorts?|tiktok|reels?)/i.test(rawTitle) ||
+          /\b(livestream|live-stream|24\/7)\b/i.test(rawTitle) ||
+          rawTitle.includes("🔴")
         ) {
           continue;
         }
@@ -135,10 +155,12 @@ async function fetchVideosForChannel(
           durationText = vr.lengthText.simpleText;
         }
 
-        // Check if duration is too short (< 60s)
+        // Enforce 5 to 25 minutes duration (300 to 1500 seconds)
         if (durationText) {
-          const parts = durationText.split(":").map(Number);
-          if (parts.length === 2 && parts[0] === 0 && parts[1] < 60) continue;
+          const sec = parseDurationToSeconds(durationText);
+          if (sec !== null && (sec < 300 || sec > 1500)) {
+            continue;
+          }
         }
 
         results.push({
@@ -174,7 +196,13 @@ async function fetchVideosForChannel(
           const titleMatch = entry.match(/<title>([^<]+)<\/title>/);
           const id = idMatch ? idMatch[1].trim() : "";
           const rawTitle = titleMatch ? titleMatch[1].trim() : "";
-          if (id && YOUTUBE_ID_REGEX.test(id) && !/\b(shorts?)\b/i.test(rawTitle)) {
+
+          if (
+            id &&
+            YOUTUBE_ID_REGEX.test(id) &&
+            !/\b(shorts?|tiktok|reels?|livestream|24\/7)\b/i.test(rawTitle) &&
+            !rawTitle.includes("🔴")
+          ) {
             results.push({
               id,
               title: rawTitle.replace(/&amp;/g, "&").replace(/&quot;/g, '"'),
@@ -205,67 +233,59 @@ export async function GET(request: NextRequest) {
     const limit = Math.max(1, Math.min(50, parseInt(searchParams.get("limit") || "16", 10)));
     const seedParam = searchParams.get("seed");
     const seed = seedParam ? parseInt(seedParam, 10) : 12345;
-    const channelIdsParam = searchParams.get("channelIds") || "";
 
-    let baseVideos: YouTubeRecommendedVideo[] = [];
+    // Fetch from all curated B1 and B2 channels
+    const channelLists = await Promise.all(
+      POOL_CHANNELS.map((ch) => fetchVideosForChannel(ch.id, ch.name, ch.level))
+    );
 
-    if (tab === "subscriptions") {
-      // Subscriptions mode
-      const rawIds = channelIdsParam.split(",").map((s) => s.trim()).filter(Boolean);
-      const effectiveIds = rawIds.length > 0 ? rawIds : POOL_CHANNELS.slice(0, 4).map((c) => c.id);
-
-      const channelLists = await Promise.all(
-        effectiveIds.map((id) => {
-          const poolMatch = POOL_CHANNELS.find((c) => c.id === normalizeChannelId(id));
-          const name = poolMatch ? poolMatch.name : "Подписка";
-          return fetchVideosForChannel(id, name, poolMatch?.level || "B1");
-        })
-      );
-
-      // Interleave channels so consecutive videos come from different channels
-      const maxLen = Math.max(...channelLists.map((l) => l.length), 0);
-      for (let i = 0; i < maxLen; i++) {
-        for (const list of channelLists) {
-          if (list[i]) {
-            baseVideos.push(list[i]);
-          }
+    // Interleave channels to ensure high thematic diversity (science, society, technology, reports)
+    const baseVideos: YouTubeRecommendedVideo[] = [];
+    const maxLen = Math.max(...channelLists.map((l) => l.length), 0);
+    for (let i = 0; i < maxLen; i++) {
+      for (const list of channelLists) {
+        if (list[i]) {
+          baseVideos.push(list[i]);
         }
       }
-    } else {
-      // Recommendations mode (All pool channels)
-      const channelLists = await Promise.all(
-        POOL_CHANNELS.map((ch) => fetchVideosForChannel(ch.id, ch.name, ch.level))
-      );
-
-      // Interleave pool channels
-      const maxLen = Math.max(...channelLists.map((l) => l.length), 0);
-      for (let i = 0; i < maxLen; i++) {
-        for (const list of channelLists) {
-          if (list[i]) {
-            baseVideos.push(list[i]);
-          }
-        }
-      }
-
-      // Add curated videos as fallback base
-      baseVideos.push(...RECOMMENDED_YOUTUBE_VIDEOS);
     }
 
-    // Deduplicate by ID
+    // Add curated fallback base videos
+    baseVideos.push(...RECOMMENDED_YOUTUBE_VIDEOS);
+
+    // Deduplicate and filter (5-25 min, strictly non-shorts and non-streams)
     const seen = new Set<string>();
-    const deduplicated: YouTubeRecommendedVideo[] = [];
+    const filtered: YouTubeRecommendedVideo[] = [];
+
     for (const v of baseVideos) {
       if (!v.id || !YOUTUBE_ID_REGEX.test(v.id)) continue;
-      if (!seen.has(v.id)) {
-        seen.add(v.id);
-        deduplicated.push(v);
+      if (seen.has(v.id)) continue;
+
+      // Filter Shorts / live
+      const text = (v.title + " " + (v.description || "")).toLowerCase();
+      if (
+        /\b(shorts?|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(text) ||
+        text.includes("🔴")
+      ) {
+        continue;
       }
+
+      // Filter duration 5 to 25 minutes if durationText is known
+      if (v.durationText) {
+        const sec = parseDurationToSeconds(v.durationText);
+        if (sec !== null && (sec < 300 || sec > 1500)) {
+          continue;
+        }
+      }
+
+      seen.add(v.id);
+      filtered.push(v);
     }
 
-    // Shuffle deterministically based on seed
-    const shuffled = shuffleArrayWithSeed(deduplicated, seed);
+    // Shuffle deterministically based on seed (allows refresh button ↻ to produce fresh mix)
+    const shuffled = shuffleArrayWithSeed(filtered, seed);
 
-    // Infinite cyclic pagination: never stop or return empty
+    // Cyclic infinite pagination
     const totalCount = shuffled.length;
     let pageVideos: YouTubeRecommendedVideo[] = [];
 
@@ -283,7 +303,7 @@ export async function GET(request: NextRequest) {
       limit,
       seed,
       videos: pageVideos,
-      hasMore: true, // Infinite scroll continues seamlessly
+      hasMore: true,
       totalAvailable: totalCount,
     });
   } catch (error: any) {

@@ -1,6 +1,5 @@
 import React from "react";
 import YouTubeHeader from "@/components/youtube/YouTubeHeader";
-import VocabularyModal from "@/components/youtube/VocabularyModal";
 import { YouTubeProvider } from "@/context/YouTubeContext";
 
 export default function YouTubeLayout({
@@ -13,7 +12,6 @@ export default function YouTubeLayout({
       <div className="min-h-screen bg-[#141414] text-white flex flex-col">
         <YouTubeHeader />
         <main className="flex-1 pt-14">{children}</main>
-        <VocabularyModal />
       </div>
     </YouTubeProvider>
   );
