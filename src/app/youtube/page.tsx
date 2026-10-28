@@ -19,9 +19,17 @@ import {
 } from "@/data/youtubeVideos";
 import { YouTubeRecommendedVideo } from "@/types/youtube";
 import { useYouTube } from "@/context/YouTubeContext";
-import InteractivePlayer from "@/components/youtube/InteractivePlayer";
 import VideoCard from "@/components/youtube/VideoCard";
 import ManageChannelsModal, { SubscribedChannel } from "@/components/youtube/ManageChannelsModal";
+
+const CHANNELS_FILTER = [
+  { id: "ALL", name: "Все каналы" },
+  { id: "Easy German", name: "Easy German" },
+  { id: "Galileo", name: "Galileo" },
+  { id: "Simplicissimus", name: "Simplicissimus" },
+  { id: "Quarks", name: "Quarks" },
+  { id: "DW Deutsch lernen", name: "DW Deutsch lernen" },
+];
 
 const DEFAULT_SUBSCRIPTIONS: SubscribedChannel[] = [
   { id: "UCbxb2fqe9oNgglAoYqsYOtQ", name: "Easy German" },
@@ -83,18 +91,14 @@ export default function YouTubeCatalogPage() {
   const [searchInput, setSearchInput] = useState<string>("");
   const [inputError, setInputError] = useState<string | null>(null);
 
-  // Active Video Modal
-  const [activeVideo, setActiveVideo] = useState<{
-    id: string;
-    title?: string;
-    channel?: string;
-  } | null>(null);
-
   // Tabs: 'recommendations' | 'subscriptions' | 'favorites'
   const [activeTab, setActiveTab] = useState<"recommendations" | "subscriptions" | "favorites">("recommendations");
 
-  // Difficulty Level Filter: 'all' | 'B1' | 'B2'
-  const [selectedLevel, setSelectedLevel] = useState<"all" | "B1" | "B2">("all");
+  // Difficulty Level Filter: 'ALL' | 'B1' | 'B2'
+  const [selectedLevel, setSelectedLevel] = useState<"ALL" | "B1" | "B2">("ALL");
+
+  // Channel Filter: 'ALL' | channel name
+  const [selectedChannel, setSelectedChannel] = useState<string>("ALL");
 
   // Manage Channels Modal
   const [isManageModalOpen, setIsManageModalOpen] = useState<boolean>(false);
@@ -323,7 +327,7 @@ export default function YouTubeCatalogPage() {
     setIsRefreshing(false);
   };
 
-  // Handle Search / Direct Watch
+  // Handle Search / Direct Watch (Opens YouTube in a new tab)
   const handleSearchOrWatch = (e: React.FormEvent) => {
     e.preventDefault();
     setInputError(null);
@@ -333,11 +337,7 @@ export default function YouTubeCatalogPage() {
 
     const directId = extractYouTubeId(trimmed);
     if (directId) {
-      setActiveVideo({
-        id: directId,
-        title: "Пользовательское видео",
-        channel: "YouTube",
-      });
+      window.open(`https://www.youtube.com/watch?v=${directId}`, "_blank", "noopener,noreferrer");
       return;
     }
   };
@@ -354,77 +354,44 @@ export default function YouTubeCatalogPage() {
     setSubVideos((prev) => prev.filter((v) => v.channelId !== channelId));
   };
 
-  // Filter recommendations, subscriptions & favorites based on search query and level
+  // Base list of videos depending on activeTab
+  const baseVideos =
+    activeTab === "recommendations"
+      ? recommendations
+      : activeTab === "subscriptions"
+      ? subVideos
+      : favorites;
+
+  // Filter videos based on search query, difficulty level and channel
   const query = searchInput.trim().toLowerCase();
   const isSearchQuery = query.length > 0 && !extractYouTubeId(searchInput.trim());
 
-  function matchesLevel(level: string | undefined, filter: "all" | "B1" | "B2"): boolean {
-    if (filter === "all") return true;
-    const l = (level || "B1").toUpperCase();
-    if (filter === "B1") {
-      return l === "B1" || l === "A2" || l === "A1";
-    }
-    if (filter === "B2") {
-      return l === "B2" || l === "C1" || l === "C2";
-    }
-    return true;
-  }
+  const currentVideos = baseVideos.filter((video) => {
+    // 0. Filter out YouTube Shorts
+    if (isYouTubeShort(video)) return false;
 
-  const filteredRecommendations = (
-    isSearchQuery
-      ? recommendations.filter(
-          (v) =>
-            v.title.toLowerCase().includes(query) ||
-            v.channel.toLowerCase().includes(query) ||
-            (v.description || "").toLowerCase().includes(query) ||
-            v.level.toLowerCase().includes(query)
-        )
-      : recommendations
-  )
-    .filter((v) => !isYouTubeShort(v))
-    .filter((v) => matchesLevel(v.level, selectedLevel));
+    // 1. Поиск
+    const matchesSearch = !isSearchQuery || 
+      video.title.toLowerCase().includes(query) || 
+      video.channel.toLowerCase().includes(query) ||
+      (video.description || "").toLowerCase().includes(query);
 
-  const filteredSubVideos = (
-    isSearchQuery
-      ? subVideos.filter(
-          (v) =>
-            v.title.toLowerCase().includes(query) ||
-            v.channel.toLowerCase().includes(query)
-        )
-      : subVideos
-  )
-    .filter((v) => !isYouTubeShort(v))
-    .filter((v) => matchesLevel(v.level, selectedLevel));
+    // 2. Уровень B1 / B2
+    const l = (video.level || "B1").toUpperCase();
+    const isB2 = l.startsWith("B2") || l === "C1" || l === "C2";
+    const matchesLevel = 
+      selectedLevel === 'ALL' || 
+      (selectedLevel === 'B1' && !isB2) || 
+      (selectedLevel === 'B2' && isB2);
 
-  const filteredFavorites = (
-    isSearchQuery
-      ? favorites.filter(
-          (v) =>
-            v.title.toLowerCase().includes(query) ||
-            v.channel.toLowerCase().includes(query)
-        )
-      : favorites
-  ).filter((v) => matchesLevel(v.level, selectedLevel));
+    // 3. Канал
+    const matchesChannel = 
+      selectedChannel === 'ALL' || 
+      video.channel.toLowerCase().trim() === selectedChannel.toLowerCase().trim() ||
+      video.channel.toLowerCase().includes(selectedChannel.toLowerCase().trim());
 
-  const currentVideos =
-    activeTab === "recommendations"
-      ? filteredRecommendations
-      : activeTab === "subscriptions"
-      ? filteredSubVideos
-      : filteredFavorites;
-
-  // Handle Next Video callback for player
-  const handleNextVideo = () => {
-    if (!activeVideo || currentVideos.length === 0) return;
-    const currentIndex = currentVideos.findIndex((v) => v.id === activeVideo.id);
-    if (currentIndex >= 0 && currentIndex < currentVideos.length - 1) {
-      const next = currentVideos[currentIndex + 1];
-      setActiveVideo({ id: next.id, title: next.title, channel: next.channel });
-    } else {
-      const next = currentVideos[0];
-      setActiveVideo({ id: next.id, title: next.title, channel: next.channel });
-    }
-  };
+    return matchesSearch && matchesLevel && matchesChannel;
+  });
 
   return (
     <div className="min-h-screen bg-[#141414] text-white pb-24 px-4 md:px-12 pt-4">
@@ -537,24 +504,6 @@ export default function YouTubeCatalogPage() {
                 <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#E50914]" : ""}`} />
               </button>
             )}
-
-            {/* Level Filter Chips: [ Все уровни ] [ B1 ] [ B2 ] */}
-            <div className="flex items-center gap-1.5 ml-1 sm:ml-2 pl-2 sm:pl-3 border-l border-zinc-800">
-              {[
-                { id: "all", label: "Все уровни" },
-                { id: "B1", label: "B1" },
-                { id: "B2", label: "B2" },
-              ].map((chip) => (
-                <button
-                  key={chip.id}
-                  onClick={() => setSelectedLevel(chip.id as "all" | "B1" | "B2")}
-                  data-active={selectedLevel === chip.id}
-                  className="px-3 py-1 text-xs rounded-full border border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-white data-[active=true]:bg-zinc-200 data-[active=true]:text-black font-medium transition cursor-pointer"
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Right: Channel Management & Add Channel ONLY rendered on subscriptions tab */}
@@ -578,6 +527,55 @@ export default function YouTubeCatalogPage() {
               </button>
             </div>
           )}
+        </div>
+
+        {/* Filters Bar: Difficulty Levels & Channels Ribbon */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-3">
+          {/* Level Filter Chips */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-zinc-400 font-medium mr-0.5">Уровень:</span>
+            {[
+              { id: "ALL", label: "Все уровни" },
+              { id: "B1", label: "B1 (Средний)" },
+              { id: "B2", label: "B2 (Продвинутый)" },
+            ].map((chip) => {
+              const isActive = selectedLevel === chip.id;
+              return (
+                <button
+                  key={chip.id}
+                  onClick={() => setSelectedLevel(chip.id as "ALL" | "B1" | "B2")}
+                  className={`px-3.5 py-1.5 rounded-full text-xs transition cursor-pointer ${
+                    isActive
+                      ? "bg-white text-black font-semibold shadow-md"
+                      : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Horizontal Channel Ribbon */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+            <span className="text-xs text-zinc-400 font-medium mr-0.5 flex-shrink-0">Канал:</span>
+            {CHANNELS_FILTER.map((ch) => {
+              const isActive = selectedChannel === ch.id;
+              return (
+                <button
+                  key={ch.id}
+                  onClick={() => setSelectedChannel(ch.id)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
+                    isActive
+                      ? "bg-white text-black font-semibold shadow-md"
+                      : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
+                  }`}
+                >
+                  {ch.name}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -620,20 +618,13 @@ export default function YouTubeCatalogPage() {
             )}
           </div>
         ) : (
-          /* Video Grid (Strictly non-Shorts) */
+          /* Video Grid (Strictly non-Shorts, opens direct YouTube in new tab) */
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
               {currentVideos.map((video) => (
                 <VideoCard
                   key={video.id}
                   video={video}
-                  onClick={() =>
-                    setActiveVideo({
-                      id: video.id,
-                      title: video.title,
-                      channel: video.channel,
-                    })
-                  }
                   onRemoveFavorite={
                     activeTab === "favorites"
                       ? () => removeFavorite(video.id)
@@ -660,19 +651,6 @@ export default function YouTubeCatalogPage() {
           </>
         )}
       </div>
-
-      {/* Modal Interactive Player */}
-      {activeVideo && (
-        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col p-2 sm:p-4 overflow-hidden animate-in fade-in duration-150">
-          <InteractivePlayer
-            videoId={activeVideo.id}
-            videoTitle={activeVideo.title}
-            channelTitle={activeVideo.channel}
-            onBackToCatalog={() => setActiveVideo(null)}
-            onNextVideo={handleNextVideo}
-          />
-        </div>
-      )}
 
       {/* Manage Channels Modal */}
       <ManageChannelsModal

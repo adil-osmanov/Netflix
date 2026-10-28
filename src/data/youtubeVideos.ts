@@ -50,6 +50,12 @@ export const CORE_CHANNELS: Record<string, ChannelInfo> = {
     handle: "@Quarks",
     defaultLevel: "B2",
   },
+  "Galileo": {
+    id: "UC3dc11Xl5Iq_K4e5j-WdO_A",
+    name: "Galileo",
+    handle: "@Galileo",
+    defaultLevel: "B1",
+  },
   "Deutsch mit Marija": {
     id: "UCCAI6jmeW5hWz2-jaLPqLUQ",
     name: "Deutsch mit Marija",
@@ -298,6 +304,26 @@ export const RECOMMENDED_YOUTUBE_VIDEOS: YouTubeRecommendedVideo[] = [
     thumbnailUrl: "https://i.ytimg.com/vi/FKYoStbEYjU/hqdefault.jpg",
     description: "Интересная методика расширения словарного запаса через детальное описание предметов.",
     durationText: "13 мин",
+  },
+
+  // 9. Galileo (B1/B2)
+  {
+    id: "bUo0h_1Z1o0",
+    title: "Wie entsteht eigentlich ein Döner? | Galileo",
+    channel: "Galileo",
+    level: "B1",
+    thumbnailUrl: "https://i.ytimg.com/vi/bUo0h_1Z1o0/hqdefault.jpg",
+    description: "Galileo blickt hinter die Kulissen der Dönerproduktion in Deutschland.",
+    durationText: "14 мин",
+  },
+  {
+    id: "gN7T23Y74OQ",
+    title: "Das teuerste Restaurant der Welt | Galileo",
+    channel: "Galileo",
+    level: "B2",
+    thumbnailUrl: "https://i.ytimg.com/vi/gN7T23Y74OQ/hqdefault.jpg",
+    description: "Galileo testet kulinarische Meisterwerke und exklusive Gerichte.",
+    durationText: "16 мин",
   },
 ];
 
