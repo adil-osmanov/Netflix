@@ -20,15 +20,18 @@ interface MediathekItem {
 }
 
 const TOPICS_POOL = [
-  'Terra X', 'Doku', 'Wissen', 'Film', 'Krimi', 'Reportage',
-  'SWR Handwerkskunst', 'NDR Doku', 'ZDFinfo', 'Arte', 'Technik', 'Natur'
+  'Terra X', 'Arte', 'ZDFinfo', 'Doku', 'WDR Doku', 'NDR Doku',
+  'SWR Handwerkskunst', 'Wissen', 'Spielfilm', 'Technik', 'Natur'
 ];
+
+// Anti-Trash & Anti-Audiodeskription filter
+const TRASH_REGEX = /(audiodeskription|hörfassung|krimi|soko|usedom|masuren|bozen|kroatien-krimi|zürich-krimi|rote rosen|sturm der liebe|silvia kocht|rentnercops|in aller freundschaft|der bergdoktor|barbara salesch)/i;
 
 // In-memory cache for extracted og:images across requests
 const ogImageCache = new Map<string, string>();
 
 async function fetchOgImage(url: string): Promise<string | null> {
-  if (!url) return null;
+  if (!url || !url.startsWith('http')) return null;
   if (ogImageCache.has(url)) {
     return ogImageCache.get(url)!;
   }
@@ -40,7 +43,7 @@ async function fetchOgImage(url: string): Promise<string | null> {
     const res = await fetch(url, {
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       },
       signal: controller.signal,
     });
@@ -54,8 +57,8 @@ async function fetchOgImage(url: string): Promise<string | null> {
       html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
       html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i);
 
-    if (metaMatch && metaMatch[1]) {
-      const img = metaMatch[1];
+    if (metaMatch && metaMatch[1] && metaMatch[1].startsWith('http')) {
+      const img = metaMatch[1].trim();
       ogImageCache.set(url, img);
       return img;
     }
@@ -67,48 +70,24 @@ async function fetchOgImage(url: string): Promise<string | null> {
       html.match(/"dim768X432":\s*"([^"]+)"/i);
 
     if (zdfMatch && zdfMatch[1]) {
-      const img = zdfMatch[1].replace(/\\u0026/g, '&');
+      const img = zdfMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/').trim();
+      if (img.startsWith('http')) {
+        ogImageCache.set(url, img);
+        return img;
+      }
+    }
+
+    // 3. ARD image service in json
+    const ardMatch = html.match(/(https?:\/\/[^"'\s]*api\.ardmediathek\.de\/image-service[^"'\s]*)/i);
+    if (ardMatch && ardMatch[1]) {
+      const img = ardMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/').trim();
       ogImageCache.set(url, img);
       return img;
     }
   } catch {
-    // Network / timeout error
+    // Timeout or network error
   }
   return null;
-}
-
-function getFallbackThumbnail(channel: string, topic: string, title: string): string {
-  const ch = channel.toUpperCase();
-  let accentColor = "#e50914";
-  if (ch.includes("ZDF")) {
-    accentColor = "#fa7d00";
-  } else if (ch.includes("ARD") || ch.includes("ERSTE")) {
-    accentColor = "#0055a5";
-  } else if (ch.includes("ARTE")) {
-    accentColor = "#ff501a";
-  } else if (ch.includes("3SAT") || ch.includes("WDR") || ch.includes("NDR") || ch.includes("SWR")) {
-    accentColor = "#00a399";
-  }
-
-  const safeTopic = (topic || "Mediathek").slice(0, 24).replace(/[<>&"]/g, '');
-  const safeTitle = (title || "Sendung").slice(0, 32).replace(/[<>&"]/g, '');
-
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
-    <defs>
-      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#18181b" />
-        <stop offset="100%" stop-color="#09090b" />
-      </linearGradient>
-    </defs>
-    <rect width="640" height="360" fill="url(#bg)" />
-    <circle cx="580" cy="80" r="130" fill="${accentColor}" opacity="0.14" />
-    <rect x="36" y="36" width="96" height="32" rx="6" fill="${accentColor}" opacity="0.25" />
-    <text x="84" y="58" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="15" font-weight="900" fill="${accentColor}" text-anchor="middle">${ch.slice(0, 10)}</text>
-    <text x="36" y="115" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="700" fill="#a1a1aa" letter-spacing="1">${safeTopic.toUpperCase()}</text>
-    <text x="36" y="185" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="22" font-weight="800" fill="#f4f4f5">${safeTitle}</text>
-  </svg>`;
-
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 // Fisher-Yates shuffle
@@ -138,23 +117,21 @@ export async function POST(req: Request) {
     if (query && query.trim()) {
       queries.push({ fields: ['title', 'topic', 'description'], query: query.trim() });
     } else if (category === 'films') {
-      queries.push({ fields: ['topic', 'title'], query: 'Film' });
+      queries.push({ fields: ['topic', 'title'], query: 'Spielfilm' });
     } else if (category === 'series') {
       queries.push({ fields: ['topic', 'title'], query: 'Serie' });
     } else if (category === 'doku') {
-      queries.push({ fields: ['topic', 'title'], query: 'Doku' });
+      queries.push({ fields: ['topic', 'title'], query: 'Terra X Doku Wissen' });
     } else if (category === 'ALL' && seed) {
-      // Pick dynamic rotating topic from pool on user rotation/refresh
       const poolIndex = Math.abs(Number(seed)) % TOPICS_POOL.length;
       const topicToQuery = TOPICS_POOL[poolIndex];
       queries.push({ fields: ['topic', 'title'], query: topicToQuery });
     }
 
-    // Larger batch for quality filtering
-    const fetchSize = Math.max(size * 3, 60);
+    // Larger batch for strict quality and poster filtering
+    const fetchSize = Math.max(size * 4, 80);
 
-    // Random offset shift if seed is provided on initial page
-    const randomShift = (offset === 0 && seed) ? (Math.floor(Math.random() * 5) * 10) : 0;
+    const randomShift = (offset === 0 && seed) ? (Math.floor(Math.random() * 4) * 10) : 0;
     const effectiveOffset = offset + randomShift;
 
     const payload = {
@@ -180,29 +157,53 @@ export async function POST(req: Request) {
     const rawResults: MediathekItem[] = data.result?.results || [];
 
     // Filter quality:
-    // 1. Duration >= 15 minutes (>= 900 sec)
+    // 1. Duration filter: films >= 50 min (3000s), others >= 15 min (900s)
     // 2. Official German studio subtitles present
-    // 3. Skip pure audio descriptions if standard is available or pure trailers
-    const seenTitles = new Set<string>();
+    // 3. Skip trash series, daily soaps, and Audiodeskription duplicates
+    // 4. Server-side clean title deduplication
+    const seenCleanTitles = new Set<string>();
 
     const filtered = rawResults
       .filter((item) => {
+        // Subtitles check
         const subUrl = item.url_subtitle || item.url_subtitles;
         const hasSubtitles = Boolean(subUrl && subUrl.length > 5);
-        const isLongEnough = typeof item.duration === 'number' && item.duration >= 900;
-        const isTrailer = /\b(trailer|teaser|vorschau)\b/i.test(item.title);
-        return hasSubtitles && isLongEnough && !isTrailer;
+        if (!hasSubtitles) return false;
+
+        // Min duration check
+        const minDuration = category === 'films' ? 3000 : 900;
+        if (typeof item.duration !== 'number' || item.duration < minDuration) {
+          return false;
+        }
+
+        // Anti-trash & anti-audiodeskription
+        const combinedText = `${item.topic} ${item.title}`;
+        if (TRASH_REGEX.test(combinedText)) {
+          return false;
+        }
+
+        if (/\b(trailer|teaser|vorschau|preview)\b/i.test(item.title)) {
+          return false;
+        }
+
+        return true;
       })
       .filter((item) => {
-        // Deduplicate almost identical titles (e.g. standard vs Audiodeskription)
-        const baseTitle = item.title.replace(/\s*\((?:audiodeskription|hörfassung|ov|omud)\)/i, '').trim();
-        const key = `${item.channel}-${baseTitle}`;
-        if (seenTitles.has(key)) return false;
-        seenTitles.add(key);
+        // Clean title from season/episode markers: e.g. (S01/E02), (Folge 12)
+        const cleanTitle = item.title
+          .replace(/\s*\(S\d+.*\)/gi, '')
+          .replace(/\s*\(Folge\s*\d+.*\)/gi, '')
+          .replace(/\s*\(E\d+.*\)/gi, '')
+          .replace(/\s*\(Teil\s*\d+.*\)/gi, '')
+          .trim()
+          .toLowerCase();
+
+        const key = `${item.channel.toLowerCase()}-${cleanTitle}`;
+        if (seenCleanTitles.has(key)) return false;
+        seenCleanTitles.add(key);
         return true;
       })
       .map((item) => {
-        // Smart level scoring B1 vs B2
         const isB1 =
           item.duration < 1800 ||
           /maus|logo|einfach|alltag|handwerk|reportage|service|ratgeber|küche|kochen/i.test(
@@ -214,7 +215,7 @@ export async function POST(req: Request) {
           title: item.title,
           topic: item.topic,
           description: item.description,
-          channel: item.channel, // ZDF, ARD, Arte, 3sat, NDR, WDR, SWR, BR, MDR...
+          channel: item.channel,
           duration: Math.round(item.duration / 60), // in minutes
           url_website: item.url_website,
           url_subtitles: item.url_subtitle || item.url_subtitles,
@@ -228,16 +229,17 @@ export async function POST(req: Request) {
       ? filtered
       : filtered.filter((item) => item.level === level);
 
-    // Shuffle so cards don't appear in monolithic blocks of one TV series
+    // Shuffle so cards don't appear in monotonous blocks
     const shuffled = shuffleArray(levelFiltered);
-    const pageItems = shuffled.slice(0, size);
 
-    // Parallel extraction of real og:images for current page batch
-    const itemsWithImages = await Promise.all(
-      pageItems.map(async (item) => {
-        let poster = await fetchOgImage(item.url_website);
-        if (!poster) {
-          poster = getFallbackThumbnail(item.channel, item.topic, item.title);
+    // Parallel extraction of real og:images
+    // IRON RULE: No poster = No card! Only include items with verified real HTTP image posters
+    const candidates = shuffled.slice(0, size * 2);
+    const enrichedCandidates = await Promise.all(
+      candidates.map(async (item) => {
+        const poster = await fetchOgImage(item.url_website);
+        if (!poster || !poster.startsWith('http')) {
+          return null;
         }
         return {
           ...item,
@@ -246,8 +248,13 @@ export async function POST(req: Request) {
       })
     );
 
+    // Strict filter: keep only items with valid HTTP posters
+    const validItems = enrichedCandidates.filter(
+      (item): item is NonNullable<typeof item> => item !== null && Boolean(item.thumbnailUrl && item.thumbnailUrl.startsWith('http'))
+    );
+
     return NextResponse.json({
-      items: itemsWithImages,
+      items: validItems.slice(0, size),
       hasMore: rawResults.length >= fetchSize,
     });
   } catch (error: any) {

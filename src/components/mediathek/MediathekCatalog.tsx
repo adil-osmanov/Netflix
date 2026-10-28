@@ -72,39 +72,12 @@ function getChannelBadgeClass(channel: string): string {
   return "bg-zinc-800 text-zinc-300 border-zinc-700";
 }
 
-function getClientFallbackThumbnail(channel: string, topic: string, title: string): string {
-  const ch = channel.toUpperCase();
-  let accentColor = "#e50914";
-  if (ch.includes("ZDF")) accentColor = "#fa7d00";
-  else if (ch.includes("ARD") || ch.includes("ERSTE")) accentColor = "#0055a5";
-  else if (ch.includes("ARTE")) accentColor = "#ff501a";
-  else if (ch.includes("3SAT") || ch.includes("WDR") || ch.includes("NDR") || ch.includes("SWR")) accentColor = "#00a399";
-
-  const safeTopic = (topic || "Mediathek").slice(0, 24).replace(/[<>&"]/g, '');
-  const safeTitle = (title || "Sendung").slice(0, 32).replace(/[<>&"]/g, '');
-
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
-    <defs>
-      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#18181b" />
-        <stop offset="100%" stop-color="#09090b" />
-      </linearGradient>
-    </defs>
-    <rect width="640" height="360" fill="url(#bg)" />
-    <circle cx="580" cy="80" r="130" fill="${accentColor}" opacity="0.14" />
-    <rect x="36" y="36" width="96" height="32" rx="6" fill="${accentColor}" opacity="0.25" />
-    <text x="84" y="58" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="15" font-weight="900" fill="${accentColor}" text-anchor="middle">${ch.slice(0, 10)}</text>
-    <text x="36" y="115" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="700" fill="#a1a1aa" letter-spacing="1">${safeTopic.toUpperCase()}</text>
-    <text x="36" y="185" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="22" font-weight="800" fill="#f4f4f5">${safeTitle}</text>
-  </svg>`;
-
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-}
-
 export default function MediathekCatalog() {
   const { isFavorite, toggleFavorite } = useYouTube();
 
   const [items, setItems] = useState<MediathekMediaItem[]>([]);
+  const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set());
+
   const [category, setCategory] = useState<CategoryType>("ALL");
   const [level, setLevel] = useState<LevelType>("ALL");
   const [searchInput, setSearchInput] = useState<string>("");
@@ -147,7 +120,9 @@ export default function MediathekCatalog() {
       }
 
       const data = await res.json();
-      const newItems: MediathekMediaItem[] = data.items || [];
+      const newItems: MediathekMediaItem[] = (data.items || []).filter(
+        (it: MediathekMediaItem) => it.thumbnailUrl && it.thumbnailUrl.startsWith("http")
+      );
 
       setItems((prev) => (isInitial ? newItems : [...prev, ...newItems]));
       setHasMore(Boolean(data.hasMore && newItems.length > 0));
@@ -165,6 +140,7 @@ export default function MediathekCatalog() {
     const newSeed = Math.floor(Math.random() * 1000000) + 1;
     setSeed(newSeed);
     setItems([]);
+    setBrokenIds(new Set());
     setOffset(0);
     setHasMore(true);
   };
@@ -210,7 +186,6 @@ export default function MediathekCatalog() {
   };
 
   const handleCardClick = (url: string) => {
-    // Seamless in-window navigation inside Chrome App
     window.location.href = url;
   };
 
@@ -222,11 +197,26 @@ export default function MediathekCatalog() {
       title: item.title,
       channel: item.channel,
       level: item.level,
-      thumbnailUrl: item.thumbnailUrl || getClientFallbackThumbnail(item.channel, item.topic, item.title),
+      thumbnailUrl: item.thumbnailUrl || "",
       description: item.topic,
       durationText: `${item.duration} мин`,
     });
   };
+
+  // Filter out any broken posters and deduplicate
+  const seenTitles = new Set<string>();
+  const displayedItems = items
+    .filter((it) => it.thumbnailUrl && it.thumbnailUrl.startsWith("http") && !brokenIds.has(it.id))
+    .filter((item) => {
+      const clean = item.title
+        .replace(/\s*\(S\d+.*\)/gi, "")
+        .replace(/\s*\(Folge\s*\d+.*\)/gi, "")
+        .trim()
+        .toLowerCase();
+      if (seenTitles.has(clean)) return false;
+      seenTitles.add(clean);
+      return true;
+    });
 
   return (
     <div className="w-full">
@@ -241,7 +231,7 @@ export default function MediathekCatalog() {
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Поиск по архивам ARD, ZDF, 3sat, Arte (например: Tatort, Natur, Berlin)..."
+            placeholder="Поиск по архивам ARD, ZDF, 3sat, Arte (например: Terra X, Natur, Berlin)..."
             className="bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-500 outline-none w-full"
           />
           {searchInput && (
@@ -352,20 +342,20 @@ export default function MediathekCatalog() {
       )}
 
       {/* Empty State */}
-      {!isLoading && !error && items.length === 0 && (
+      {!isLoading && !error && displayedItems.length === 0 && (
         <div className="max-w-md mx-auto my-16 text-center space-y-3">
           <Film className="w-10 h-10 text-zinc-600 mx-auto" />
           <h3 className="text-base font-bold text-white">Передачи не найдены</h3>
           <p className="text-xs text-zinc-400">
-            Попробуйте изменить поисковый запрос или выбрать категорию «Все».
+            Попробуйте обновить ленту или выбрать другую категорию.
           </p>
         </div>
       )}
 
-      {/* Grid of Mediathek Cards - Unified with YouTube Card style */}
-      {!isLoading && items.length > 0 && (
+      {/* Grid of Mediathek Cards - ONLY with verified real posters */}
+      {!isLoading && displayedItems.length > 0 && (
         <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-          {items.map((item) => {
+          {displayedItems.map((item) => {
             const isFav = isFavorite(item.url_website) || isFavorite(item.id);
 
             return (
@@ -385,14 +375,11 @@ export default function MediathekCatalog() {
                 {/* 1. Preview 16:9 */}
                 <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-all duration-300">
                   <img
-                    src={item.thumbnailUrl || getClientFallbackThumbnail(item.channel, item.topic, item.title)}
+                    src={item.thumbnailUrl}
                     alt={item.title}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = getClientFallbackThumbnail(
-                        item.channel,
-                        item.topic,
-                        item.title
-                      );
+                    onError={() => {
+                      // Iron rule: remove card from DOM if poster fails
+                      setBrokenIds((prev) => new Set(prev).add(item.id));
                     }}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     loading="lazy"
@@ -470,7 +457,7 @@ export default function MediathekCatalog() {
             <span>Загрузка следующих передач...</span>
           </div>
         )}
-        {!hasMore && items.length > 0 && !isLoading && (
+        {!hasMore && displayedItems.length > 0 && !isLoading && (
           <span className="text-xs text-zinc-600">Вы просмотрели все доступные передачи</span>
         )}
       </div>

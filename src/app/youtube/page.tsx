@@ -22,8 +22,8 @@ import VideoCard from "@/components/youtube/VideoCard";
 import ManageChannelsModal, { SubscribedChannel } from "@/components/youtube/ManageChannelsModal";
 import MediathekCatalog from "@/components/mediathek/MediathekCatalog";
 
-export type MediaSection = "youtube" | "mediathek";
-export type MainTab = "recommendations" | "subscriptions" | "favorites";
+export type TopCategory = "youtube" | "mediathek" | "favorites";
+export type MainTab = "recommendations" | "subscriptions";
 
 const DEFAULT_SUBSCRIPTIONS: SubscribedChannel[] = [
   { id: "UCbxb2fqe9oNgglAoYqsYOtQ", name: "Easy German" },
@@ -53,7 +53,7 @@ function parseDurationToSeconds(durationStr?: string): number | null {
 }
 
 /**
- * Filter out YouTube Shorts, live streams, broken videos, and videos under 3 minutes:
+ * Filter out YouTube Shorts, live streams, broken videos, and videos under 4 minutes:
  */
 const BLOCKED_PATTERNS = [
   /winnetou/i,
@@ -115,10 +115,10 @@ function isYouTubeShort(video: {
 export default function YouTubeCatalogPage() {
   const { favorites, removeFavorite } = useYouTube();
 
-  // Переключатель медиа-раздела: YouTube DE vs ARD & ZDF Mediathek
-  const [mediaSection, setMediaSection] = useState<MediaSection>("youtube");
+  // 1. Главная трехуровневая навигация: 'youtube' | 'mediathek' | 'favorites'
+  const [activeCategory, setActiveCategory] = useState<TopCategory>("youtube");
 
-  // 1. Главная трехуровневая навигация: 'recommendations' | 'subscriptions' | 'favorites'
+  // Подвкладки YouTube: 'recommendations' | 'subscriptions'
   const [activeTab, setActiveTab] = useState<MainTab>("recommendations");
 
   // Search & Direct Watch
@@ -175,194 +175,136 @@ export default function YouTubeCatalogPage() {
     } catch {}
   };
 
-  // 1. Fetch Recommendations from unified feed API
-  const loadRecommendations = useCallback(
-    async (page: number, isReset: boolean = false, customSeed?: number) => {
-      const currentSeed = customSeed !== undefined ? customSeed : seed;
-      if (isReset) {
-        setIsLoadingRec(true);
-      } else {
-        setIsLoadingMoreRec(true);
-      }
-
-      try {
-        const resp = await fetch(
-          `/api/youtube/feed?tab=recommendations&page=${page}&limit=16&seed=${currentSeed}`
-        );
-        if (resp.ok) {
-          const data = await resp.json();
-          if (Array.isArray(data.videos) && data.videos.length > 0) {
-            if (isReset) {
-              setRecommendations(data.videos);
-              setRecPage(1);
-            } else {
-              setRecommendations((prev) => {
-                const existingIds = new Set(prev.map((v) => v.id));
-                const fresh = data.videos.filter(
-                  (v: YouTubeRecommendedVideo) => !existingIds.has(v.id)
-                );
-                return [...prev, ...fresh];
-              });
-              setRecPage(page);
-            }
-            setHasMoreRec(Boolean(data.hasMore));
-          } else {
-            if (isReset) {
-              setRecommendations(RECOMMENDED_YOUTUBE_VIDEOS);
-            }
-            setHasMoreRec(false);
-          }
-        } else {
-          if (isReset) setRecommendations(RECOMMENDED_YOUTUBE_VIDEOS);
-        }
-      } catch {
-        if (isReset) setRecommendations(RECOMMENDED_YOUTUBE_VIDEOS);
-      } finally {
-        if (isReset) setIsLoadingRec(false);
-        setIsLoadingMoreRec(false);
-      }
-    },
-    [seed]
-  );
-
-  // 2. Fetch Subscriptions from feed API
-  const loadSubscriptions = useCallback(
-    async (channels: SubscribedChannel[], page: number, isReset: boolean = false, customSeed?: number) => {
-      if (channels.length === 0) {
+  // Fetch subscriptions videos
+  const fetchSubscriptionVideos = useCallback(
+    async (pageToLoad: number, append: boolean = false) => {
+      if (subscriptions.length === 0) {
         setSubVideos([]);
-        setIsLoadingSubs(false);
-        setIsLoadingMoreSub(false);
         setHasMoreSub(false);
         return;
       }
 
-      const currentSeed = customSeed !== undefined ? customSeed : seed;
-      if (isReset) {
-        setIsLoadingSubs(true);
-      } else {
+      if (append) {
         setIsLoadingMoreSub(true);
+      } else {
+        setIsLoadingSubs(true);
       }
 
       try {
-        const channelIds = channels.map((c) => c.id).join(",");
-        const resp = await fetch(
-          `/api/youtube/feed?tab=subscriptions&channels=${encodeURIComponent(
-            channelIds
-          )}&page=${page}&limit=16&seed=${currentSeed}`
+        const channelIds = subscriptions.map((s) => s.id).join(",");
+        const res = await fetch(
+          `/api/youtube/subscriptions?channels=${encodeURIComponent(channelIds)}&page=${pageToLoad}&limit=16&seed=${seed}`
         );
-
-        if (resp.ok) {
-          const data = await resp.json();
-          if (Array.isArray(data.videos) && data.videos.length > 0) {
-            if (isReset) {
-              setSubVideos(data.videos);
-              setSubPage(1);
-            } else {
-              setSubVideos((prev) => {
-                const existingIds = new Set(prev.map((v) => v.id));
-                const fresh = data.videos.filter(
-                  (v: YouTubeRecommendedVideo) => !existingIds.has(v.id)
-                );
-                return [...prev, ...fresh];
-              });
-              setSubPage(page);
-            }
-            setHasMoreSub(Boolean(data.hasMore));
-          } else {
-            setHasMoreSub(false);
-          }
+        if (res.ok) {
+          const data = await res.json();
+          const newVideos = data.videos || [];
+          setSubVideos((prev) => (append ? [...prev, ...newVideos] : newVideos));
+          setHasMoreSub(data.hasMore ?? false);
+          setSubPage(pageToLoad);
         }
-      } catch {
+      } catch (err) {
+        console.error("Failed to fetch subscriptions feed:", err);
       } finally {
-        if (isReset) setIsLoadingSubs(false);
+        setIsLoadingSubs(false);
         setIsLoadingMoreSub(false);
       }
     },
-    [seed]
+    [subscriptions, seed]
   );
 
-  // Initial Load: Recommendations
-  useEffect(() => {
-    loadRecommendations(1, true);
-  }, [loadRecommendations]);
+  // Fetch recommendations
+  const fetchRecommendations = useCallback(
+    async (pageToLoad: number, append: boolean = false) => {
+      if (append) {
+        setIsLoadingMoreRec(true);
+      } else {
+        setIsLoadingRec(true);
+      }
 
-  // Initial Load / Subscriptions change
+      try {
+        const res = await fetch(`/api/youtube/recommendations?page=${pageToLoad}&limit=16`);
+        if (res.ok) {
+          const data = await res.json();
+          const newVideos = data.videos || [];
+          setRecommendations((prev) => (append ? [...prev, ...newVideos] : newVideos));
+          setHasMoreRec(data.hasMore ?? false);
+          setRecPage(pageToLoad);
+        }
+      } catch (err) {
+        console.error("Failed to fetch recommendations:", err);
+      } finally {
+        setIsLoadingRec(false);
+        setIsLoadingMoreRec(false);
+      }
+    },
+    []
+  );
+
+  // Initial fetch for recommendations on mount
   useEffect(() => {
-    if (activeTab === "subscriptions") {
-      loadSubscriptions(subscriptions, 1, true);
-    }
-  }, [subscriptions, activeTab, loadSubscriptions]);
+    fetchRecommendations(1, false);
+  }, [fetchRecommendations]);
+
+  // Initial fetch for subscriptions
+  useEffect(() => {
+    fetchSubscriptionVideos(1, false);
+  }, [fetchSubscriptionVideos]);
 
   // Infinite Scroll IntersectionObserver
   useEffect(() => {
-    if (activeTab === "favorites") return;
-    const target = loadMoreTriggerRef.current;
-    if (!target) return;
+    const trigger = loadMoreTriggerRef.current;
+    if (!trigger) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting) {
-          if (activeTab === "recommendations") {
-            if (!isLoadingMoreRec && !isLoadingRec && hasMoreRec) {
-              loadRecommendations(recPage + 1, false);
-            }
-          } else if (activeTab === "subscriptions") {
-            if (!isLoadingMoreSub && !isLoadingSubs && hasMoreSub) {
-              loadSubscriptions(subscriptions, subPage + 1, false);
-            }
+        const first = entries[0];
+        if (first.isIntersecting) {
+          if (activeCategory !== "youtube") return;
+
+          if (activeTab === "recommendations" && hasMoreRec && !isLoadingRec && !isLoadingMoreRec) {
+            fetchRecommendations(recPage + 1, true);
+          } else if (activeTab === "subscriptions" && hasMoreSub && !isLoadingSubs && !isLoadingMoreSub) {
+            fetchSubscriptionVideos(subPage + 1, true);
           }
         }
       },
-      {
-        root: null,
-        rootMargin: "500px",
-        threshold: 0.1,
-      }
+      { threshold: 0.1, rootMargin: "250px" }
     );
 
-    observer.observe(target);
-    return () => {
-      observer.disconnect();
-    };
+    observer.observe(trigger);
+    return () => observer.disconnect();
   }, [
+    activeCategory,
     activeTab,
-    recPage,
     hasMoreRec,
-    isLoadingMoreRec,
     isLoadingRec,
-    loadRecommendations,
-    subPage,
+    isLoadingMoreRec,
+    recPage,
+    fetchRecommendations,
     hasMoreSub,
-    isLoadingMoreSub,
     isLoadingSubs,
-    loadSubscriptions,
-    subscriptions,
+    isLoadingMoreSub,
+    subPage,
+    fetchSubscriptionVideos,
   ]);
 
-  // Handle Refresh feed button (Shuffles recommendations with a fresh seed)
-  const handleRefreshFeed = async () => {
+  // Refresh feed with new random seed
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    const newSeed = Date.now();
+    const newSeed = Math.floor(Math.random() * 1000000) + 1;
     setSeed(newSeed);
 
-    if (activeTab === "subscriptions") {
-      setSubPage(1);
-      setHasMoreSub(true);
-      await loadSubscriptions(subscriptions, 1, true, newSeed);
-    } else if (activeTab === "recommendations") {
-      setRecPage(1);
-      setHasMoreRec(true);
-      await loadRecommendations(1, true, newSeed);
+    if (activeTab === "recommendations") {
+      await fetchRecommendations(1, false);
+    } else if (activeTab === "subscriptions") {
+      await fetchSubscriptionVideos(1, false);
     }
     setIsRefreshing(false);
   };
 
-  // Handle Search / Direct Watch (Seamless navigation inside same Chrome App window)
+  // Search input handler: direct URL watch or search query
   const handleSearchOrWatch = (e: React.FormEvent) => {
     e.preventDefault();
-    setInputError(null);
-
     const trimmed = searchInput.trim();
     if (!trimmed) return;
 
@@ -385,99 +327,156 @@ export default function YouTubeCatalogPage() {
     setSubVideos((prev) => prev.filter((v) => v.channelId !== channelId));
   };
 
-  // Active base videos depending on active tab
-  const baseVideos =
-    activeTab === "recommendations"
-      ? recommendations
-      : activeTab === "subscriptions"
-      ? subVideos
-      : favorites;
+  // Base videos for YouTube subtabs
+  const baseVideos = activeTab === "recommendations" ? recommendations : subVideos;
 
-  // Filter videos based on search query, difficulty level and channel
+  // Filter YouTube videos
   const query = searchInput.trim().toLowerCase();
   const isSearchQuery = query.length > 0 && !extractYouTubeId(searchInput.trim());
 
-  const currentVideos =
-    activeTab === "favorites"
-      ? favorites.filter((video) => {
-          if (!isSearchQuery) return true;
-          return (
-            (video.title || "").toLowerCase().includes(query) ||
-            (video.channel || "").toLowerCase().includes(query) ||
-            (video.description || "").toLowerCase().includes(query)
-          );
-        })
-      : baseVideos.filter((video) => {
-          // 0. Filter out Shorts, streams and durations under 4 min
-          if (isYouTubeShort(video)) return false;
+  const currentVideos = baseVideos.filter((video) => {
+    // 0. Filter out Shorts, streams and durations under 4 min
+    if (isYouTubeShort(video)) return false;
 
-          // 1. Поиск по текущей активной вкладке
-          const matchesSearch =
-            !isSearchQuery ||
-            (video.title || "").toLowerCase().includes(query) ||
-            (video.channel || "").toLowerCase().includes(query) ||
-            (video.description || "").toLowerCase().includes(query);
+    // 1. Поиск по текущей активной вкладке
+    const matchesSearch =
+      !isSearchQuery ||
+      (video.title || "").toLowerCase().includes(query) ||
+      (video.channel || "").toLowerCase().includes(query) ||
+      (video.description || "").toLowerCase().includes(query);
 
-          if (!matchesSearch) return false;
+    if (!matchesSearch) return false;
 
-          // 2. Контекстные фильтры вкладок
-          if (activeTab === "recommendations") {
-            const l = (video.level || "B1").toUpperCase();
-            const isB2 = l.startsWith("B2") || l === "C1" || l === "C2";
-            return (
-              selectedLevel === "ALL" ||
-              (selectedLevel === "B1" && !isB2) ||
-              (selectedLevel === "B2" && isB2)
-            );
-          }
+    // 2. Контекстные фильтры вкладок
+    if (activeTab === "recommendations") {
+      const l = (video.level || "B1").toUpperCase();
+      const isB2 = l.startsWith("B2") || l === "C1" || l === "C2";
+      return (
+        selectedLevel === "ALL" ||
+        (selectedLevel === "B1" && !isB2) ||
+        (selectedLevel === "B2" && isB2)
+      );
+    }
 
-          if (activeTab === "subscriptions") {
-            if (selectedSubscribedChannel === "ALL") return true;
-            const chClean = (video.channel || "").toLowerCase().trim();
-            const selClean = selectedSubscribedChannel.toLowerCase().trim();
-            return (
-              chClean === selClean ||
-              chClean.includes(selClean) ||
-              video.channelId === selectedSubscribedChannel
-            );
-          }
+    if (activeTab === "subscriptions") {
+      if (selectedSubscribedChannel === "ALL") return true;
+      const chClean = (video.channel || "").toLowerCase().trim();
+      const selClean = selectedSubscribedChannel.toLowerCase().trim();
+      return (
+        chClean === selClean ||
+        chClean.includes(selClean) ||
+        video.channelId === selectedSubscribedChannel
+      );
+    }
 
-          return true;
-        });
+    return true;
+  });
+
+  // Client-side deduplication of unique videos by ID and Title
+  const seenTitles = new Set<string>();
+  const uniqueVideos = Array.from(
+    new Map(currentVideos.map((v) => [(v as any).youtube_id || v.id, v])).values()
+  ).filter((v) => {
+    const norm = (v.title || "").trim().toLowerCase();
+    if (seenTitles.has(norm)) return false;
+    seenTitles.add(norm);
+    return true;
+  });
+
+  // Client-side deduplication of favorites
+  const uniqueFavorites = Array.from(
+    new Map(favorites.map((v) => [(v as any).youtube_id || v.id || (v as any).url_website, v])).values()
+  );
 
   return (
     <div className="min-h-screen bg-[#141414] text-white pb-24 px-4 md:px-12 pt-4">
-      {/* Top Media Switcher: YouTube DE vs ARD & ZDF Mediathek */}
+      {/* 1. Верхняя навигация: вынос «Избранного» на первый уровень */}
       <div className="max-w-7xl mx-auto mb-6 pt-2 flex items-center justify-center">
-        <div className="inline-flex p-1 bg-zinc-900/90 border border-zinc-800 rounded-full shadow-lg">
+        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap justify-center">
+          {/* YouTube DE */}
           <button
-            onClick={() => setMediaSection("youtube")}
-            className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-              mediaSection === "youtube"
-                ? "bg-white text-black shadow-md"
-                : "text-zinc-400 hover:text-white"
+            onClick={() => setActiveCategory("youtube")}
+            className={`px-5 py-2.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+              activeCategory === "youtube"
+                ? "bg-white text-black shadow-lg shadow-white/10"
+                : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-red-600" />
             <span>YouTube DE</span>
           </button>
+
+          {/* ARD & ZDF Mediathek */}
           <button
-            onClick={() => setMediaSection("mediathek")}
-            className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-              mediaSection === "mediathek"
-                ? "bg-white text-black shadow-md"
-                : "text-zinc-400 hover:text-white"
+            onClick={() => setActiveCategory("mediathek")}
+            className={`px-5 py-2.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+              activeCategory === "mediathek"
+                ? "bg-white text-black shadow-lg shadow-white/10"
+                : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-blue-500" />
+            <span className="w-2 h-2 rounded-full bg-sky-500" />
             <span>ARD & ZDF Mediathek</span>
+          </button>
+
+          {/* Избранное (Общее) - Выделяется золотистым/янтарным акцентом */}
+          <button
+            onClick={() => setActiveCategory("favorites")}
+            className={`px-5 py-2.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 border cursor-pointer ${
+              activeCategory === "favorites"
+                ? "bg-amber-500 text-black border-amber-400 shadow-lg shadow-amber-500/20 font-bold"
+                : "bg-zinc-900/80 text-zinc-300 hover:text-white border-zinc-800 hover:border-amber-500/40"
+            }`}
+          >
+            <Bookmark
+              size={14}
+              className={activeCategory === "favorites" ? "fill-black text-black" : "text-amber-400"}
+            />
+            <span>Избранное</span>
+            {favorites.length > 0 && (
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  activeCategory === "favorites"
+                    ? "bg-black text-amber-400"
+                    : "bg-amber-500/20 text-amber-300"
+                }`}
+              >
+                {favorites.length}
+              </span>
+            )}
           </button>
         </div>
       </div>
 
-      {mediaSection === "mediathek" ? (
+      {/* RENDER ACTIVE TOP CATEGORY */}
+      {activeCategory === "favorites" ? (
+        /* 4. Раздел «Избранное» (Общая сетка YouTube + ARD/ZDF) */
+        <div className="max-w-7xl mx-auto">
+          {uniqueFavorites.length === 0 ? (
+            <div className="py-24 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl text-center flex flex-col items-center justify-center p-8 gap-3 max-w-lg mx-auto">
+              <Bookmark className="w-12 h-12 text-zinc-600" />
+              <h3 className="text-base font-bold text-white">Здесь будут ваши сохраненные фильмы и ролики</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Нажмите на значок закладки на любой карточке в YouTube или ARD & ZDF, чтобы добавить видео в этот список.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+              {uniqueFavorites.map((item) => (
+                <VideoCard
+                  key={(item as any).youtube_id || item.id || (item as any).url_website}
+                  video={item}
+                  onRemoveFavorite={() => removeFavorite(item.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : activeCategory === "mediathek" ? (
+        /* ARD & ZDF Mediathek Catalog */
         <MediathekCatalog />
       ) : (
+        /* YouTube DE Feed with Sub-navigation */
         <>
           {/* Top Controls: Centered Clean Search Bar */}
           <div className="max-w-3xl mx-auto mb-6 pt-2">
@@ -485,272 +484,240 @@ export default function YouTubeCatalogPage() {
               onSubmit={handleSearchOrWatch}
               className="relative bg-zinc-900/90 border border-zinc-800 rounded-full px-4 py-2.5 flex items-center gap-2.5 focus-within:border-zinc-500 transition-all shadow-xl"
             >
-          <Search className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => {
-              setSearchInput(e.target.value);
-              if (inputError) setInputError(null);
-            }}
-            placeholder="Поиск видео по теме или вставка ссылки YouTube..."
-            className="bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-500 outline-none w-full"
-          />
-          {searchInput && (
-            <button
-              type="button"
-              onClick={() => setSearchInput("")}
-              className="text-zinc-500 hover:text-white p-0.5"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-          <button
-            type="submit"
-            className="hidden sm:inline-block px-4 py-1.5 rounded-full bg-[#E50914] hover:bg-[#b80710] text-xs font-bold text-white transition-colors cursor-pointer shadow"
-          >
-            Смотреть
-          </button>
-        </form>
-
-        {inputError && (
-          <div className="flex items-center gap-1.5 text-red-400 text-xs mt-2 px-3">
-            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>{inputError}</span>
-          </div>
-        )}
-      </div>
-
-      {/* 1. Главная трехуровневая навигация (Табы первого уровня) */}
-      <div className="max-w-7xl mx-auto mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            {/* Таб 1: Рекомендации B1–B2 */}
-            <button
-              onClick={() => setActiveTab("recommendations")}
-              className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm transition-all cursor-pointer ${
-                activeTab === "recommendations"
-                  ? "bg-red-600 text-white font-semibold shadow-lg shadow-red-950/40"
-                  : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
-              }`}
-            >
-              Рекомендации B1–B2
-            </button>
-
-            {/* Таб 2: Мои подписки с бейджем количества каналов */}
-            <button
-              onClick={() => setActiveTab("subscriptions")}
-              className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === "subscriptions"
-                  ? "bg-red-600 text-white font-semibold shadow-lg shadow-red-950/40"
-                  : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
-              }`}
-            >
-              <span>Мои подписки</span>
-              <span
-                className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  activeTab === "subscriptions"
-                    ? "bg-white/20 text-white"
-                    : "bg-zinc-800 text-zinc-300"
-                }`}
-              >
-                {subscriptions.length}
-              </span>
-            </button>
-
-            {/* Таб 3: Избранное с бейджем сохраненных видео */}
-            <button
-              onClick={() => setActiveTab("favorites")}
-              className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === "favorites"
-                  ? "bg-red-600 text-white font-semibold shadow-lg shadow-red-950/40"
-                  : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
-              }`}
-            >
-              <span>Избранное</span>
-              <span
-                className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  activeTab === "favorites"
-                    ? "bg-white/20 text-white"
-                    : "bg-zinc-800 text-zinc-300"
-                }`}
-              >
-                {favorites.length}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* 2. Подпанель для каждой вкладки (Контекстные фильтры) */}
-        {activeTab === "recommendations" && (
-          <div className="flex items-center justify-between gap-3 pt-3 flex-wrap animate-in fade-in duration-200">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-zinc-400 font-medium mr-0.5">Уровень:</span>
-              {[
-                { id: "ALL", label: "Все уровни" },
-                { id: "B1", label: "B1 (Средний)" },
-                { id: "B2", label: "B2 (Продвинутый)" },
-              ].map((chip) => {
-                const isActive = selectedLevel === chip.id;
-                return (
-                  <button
-                    key={chip.id}
-                    onClick={() => setSelectedLevel(chip.id as "ALL" | "B1" | "B2")}
-                    className={`px-3.5 py-1.5 rounded-full text-xs transition cursor-pointer ${
-                      isActive
-                        ? "bg-white text-black font-semibold shadow-md"
-                        : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
-                    }`}
-                  >
-                    {chip.label}
-                  </button>
-                );
-              })}
-
-              {/* Refresh feed button */}
-              <button
-                onClick={handleRefreshFeed}
-                disabled={isRefreshing}
-                className="p-2 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors cursor-pointer ml-1"
-                title="Перемешать рекомендации"
-              >
-                <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#E50914]" : ""}`} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "subscriptions" && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 animate-in fade-in duration-200">
-            {/* Лента чипсов добавленных каналов */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-              <button
-                onClick={() => setSelectedSubscribedChannel("ALL")}
-                className={`px-3.5 py-1.5 rounded-full text-xs whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
-                  selectedSubscribedChannel === "ALL"
-                    ? "bg-white text-black font-semibold shadow-md"
-                    : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
-                }`}
-              >
-                Все подписки
-              </button>
-
-              {subscriptions.map((ch) => {
-                const isActive = selectedSubscribedChannel === ch.name || selectedSubscribedChannel === ch.id;
-                return (
-                  <button
-                    key={ch.id}
-                    onClick={() => setSelectedSubscribedChannel(ch.name)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
-                      isActive
-                        ? "bg-white text-black font-semibold shadow-md"
-                        : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
-                    }`}
-                  >
-                    {ch.name}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Аккуратная кнопка + Добавить канал */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={() => setIsManageModalOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold cursor-pointer shadow transition active:scale-95"
-              >
-                <Plus size={14} />
-                <span>Добавить канал</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Main Video Feed Area */}
-      <div className="max-w-7xl mx-auto">
-        {activeTab === "favorites" ? (
-          favorites.length === 0 ? (
-            <div className="py-20 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl text-center flex flex-col items-center justify-center p-8 gap-3 max-w-lg mx-auto">
-              <Bookmark className="w-10 h-10 text-zinc-600" />
-              <h3 className="text-base font-bold text-white">Вы пока не добавили ни одного видео в избранное</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Нажмите на значок закладки на любой карточке, чтобы добавить видео в этот список.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-              {currentVideos.map((video) => (
-                <VideoCard
-                  key={(video as any).youtube_id || video.id || (video as any).url_website}
-                  video={video}
-                  onRemoveFavorite={() => removeFavorite(video.id)}
-                />
-              ))}
-            </div>
-          )
-        ) : ((activeTab === "subscriptions" && isLoadingSubs && subVideos.length === 0) ||
-          (activeTab === "recommendations" && isLoadingRec && recommendations.length === 0)) ? (
-          <div className="py-24 flex flex-col items-center justify-center gap-3 text-zinc-400">
-            <Loader2 className="w-8 h-8 animate-spin text-[#E50914]" />
-            <span className="text-sm font-medium">Загрузка свежих видео из немецких каналов...</span>
-          </div>
-        ) : currentVideos.length === 0 ? (
-          /* Empty State for recommendations / subscriptions */
-          <div className="py-20 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl text-center flex flex-col items-center justify-center p-8 gap-3 max-w-lg mx-auto">
-            {activeTab === "subscriptions" ? (
-              <>
-                <Tv className="w-10 h-10 text-zinc-600" />
-                <h3 className="text-base font-bold text-white">В ваших подписках пока нет доступных видео</h3>
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  Добавьте больше немецких YouTube-каналов или выберите другой канал в списке.
-                </p>
+              <Search className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => {
+                  setSearchInput(e.target.value);
+                  if (inputError) setInputError(null);
+                }}
+                placeholder="Поиск видео по теме или вставка ссылки YouTube..."
+                className="bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-500 outline-none w-full"
+              />
+              {searchInput && (
                 <button
-                  onClick={() => setIsManageModalOpen(true)}
-                  className="mt-2 px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors cursor-pointer"
+                  type="button"
+                  onClick={() => setSearchInput("")}
+                  className="text-zinc-500 hover:text-white p-0.5"
                 >
-                  Добавить немецкий YouTube-канал
+                  <X className="w-3.5 h-3.5" />
                 </button>
-              </>
+              )}
+              <button
+                type="submit"
+                className="hidden sm:inline-block px-4 py-1.5 rounded-full bg-[#E50914] hover:bg-[#b80710] text-xs font-bold text-white transition-colors cursor-pointer shadow"
+              >
+                Смотреть
+              </button>
+            </form>
+
+            {inputError && (
+              <div className="flex items-center gap-1.5 text-red-400 text-xs mt-2 px-3">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{inputError}</span>
+              </div>
+            )}
+          </div>
+
+          {/* YouTube Подменю: Только [ Рекомендации B1–B2 ] и [ Мои подписки ] */}
+          <div className="max-w-7xl mx-auto mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                {/* Таб 1: Рекомендации B1–B2 */}
+                <button
+                  onClick={() => setActiveTab("recommendations")}
+                  className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm transition-all cursor-pointer ${
+                    activeTab === "recommendations"
+                      ? "bg-red-600 text-white font-semibold shadow-lg shadow-red-950/40"
+                      : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
+                  }`}
+                >
+                  Рекомендации B1–B2
+                </button>
+
+                {/* Таб 2: Мои подписки с бейджем количества каналов */}
+                <button
+                  onClick={() => setActiveTab("subscriptions")}
+                  className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-2 ${
+                    activeTab === "subscriptions"
+                      ? "bg-red-600 text-white font-semibold shadow-lg shadow-red-950/40"
+                      : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
+                  }`}
+                >
+                  <span>Мои подписки</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      activeTab === "subscriptions"
+                        ? "bg-white/20 text-white"
+                        : "bg-zinc-800 text-zinc-300"
+                    }`}
+                  >
+                    {subscriptions.length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Controls right side */}
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Contextual Filters: Recommendations Difficulty (B1 / B2) */}
+                {activeTab === "recommendations" && (
+                  <div className="flex items-center gap-1 bg-zinc-900/90 p-1 rounded-full border border-zinc-800">
+                    <button
+                      onClick={() => setSelectedLevel("ALL")}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                        selectedLevel === "ALL"
+                          ? "bg-white text-black shadow"
+                          : "text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      Все
+                    </button>
+                    <button
+                      onClick={() => setSelectedLevel("B1")}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                        selectedLevel === "B1"
+                          ? "bg-emerald-500 text-black shadow font-bold"
+                          : "text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      B1
+                    </button>
+                    <button
+                      onClick={() => setSelectedLevel("B2")}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                        selectedLevel === "B2"
+                          ? "bg-sky-500 text-black shadow font-bold"
+                          : "text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      B2
+                    </button>
+                  </div>
+                )}
+
+                {/* Refresh Feed Button */}
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing || isLoadingRec || isLoadingSubs}
+                  className="p-2 rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition disabled:opacity-50 cursor-pointer shadow"
+                  title="Перемешать и обновить ленту"
+                >
+                  <RotateCw
+                    className={`w-4 h-4 text-red-500 ${isRefreshing ? "animate-spin" : ""}`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Subscriptions sub-bar */}
+            {activeTab === "subscriptions" && (
+              <div className="mt-4 flex items-center justify-between gap-3 overflow-x-auto pb-1 scrollbar-none">
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  <span className="text-xs text-zinc-400 font-medium whitespace-nowrap mr-1">
+                    Канал:
+                  </span>
+                  <button
+                    onClick={() => setSelectedSubscribedChannel("ALL")}
+                    className={`px-3 py-1 rounded-full text-xs transition cursor-pointer whitespace-nowrap ${
+                      selectedSubscribedChannel === "ALL"
+                        ? "bg-white text-black font-semibold"
+                        : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
+                    }`}
+                  >
+                    Все каналы
+                  </button>
+                  {subscriptions.map((ch) => (
+                    <button
+                      key={ch.id}
+                      onClick={() => setSelectedSubscribedChannel(ch.id)}
+                      className={`px-3 py-1 rounded-full text-xs transition cursor-pointer whitespace-nowrap ${
+                        selectedSubscribedChannel === ch.id
+                          ? "bg-white text-black font-semibold"
+                          : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
+                      }`}
+                    >
+                      {ch.name}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => setIsManageModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold cursor-pointer shadow transition active:scale-95"
+                  >
+                    <Plus size={14} />
+                    <span>Добавить канал</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Main Video Feed Area */}
+          <div className="max-w-7xl mx-auto">
+            {((activeTab === "subscriptions" && isLoadingSubs && subVideos.length === 0) ||
+              (activeTab === "recommendations" && isLoadingRec && recommendations.length === 0)) ? (
+              <div className="py-24 flex flex-col items-center justify-center gap-3 text-zinc-400">
+                <Loader2 className="w-8 h-8 animate-spin text-[#E50914]" />
+                <span className="text-sm font-medium">Загрузка свежих видео из немецких каналов...</span>
+              </div>
+            ) : uniqueVideos.length === 0 ? (
+              <div className="py-20 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl text-center flex flex-col items-center justify-center p-8 gap-3 max-w-lg mx-auto">
+                {activeTab === "subscriptions" ? (
+                  <>
+                    <Tv className="w-10 h-10 text-zinc-600" />
+                    <h3 className="text-base font-bold text-white">В ваших подписках пока нет доступных видео</h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Добавьте больше немецких YouTube-каналов или выберите другой канал в списке.
+                    </p>
+                    <button
+                      onClick={() => setIsManageModalOpen(true)}
+                      className="mt-2 px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors cursor-pointer"
+                    >
+                      Добавить немецкий YouTube-канал
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Video className="w-10 h-10 text-zinc-600" />
+                    <h3 className="text-base font-bold text-white">Видео не найдены</h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      {isSearchQuery
+                        ? `По запросу «${searchInput}» ничего не найдено.`
+                        : "В каталоге пока нет видео по выбранным критериям."}
+                    </p>
+                  </>
+                )}
+              </div>
             ) : (
+              /* Video Grid (Strictly non-Shorts, >= 4 min, deduplicated) */
               <>
-                <Video className="w-10 h-10 text-zinc-600" />
-                <h3 className="text-base font-bold text-white">Видео не найдены</h3>
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  {isSearchQuery
-                    ? `По запросу «${searchInput}» ничего не найдено.`
-                    : "В каталоге пока нет видео по выбранным критериям."}
-                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+                  {uniqueVideos.map((video) => (
+                    <VideoCard
+                      key={(video as any).youtube_id || video.id || (video as any).url_website}
+                      video={video}
+                    />
+                  ))}
+                </div>
+
+                {/* Infinite Scroll Trigger Target */}
+                <div
+                  ref={loadMoreTriggerRef}
+                  className="h-20 w-full flex items-center justify-center mt-6 pointer-events-none"
+                >
+                  {(isLoadingMoreRec || isLoadingMoreSub) && (
+                    <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm">
+                      <Loader2 className="w-5 h-5 animate-spin text-[#E50914]" />
+                      <span>Загрузка новых видео...</span>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>
-        ) : (
-          /* Video Grid (Strictly non-Shorts, >= 4 min, opens in same window) */
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-              {currentVideos.map((video) => (
-                <VideoCard
-                  key={(video as any).youtube_id || video.id || (video as any).url_website}
-                  video={video}
-                />
-              ))}
-            </div>
-
-            {/* Infinite Scroll Trigger Target */}
-            <div
-              ref={loadMoreTriggerRef}
-              className="h-20 w-full flex items-center justify-center mt-6 pointer-events-none"
-            >
-                {(isLoadingMoreRec || isLoadingMoreSub) && (
-                  <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm">
-                    <Loader2 className="w-5 h-5 animate-spin text-[#E50914]" />
-                    <span>Загрузка новых видео...</span>
-                  </div>
-                )}
-              </div>
-          </>
-        )}
-      </div>
         </>
       )}
 
