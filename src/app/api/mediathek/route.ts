@@ -3,34 +3,29 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-interface MediathekItem {
-  id?: string;
-  channel: string;
-  topic: string;
-  title: string;
-  description: string;
-  timestamp: number;
-  duration: number; // in seconds
-  size: number;
-  url_website: string;
-  url_video?: string;
-  url_video_hd?: string;
-  url_subtitle?: string;
-  url_subtitles?: string;
-}
-
-const TOPICS_POOL = [
-  'Terra X', 'Arte', 'ZDFinfo', 'Doku', 'WDR Doku', 'NDR Doku',
-  'SWR Handwerkskunst', 'Wissen', 'Spielfilm', 'Technik', 'Natur'
+// Белый список проверенных премиальных программ с идеальным визуалом и дикцией
+const CURATED_DOCS = [
+  'Terra X',
+  'ZDFinfo',
+  'Arte Doku',
+  'WDR die story',
+  'ZDFzoom',
+  'Planet Wissen'
 ];
 
-// Anti-Trash & Anti-Audiodeskription filter
-const TRASH_REGEX = /(audiodeskription|hörfassung|krimi|soko|usedom|masuren|bozen|kroatien-krimi|zürich-krimi|rote rosen|sturm der liebe|silvia kocht|rentnercops|in aller freundschaft|der bergdoktor|barbara salesch)/i;
+const CURATED_FILMS = [
+  'Film im Ersten',
+  'ZDF Fernsehfilm der Woche',
+  'Arte Kino',
+  'Spielfilm'
+];
 
-// In-memory cache for extracted og:images across requests
+// Черный список: ток-шоу, архивные беседы, региональные хроники
+const BLACKLIST_REGEX = /(zeitzeugen|talkshow|talk|gottesdienst|regional|magazin|nachrichten|wetter|sport|presseclub|landesschau|aktuell|markt|service)/i;
+
 const ogImageCache = new Map<string, string>();
 
-async function fetchOgImage(url: string): Promise<string | null> {
+async function fetchFastOgImage(url: string): Promise<string | null> {
   if (!url || !url.startsWith('http')) return null;
   if (ogImageCache.has(url)) {
     return ogImageCache.get(url)!;
@@ -38,109 +33,79 @@ async function fetchOgImage(url: string): Promise<string | null> {
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2500);
+    const timeout = setTimeout(() => controller.abort(), 1200); // Строгий таймаут 1.2 сек
 
     const res = await fetch(url, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      },
       signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      next: { revalidate: 86400 } // Кэш на 24 часа
     });
-    clearTimeout(timer);
+    clearTimeout(timeout);
 
     if (!res.ok) return null;
     const html = await res.text();
+    const match =
+      html.match(/<meta\s+(?:property|name)=["'](?:og:image|twitter:image)["']\s+content=["']([^"']+)["']/i) ||
+      html.match(/<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["'](?:og:image|twitter:image)["']/i);
 
-    // 1. og:image or twitter:image
-    const metaMatch =
-      html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
-      html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i);
+    let poster = match ? match[1] : null;
 
-    if (metaMatch && metaMatch[1] && metaMatch[1].startsWith('http')) {
-      const img = metaMatch[1].trim();
-      ogImageCache.set(url, img);
-      return img;
-    }
-
-    // 2. ZDF JSON layouts in page
-    const zdfMatch =
-      html.match(/"dim1280X720":\s*"([^"]+)"/i) ||
-      html.match(/"dim1920X1080":\s*"([^"]+)"/i) ||
-      html.match(/"dim768X432":\s*"([^"]+)"/i);
-
-    if (zdfMatch && zdfMatch[1]) {
-      const img = zdfMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/').trim();
-      if (img.startsWith('http')) {
-        ogImageCache.set(url, img);
-        return img;
+    if (!poster) {
+      // Fallback for ZDF & ARD embedded images in page
+      const zdfMatch = html.match(/"dim1280X720":\s*"([^"]+)"/i) || html.match(/"dim1920X1080":\s*"([^"]+)"/i);
+      if (zdfMatch && zdfMatch[1]) {
+        poster = zdfMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/').trim();
+      } else {
+        const ardMatch = html.match(/(https?:\/\/[^"'\s]*api\.ardmediathek\.de\/image-service[^"'\s]*)/i);
+        if (ardMatch && ardMatch[1]) {
+          poster = ardMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/').trim();
+        }
       }
     }
 
-    // 3. ARD image service in json
-    const ardMatch = html.match(/(https?:\/\/[^"'\s]*api\.ardmediathek\.de\/image-service[^"'\s]*)/i);
-    if (ardMatch && ardMatch[1]) {
-      const img = ardMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/').trim();
-      ogImageCache.set(url, img);
-      return img;
+    if (poster && poster.startsWith('http')) {
+      ogImageCache.set(url, poster);
+      return poster;
     }
+    return null;
   } catch {
-    // Timeout or network error
+    return null;
   }
-  return null;
-}
-
-// Fisher-Yates shuffle
-function shuffleArray<T>(array: T[]): T[] {
-  const arr = [...array];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
 }
 
 export async function POST(req: Request) {
   try {
-    const { 
-      offset = 0, 
-      size = 24, 
-      level = 'ALL', 
-      category = 'ALL', 
-      query = '', 
-      seed = 0 
-    } = await req.json();
+    const { offset = 0, size = 30, category = 'ALL', level = 'ALL', query = '' } = await req.json();
 
-    // Shaping search queries
     const queries: Array<{ fields: string[]; query: string }> = [];
 
-    if (query && query.trim()) {
-      queries.push({ fields: ['title', 'topic', 'description'], query: query.trim() });
+    if (query) {
+      queries.push({ fields: ['title', 'topic'], query });
+    } else if (category === 'doku' || category === 'docs') {
+      // Ротация конкретной топовой передачи вместо кучи слов через пробел
+      const topic = CURATED_DOCS[Math.floor(Math.random() * CURATED_DOCS.length)];
+      queries.push({ fields: ['topic'], query: topic });
     } else if (category === 'films') {
-      queries.push({ fields: ['topic', 'title'], query: 'Spielfilm' });
+      const filmTopic = CURATED_FILMS[Math.floor(Math.random() * CURATED_FILMS.length)];
+      queries.push({ fields: ['topic'], query: filmTopic });
     } else if (category === 'series') {
-      queries.push({ fields: ['topic', 'title'], query: 'Serie' });
-    } else if (category === 'doku') {
-      queries.push({ fields: ['topic', 'title'], query: 'Terra X Doku Wissen' });
-    } else if (category === 'ALL' && seed) {
-      const poolIndex = Math.abs(Number(seed)) % TOPICS_POOL.length;
-      const topicToQuery = TOPICS_POOL[poolIndex];
-      queries.push({ fields: ['topic', 'title'], query: topicToQuery });
+      queries.push({ fields: ['topic'], query: 'Serie' });
+    } else {
+      // Для вкладки «Все» берем топовый познавательный контент
+      const allPool = [...CURATED_DOCS, ...CURATED_FILMS];
+      const randomSelected = allPool[Math.floor(Math.random() * allPool.length)];
+      queries.push({ fields: ['topic'], query: randomSelected });
     }
-
-    // Larger batch for strict quality and poster filtering
-    const fetchSize = Math.max(size * 4, 80);
-
-    const randomShift = (offset === 0 && seed) ? (Math.floor(Math.random() * 4) * 10) : 0;
-    const effectiveOffset = offset + randomShift;
 
     const payload = {
       queries,
       sortBy: 'timestamp',
       sortOrder: 'desc',
       future: false,
-      offset: effectiveOffset,
-      size: fetchSize,
+      offset: query ? offset : Math.floor(Math.random() * 15) * 10 + offset, // Случайный сдвиг для разнообразия
+      size: 40,
     };
 
     const response = await fetch('https://mediathekviewweb.de/api/query', {
@@ -149,116 +114,66 @@ export async function POST(req: Request) {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) {
-      throw new Error(`Mediathek API error: ${response.status}`);
-    }
-
+    if (!response.ok) throw new Error('API Mediathek error');
     const data = await response.json();
-    const rawResults: MediathekItem[] = data.result?.results || [];
+    const rawResults = data.result?.results || [];
 
-    // Filter quality:
-    // 1. Duration filter: films >= 50 min (3000s), others >= 15 min (900s)
-    // 2. Official German studio subtitles present
-    // 3. Skip trash series, daily soaps, and Audiodeskription duplicates
-    // 4. Server-side clean title deduplication
-    const seenCleanTitles = new Set<string>();
+    // Фильтруем мусор и ток-шоу
+    const cleaned = rawResults.filter((item: any) => {
+      const isSubtitled = Boolean(
+        (item.url_subtitles && item.url_subtitles.length > 5) ||
+        (item.url_subtitle && item.url_subtitle.length > 5)
+      );
+      const isLongEnough = item.duration >= 900; // от 15 минут
+      const isNotTrash = !BLACKLIST_REGEX.test(`${item.topic} ${item.title}`);
+      return isSubtitled && isLongEnough && isNotTrash;
+    });
 
-    const filtered = rawResults
-      .filter((item) => {
-        // Subtitles check
-        const subUrl = item.url_subtitle || item.url_subtitles;
-        const hasSubtitles = Boolean(subUrl && subUrl.length > 5);
-        if (!hasSubtitles) return false;
+    // Параллельный сбор превью с жестким лимитом
+    const enriched = await Promise.all(
+      cleaned.slice(0, size).map(async (item: any) => {
+        let poster = await fetchFastOgImage(item.url_website);
 
-        // Min duration check
-        const minDuration = category === 'films' ? 3000 : 900;
-        if (typeof item.duration !== 'number' || item.duration < minDuration) {
-          return false;
+        // Если страница не отдала постер, исключаем полностью
+        if (!poster) {
+          return null; // Нет нормальной обложки -> исключаем полностью
         }
 
-        // Anti-trash & anti-audiodeskription
-        const combinedText = `${item.topic} ${item.title}`;
-        if (TRASH_REGEX.test(combinedText)) {
-          return false;
-        }
-
-        if (/\b(trailer|teaser|vorschau|preview)\b/i.test(item.title)) {
-          return false;
-        }
-
-        return true;
-      })
-      .filter((item) => {
-        // Clean title from season/episode markers: e.g. (S01/E02), (Folge 12)
-        const cleanTitle = item.title
-          .replace(/\s*\(S\d+.*\)/gi, '')
-          .replace(/\s*\(Folge\s*\d+.*\)/gi, '')
-          .replace(/\s*\(E\d+.*\)/gi, '')
-          .replace(/\s*\(Teil\s*\d+.*\)/gi, '')
-          .trim()
-          .toLowerCase();
-
-        const key = `${item.channel.toLowerCase()}-${cleanTitle}`;
-        if (seenCleanTitles.has(key)) return false;
-        seenCleanTitles.add(key);
-        return true;
-      })
-      .map((item) => {
-        const isB1 =
-          item.duration < 1800 ||
-          /maus|logo|einfach|alltag|handwerk|reportage|service|ratgeber|küche|kochen/i.test(
-            `${item.topic} ${item.title}`
-          );
+        const isB1 = item.duration < 1800 || /einfach|alltag|wissen/i.test(`${item.topic} ${item.title}`);
 
         return {
-          id: item.id || `${item.timestamp}-${encodeURIComponent(item.title.slice(0, 20))}`,
+          id: item.id || `${item.timestamp}-${item.title.slice(0, 15)}`,
           title: item.title,
           topic: item.topic,
-          description: item.description,
           channel: item.channel,
-          duration: Math.round(item.duration / 60), // in minutes
+          duration: Math.round(item.duration / 60),
           url_website: item.url_website,
-          url_subtitles: item.url_subtitle || item.url_subtitles,
-          level: (isB1 ? 'B1' : 'B2') as 'B1' | 'B2',
-          date: item.timestamp ? new Date(item.timestamp * 1000).toLocaleDateString('de-DE') : '',
-        };
-      });
-
-    // Level filter
-    const levelFiltered = level === 'ALL'
-      ? filtered
-      : filtered.filter((item) => item.level === level);
-
-    // Shuffle so cards don't appear in monotonous blocks
-    const shuffled = shuffleArray(levelFiltered);
-
-    // Parallel extraction of real og:images
-    // IRON RULE: No poster = No card! Only include items with verified real HTTP image posters
-    const candidates = shuffled.slice(0, size * 2);
-    const enrichedCandidates = await Promise.all(
-      candidates.map(async (item) => {
-        const poster = await fetchOgImage(item.url_website);
-        if (!poster || !poster.startsWith('http')) {
-          return null;
-        }
-        return {
-          ...item,
+          posterUrl: poster,
           thumbnailUrl: poster,
+          level: isB1 ? 'B1' : 'B2',
+          date: new Date(item.timestamp * 1000).toLocaleDateString('de-DE'),
         };
       })
     );
 
-    // Strict filter: keep only items with valid HTTP posters
-    const validItems = enrichedCandidates.filter(
-      (item): item is NonNullable<typeof item> => item !== null && Boolean(item.thumbnailUrl && item.thumbnailUrl.startsWith('http'))
-    );
+    // Удаляем null (без картинок) и дубликаты по названию
+    const validItems = enriched.filter(Boolean);
+    const uniqueMap = new Map();
+    validItems.forEach((it: any) => {
+      const simpleTitle = it.title.split('-')[0].trim().toLowerCase();
+      if (!uniqueMap.has(simpleTitle)) {
+        uniqueMap.set(simpleTitle, it);
+      }
+    });
+
+    const finalItems = Array.from(uniqueMap.values());
 
     return NextResponse.json({
-      items: validItems.slice(0, size),
-      hasMore: rawResults.length >= fetchSize,
+      items: level === 'ALL' ? finalItems : finalItems.filter((i: any) => i.level === level),
+      hasMore: rawResults.length >= size,
     });
-  } catch (error: any) {
-    console.error('Failed to fetch from Mediathek:', error?.message);
+  } catch (error) {
+    console.error('Mediathek route error:', error);
     return NextResponse.json({ items: [], hasMore: false }, { status: 500 });
   }
 }

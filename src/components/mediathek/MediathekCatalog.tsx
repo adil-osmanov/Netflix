@@ -8,7 +8,7 @@ import {
   Play, 
   Film, 
   Tv, 
-  FileText, 
+  Compass, 
   Bookmark, 
   RotateCw,
   Sparkles,
@@ -20,24 +20,25 @@ export interface MediathekMediaItem {
   id: string;
   title: string;
   topic: string;
-  description: string;
+  description?: string;
   channel: string;
   duration: number; // in minutes
   url_website: string;
   url_subtitles?: string;
+  posterUrl: string;
   thumbnailUrl?: string;
   level: "B1" | "B2";
   date: string;
 }
 
-type CategoryType = "ALL" | "films" | "series" | "doku";
+type CategoryType = "ALL" | "films" | "doku" | "series";
 type LevelType = "ALL" | "B1" | "B2";
 
 const CATEGORIES: { id: CategoryType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "ALL", label: "Все", icon: Sparkles },
   { id: "films", label: "Фильмы", icon: Film },
+  { id: "doku", label: "Документальные фильмы", icon: Compass },
   { id: "series", label: "Сериалы", icon: Tv },
-  { id: "doku", label: "Документалки & Наука", icon: FileText },
 ];
 
 const LEVELS: { id: LevelType; label: string; desc: string }[] = [
@@ -45,32 +46,6 @@ const LEVELS: { id: LevelType; label: string; desc: string }[] = [
   { id: "B1", label: "B1", desc: "Средний темп, понятная речь" },
   { id: "B2", label: "B2", desc: "Естественная речь, фильмы" },
 ];
-
-function getChannelBadgeClass(channel: string): string {
-  const ch = channel.toLowerCase();
-  if (ch.includes("zdf")) {
-    return "bg-amber-500/25 text-amber-300 border-amber-500/40";
-  }
-  if (ch.includes("ard") || ch.includes("das erste") || ch.includes("one")) {
-    return "bg-blue-600/25 text-blue-300 border-blue-500/40";
-  }
-  if (ch.includes("arte")) {
-    return "bg-purple-600/25 text-purple-300 border-purple-500/40";
-  }
-  if (
-    ch.includes("3sat") || 
-    ch.includes("ndr") || 
-    ch.includes("wdr") || 
-    ch.includes("swr") || 
-    ch.includes("mdr") || 
-    ch.includes("br") || 
-    ch.includes("rbb") || 
-    ch.includes("hr")
-  ) {
-    return "bg-teal-600/25 text-teal-300 border-teal-500/40";
-  }
-  return "bg-zinc-800 text-zinc-300 border-zinc-700";
-}
 
 export default function MediathekCatalog() {
   const { isFavorite, toggleFavorite } = useYouTube();
@@ -107,7 +82,7 @@ export default function MediathekCatalog() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           offset: currentOffset,
-          size: 24,
+          size: 30,
           level,
           category,
           query: activeQuery,
@@ -121,7 +96,7 @@ export default function MediathekCatalog() {
 
       const data = await res.json();
       const newItems: MediathekMediaItem[] = (data.items || []).filter(
-        (it: MediathekMediaItem) => it.thumbnailUrl && it.thumbnailUrl.startsWith("http")
+        (it: MediathekMediaItem) => Boolean(it.posterUrl || it.thumbnailUrl)
       );
 
       setItems((prev) => (isInitial ? newItems : [...prev, ...newItems]));
@@ -197,7 +172,7 @@ export default function MediathekCatalog() {
       title: item.title,
       channel: item.channel,
       level: item.level,
-      thumbnailUrl: item.thumbnailUrl || "",
+      thumbnailUrl: item.posterUrl || item.thumbnailUrl || "",
       description: item.topic,
       durationText: `${item.duration} мин`,
     });
@@ -206,11 +181,12 @@ export default function MediathekCatalog() {
   // Filter out any broken posters and deduplicate
   const seenTitles = new Set<string>();
   const displayedItems = items
-    .filter((it) => it.thumbnailUrl && it.thumbnailUrl.startsWith("http") && !brokenIds.has(it.id))
+    .filter((it) => (it.posterUrl || it.thumbnailUrl) && !brokenIds.has(it.id))
     .filter((item) => {
       const clean = item.title
         .replace(/\s*\(S\d+.*\)/gi, "")
         .replace(/\s*\(Folge\s*\d+.*\)/gi, "")
+        .replace(/\s*\(Teil\s*\d+.*\)/gi, "")
         .trim()
         .toLowerCase();
       if (seenTitles.has(clean)) return false;
@@ -241,7 +217,7 @@ export default function MediathekCatalog() {
                 setSearchInput("");
                 setActiveQuery("");
               }}
-              className="text-zinc-500 hover:text-white p-0.5"
+              className="text-zinc-500 hover:text-white p-0.5 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -258,7 +234,7 @@ export default function MediathekCatalog() {
       {/* Filter Controls: Categories & Level Chips */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
-          {/* Categories */}
+          {/* Strict Categories: [ Все ] [ Фильмы ] [ Документальные фильмы ] [ Сериалы ] + ↻ */}
           <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
             {CATEGORIES.map((cat) => {
               const Icon = cat.icon;
@@ -373,44 +349,37 @@ export default function MediathekCatalog() {
                 className="group relative flex flex-col cursor-pointer text-left select-none"
               >
                 {/* 1. Preview 16:9 */}
-                <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-all duration-300">
+                <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800">
                   <img
-                    src={item.thumbnailUrl}
+                    src={item.posterUrl || item.thumbnailUrl}
                     alt={item.title}
                     onError={() => {
-                      // Iron rule: remove card from DOM if poster fails
+                      // Remove card from DOM if poster fails
                       setBrokenIds((prev) => new Set(prev).add(item.id));
                     }}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     loading="lazy"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
 
-                  {/* Top-Left: Channel Badge & Level Badge */}
-                  <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5">
-                    <span
-                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border backdrop-blur-md ${getChannelBadgeClass(
-                        item.channel
-                      )}`}
-                    >
-                      {item.channel}
-                    </span>
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold border backdrop-blur-md ${
-                        item.level === "B1"
-                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                          : "bg-sky-500/20 text-sky-300 border-sky-500/40"
-                      }`}
-                    >
-                      {item.level}
-                    </span>
-                  </div>
+                  {/* Бейдж канала (ZDF / ARD / Arte) */}
+                  <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold bg-black/70 text-white backdrop-blur-md">
+                    {item.channel}
+                  </span>
 
-                  {/* Top-Right: Bookmark Favorite Button */}
+                  {/* Бейдж B1 / B2 */}
+                  <span className={`absolute top-2 left-14 px-2 py-0.5 rounded text-[10px] font-bold backdrop-blur-md ${
+                    item.level === "B1"
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                      : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
+                  }`}>
+                    {item.level}
+                  </span>
+
+                  {/* Кнопка В избранное */}
                   <button
                     type="button"
                     onClick={(e) => handleToggleFavorite(e, item)}
-                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/90 backdrop-blur-md text-zinc-300 hover:text-white transition z-20 cursor-pointer"
+                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/90 text-white transition z-10 cursor-pointer backdrop-blur-md"
                     title={isFav ? "Удалить из избранного" : "Сохранить в избранное"}
                   >
                     <Bookmark
@@ -430,18 +399,18 @@ export default function MediathekCatalog() {
                     </div>
                   </div>
 
-                  {/* Bottom-Right: Duration Badge */}
-                  <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/85 text-[11px] font-medium text-white backdrop-blur-sm border border-white/10 font-mono">
+                  {/* Длительность */}
+                  <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] text-white">
                     {item.duration} Min.
-                  </div>
+                  </span>
                 </div>
 
                 {/* 2. Text Below Preview (Title and Channel only) */}
                 <h3 className="mt-2 text-sm font-medium text-zinc-100 line-clamp-2 group-hover:text-white transition-colors leading-snug">
                   {item.title}
                 </h3>
-                <p className="text-xs text-zinc-500 mt-0.5 truncate">
-                  {item.topic ? `${item.channel} • ${item.topic}` : item.channel}
+                <p className="text-xs text-zinc-500 mt-1 truncate">
+                  {item.channel} {item.topic ? `• ${item.topic}` : ""}
                 </p>
               </div>
             );
