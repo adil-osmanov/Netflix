@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Plus, Video, AlertCircle } from "lucide-react";
+import { X, Plus, Video, AlertCircle, Loader2 } from "lucide-react";
 import { EasyGermanVideo } from "@/types/youtube";
 import { extractYouTubeId } from "@/data/youtubeVideos";
 
@@ -12,6 +12,16 @@ interface AddEasyGermanModalProps {
   onAddVideo: (video: EasyGermanVideo) => void;
 }
 
+async function fetchYouTubeTitle(videoId: string): Promise<string> {
+  try {
+    const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
+    const data = await res.json();
+    return data.title || `Easy German Video (${videoId})`;
+  } catch {
+    return `Easy German Video (${videoId})`;
+  }
+}
+
 export default function AddEasyGermanModal({
   isOpen,
   onClose,
@@ -19,23 +29,29 @@ export default function AddEasyGermanModal({
   onAddVideo,
 }: AddEasyGermanModalProps) {
   const [urlOrId, setUrlOrId] = useState("");
-  const [title, setTitle] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const extractedId = extractYouTubeId(urlOrId);
 
   useEffect(() => {
     if (!isOpen) return;
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = "hidden";
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = originalStyle;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -45,26 +61,29 @@ export default function AddEasyGermanModal({
       return;
     }
 
-    if (!title.trim()) {
-      setError("Укажите название видео.");
-      return;
+    setIsLoading(true);
+    try {
+      const title = await fetchYouTubeTitle(ytId);
+
+      const newVideo: EasyGermanVideo = {
+        id: `eg-custom-${Date.now()}`,
+        youtube_id: ytId,
+        title,
+        level,
+        is_watched: false,
+        created_at: new Date().toISOString(),
+      };
+
+      onAddVideo(newVideo);
+
+      // Сброс формы и закрытие
+      setUrlOrId("");
+      onClose();
+    } catch {
+      setError("Не удалось добавить видео. Попробуйте ещё раз.");
+    } finally {
+      setIsLoading(false);
     }
-
-    const newVideo: EasyGermanVideo = {
-      id: `eg-custom-${Date.now()}`,
-      youtube_id: ytId,
-      title: title.trim(),
-      level,
-      is_watched: false,
-      created_at: new Date().toISOString(),
-    };
-
-    onAddVideo(newVideo);
-
-    // Сброс формы и закрытие
-    setUrlOrId("");
-    setTitle("");
-    onClose();
   };
 
   return (
@@ -102,17 +121,19 @@ export default function AddEasyGermanModal({
             </div>
           )}
 
-          {/* 1. Ссылка или ID YouTube */}
+          {/* Единственное поле ввода: Ссылка или ID YouTube */}
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-zinc-300">
-              Ссылка на YouTube или ID ролика *
+              Ссылка на YouTube или ID ролика
             </label>
             <input
               type="text"
               value={urlOrId}
+              disabled={isLoading}
               onChange={(e) => setUrlOrId(e.target.value)}
               placeholder="https://www.youtube.com/watch?v=... или 11 символов ID"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-emerald-500 text-sm text-white placeholder:text-zinc-500 outline-none transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-emerald-500 text-sm text-white placeholder:text-zinc-500 outline-none transition disabled:opacity-50"
+              autoFocus
             />
             {extractedId && (
               <div className="mt-2 flex items-center gap-3 p-2 rounded-xl bg-zinc-900/80 border border-zinc-800">
@@ -126,32 +147,31 @@ export default function AddEasyGermanModal({
                     ID распознан:{" "}
                     <span className="font-mono text-emerald-400 font-semibold">{extractedId}</span>
                   </div>
+                  <div className="text-[11px] text-zinc-500 mt-0.5">
+                    Название будет получено автоматически
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* 2. Название видео */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-zinc-300">
-              Название видео *
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Например: Alltagsgespräche in Berlin"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-emerald-500 text-sm text-white placeholder:text-zinc-500 outline-none transition"
-            />
-          </div>
-
           {/* Кнопка сохранения */}
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/50 cursor-pointer active:scale-[0.99]"
+            disabled={isLoading}
+            className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/50 cursor-pointer active:scale-[0.99]"
           >
-            <Plus className="w-4 h-4" />
-            <span>+ Добавить в {level}</span>
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Получение данных...</span>
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                <span>+ Добавить в {level}</span>
+              </>
+            )}
           </button>
         </form>
       </div>

@@ -200,10 +200,10 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
           <button
             type="button"
             onClick={() => setSelectedLevel("C1")}
-            className={`px-4 py-1.5 rounded-full text-xs transition-all cursor-pointer ${
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
               selectedLevel === "C1"
-                ? "bg-red-600 text-white font-bold border border-red-500 shadow-lg shadow-red-950/50"
-                : "border border-red-500/30 text-red-400 hover:border-red-500/60 hover:text-red-300 bg-zinc-900/60"
+                ? "bg-red-600 text-white font-bold border border-red-600 shadow-md"
+                : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
             }`}
           >
             C1
@@ -213,9 +213,8 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
         {/* Центр: Счетчик прогресса в стиле Netflix */}
         <div className="flex flex-col gap-1.5 min-w-[220px] sm:min-w-[260px]">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-zinc-300 font-medium">
-              Уровень {selectedLevel}: просмотрено <strong className="text-white">{watchedCount}</strong> из{" "}
-              <strong className="text-white">{totalCount}</strong> ({progressPercent}%)
+            <span className="text-xs font-medium text-zinc-400">
+              <span className="text-white font-semibold">{watchedCount} из {totalCount}</span> • {progressPercent}%
             </span>
           </div>
           <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
