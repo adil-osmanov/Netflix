@@ -5,7 +5,7 @@ import { Search, Menu, X } from "lucide-react";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
 import { useSearch } from "./SearchContext";
-import FullscreenToggle from "@/components/layout/FullscreenToggle";
+import { NetflixLogo } from "@/components/common/NetflixLogo";
 
 function NavbarContent() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -54,11 +54,7 @@ function NavbarContent() {
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
-          <Link href="/?category=all" onClick={() => setSearchTerm('')} className="cursor-pointer flex-shrink-0" aria-label="Netflix">
-            <svg viewBox="0 0 1024 276.742" className="w-[85px] md:w-[111px]" fill="#E50914" xmlns="http://www.w3.org/2000/svg">
-              <path d="M140.803 258.904c-15.404 2.705-31.079 3.516-47.294 5.676l-49.458-144.856v151.073c-15.404 1.621-29.457 3.783-44.051 5.945v-276.742h41.08l56.212 157.021v-157.021h43.511v258.904zm85.131-157.558c16.757 0 42.431-.811 57.835-.811v43.24c-19.189 0-41.619 0-57.835.811v64.322c25.405-1.621 50.809-3.785 76.482-4.596v41.617l-119.724 9.461v-255.39h119.724v43.241h-76.482v58.105zm237.284-58.104h-44.862v198.908c-14.594 0-29.188 0-43.239.539v-199.447h-44.862v-43.242h132.965l-.002 43.242zm70.266 55.132h59.187v43.24h-59.187v98.104h-42.433v-239.718h120.808v43.241h-78.375v55.133zm148.641 103.507c24.594.539 49.456 2.434 73.51 3.783v42.701c-38.646-2.434-77.293-4.863-116.75-5.676v-242.689h43.24v201.881zm109.994 49.457c13.783.812 28.377 1.623 42.43 3.242v-254.58h-42.43v251.338zm231.881-251.338l-54.863 131.615 54.863 145.127c-16.217-2.162-32.432-5.135-48.648-7.838l-31.078-79.994-31.617 73.51c-15.678-2.705-30.812-3.516-46.484-5.678l55.672-126.75-50.269-129.992h46.482l28.377 72.699 30.27-72.699h47.295z"/>
-            </svg>
-          </Link>
+          <NetflixLogo className="h-6 md:h-7" onClick={() => setSearchTerm('')} />
           <div className="hidden md:flex gap-5 ml-10">
             <Link href="/?category=all" onClick={() => setSearchTerm('')} className={getLinkClass('all')}>Главная</Link>
             <Link href="/?category=movies" onClick={() => setSearchTerm('')} className={getLinkClass('movies')}>Фильмы</Link>
@@ -67,15 +63,13 @@ function NavbarContent() {
             <Link 
               href="/youtube" 
               onClick={() => setSearchTerm('')} 
-              className="flex items-center gap-1.5 opacity-90 hover:opacity-100 transition-opacity outline-none py-1"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-zinc-300 hover:text-white transition-all group outline-none select-none"
               title="YouTube"
             >
-              <svg className="h-4 w-auto" viewBox="0 0 90 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M27.9727 3.12324C27.6435 1.89323 26.6768 0.926623 25.4468 0.597366C23.2197 0 14.285 0 14.285 0C14.285 0 5.35029 0 3.12324 0.597366C1.89323 0.926623 0.926623 1.89323 0.597366 3.12324C0 5.35029 0 10 0 10C0 10 0 14.6497 0.597366 16.8768C0.926623 18.1068 1.89323 19.0734 3.12324 19.4026C5.35029 20 14.285 20 14.285 20C14.285 20 23.2197 20 25.4468 19.4026C26.6768 19.0734 27.6435 18.1068 27.9727 16.8768C28.5701 14.6497 28.5701 10 28.5701 10C28.5701 10 28.5701 5.35029 27.9727 3.12324Z" fill="#FF0000"/>
-                <path d="M11.4253 14.2854L18.8477 10.0002L11.4253 5.71484V14.2854Z" fill="white"/>
-                <path d="M34.9752 18.9197V5.55664H37.8969V18.9197H34.9752ZM36.436 4.3101C35.4093 4.3101 34.6974 3.56064 34.6974 2.57143C34.6974 1.58221 35.4093 0.832764 36.436 0.832764C37.4628 0.832764 38.1747 1.58221 38.1747 2.57143C38.1747 3.56064 37.4628 4.3101 36.436 4.3101Z" fill="white"/>
-                <text x="40" y="15" fill="white" fontSize="13" fontWeight="bold" fontFamily="sans-serif">YouTube</text>
+              <svg className="w-4 h-3 fill-[#FF0000] group-hover:scale-110 transition-transform shrink-0" viewBox="0 0 24 24">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
               </svg>
+              <span className="text-xs font-semibold text-zinc-200 group-hover:text-white">YouTube</span>
             </Link>
           </div>
         </div>
@@ -110,9 +104,6 @@ function NavbarContent() {
               }}
             />
           </div>
-          <div className="ml-3 flex-shrink-0">
-            <FullscreenToggle />
-          </div>
         </div>
       </div>
 
@@ -126,15 +117,13 @@ function NavbarContent() {
           <Link 
             href="/youtube" 
             onClick={() => { setSearchTerm(''); setMobileMenuOpen(false); }} 
-            className="flex items-center gap-1.5 opacity-90 hover:opacity-100 transition-opacity outline-none py-1"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-zinc-300 hover:text-white transition-all group outline-none select-none"
             title="YouTube"
           >
-            <svg className="h-4 w-auto" viewBox="0 0 90 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M27.9727 3.12324C27.6435 1.89323 26.6768 0.926623 25.4468 0.597366C23.2197 0 14.285 0 14.285 0C14.285 0 5.35029 0 3.12324 0.597366C1.89323 0.926623 0.926623 1.89323 0.597366 3.12324C0 5.35029 0 10 0 10C0 10 0 14.6497 0.597366 16.8768C0.926623 18.1068 1.89323 19.0734 3.12324 19.4026C5.35029 20 14.285 20 14.285 20C14.285 20 23.2197 20 25.4468 19.4026C26.6768 19.0734 27.6435 18.1068 27.9727 16.8768C28.5701 14.6497 28.5701 10 28.5701 10C28.5701 10 28.5701 5.35029 27.9727 3.12324Z" fill="#FF0000"/>
-              <path d="M11.4253 14.2854L18.8477 10.0002L11.4253 5.71484V14.2854Z" fill="white"/>
-              <path d="M34.9752 18.9197V5.55664H37.8969V18.9197H34.9752ZM36.436 4.3101C35.4093 4.3101 34.6974 3.56064 34.6974 2.57143C34.6974 1.58221 35.4093 0.832764 36.436 0.832764C37.4628 0.832764 38.1747 1.58221 38.1747 2.57143C38.1747 3.56064 37.4628 4.3101 36.436 4.3101Z" fill="white"/>
-              <text x="40" y="15" fill="white" fontSize="13" fontWeight="bold" fontFamily="sans-serif">YouTube</text>
+            <svg className="w-4 h-3 fill-[#FF0000] group-hover:scale-110 transition-transform shrink-0" viewBox="0 0 24 24">
+              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
             </svg>
+            <span className="text-xs font-semibold text-zinc-200 group-hover:text-white">YouTube</span>
           </Link>
         </div>
       </div>

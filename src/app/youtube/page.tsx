@@ -547,23 +547,23 @@ export default function YouTubeCatalogPage() {
             {/* Избранное (Общее) - строго иконка и бейдж счетчика */}
             <button
               onClick={() => setActiveCategory("favorites")}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] transition-colors duration-200 ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] transition-all duration-200 ${
                 activeCategory === "favorites"
-                  ? "bg-amber-500 text-black border border-amber-400 shadow-lg shadow-amber-500/20"
-                  : "bg-zinc-900 text-zinc-300 hover:text-white border border-zinc-800 hover:border-amber-500/40"
+                  ? "bg-[#E50914] text-white shadow-lg shadow-red-950/60"
+                  : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
               }`}
               title="Избранное"
             >
               <Bookmark
                 size={15}
-                className={activeCategory === "favorites" ? "fill-black text-black" : "text-amber-400"}
+                className={activeCategory === "favorites" ? "fill-white text-white" : "text-zinc-400"}
               />
               {favorites.length > 0 && (
                 <span
                   className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold ${
                     activeCategory === "favorites"
-                      ? "bg-black text-amber-400"
-                      : "bg-amber-500/20 text-amber-300"
+                      ? "bg-black/40 text-white"
+                      : "bg-zinc-800 text-zinc-300"
                   }`}
                 >
                   {favorites.length}

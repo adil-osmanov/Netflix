@@ -15,7 +15,7 @@ import EasyGermanPlayerModal from "./EasyGermanPlayerModal";
 import AddEasyGermanModal from "./AddEasyGermanModal";
 import EasyGermanCard from "./EasyGermanCard";
 
-type LevelFilter = "B1" | "B2" | "C1";
+type LevelFilter = "A1" | "A2" | "B1" | "B2" | "C1";
 
 interface EasyGermanCatalogProps {
   searchQuery?: string;
@@ -24,9 +24,27 @@ interface EasyGermanCatalogProps {
 export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalogProps) {
   const [customVideos, setCustomVideos] = useState<EasyGermanVideo[]>([]);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
-  const [selectedLevel, setSelectedLevel] = useState<LevelFilter>("B1");
+  const [selectedLevel, setSelectedLevel] = useState<LevelFilter>("B2");
   const [activeVideo, setActiveVideo] = useState<EasyGermanVideo | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+
+  // Считываем последний открытый уровень при монтировании
+  useEffect(() => {
+    try {
+      const savedLevel = localStorage.getItem("easy_german_last_level");
+      if (savedLevel && ["A1", "A2", "B1", "B2", "C1"].includes(savedLevel)) {
+        setSelectedLevel(savedLevel as LevelFilter);
+      }
+    } catch {}
+  }, []);
+
+  // Функция переключения уровня с сохранением в localStorage
+  const handleSelectLevel = (lvl: LevelFilter) => {
+    setSelectedLevel(lvl);
+    try {
+      localStorage.setItem("easy_german_last_level", lvl);
+    } catch {}
+  };
 
   // Загрузка из localStorage + синхронизация с Supabase
   useEffect(() => {
@@ -281,12 +299,12 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
       {/* Премиальный статус-блок Easy German */}
       <div className="relative z-10 mb-6 p-4 rounded-2xl bg-gradient-to-b from-zinc-900/60 to-zinc-950/80 border border-emerald-500/20 backdrop-blur-xl shadow-2xl shadow-emerald-950/20">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Левая часть: Уровни B1, B2, C1 в капсуле (все изумрудные при выборе) */}
+          {/* Левая часть: Уровни A1, A2, B1, B2, C1 в капсуле (все изумрудные при выборе) */}
           <div className="flex items-center gap-1.5 p-1 bg-black/50 rounded-xl border border-emerald-950/60">
-            {(["B1", "B2", "C1"] as const).map((lvl) => (
+            {(["A1", "A2", "B1", "B2", "C1"] as const).map((lvl) => (
               <button
                 key={lvl}
-                onClick={() => setSelectedLevel(lvl)}
+                onClick={() => handleSelectLevel(lvl)}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
                   selectedLevel === lvl
                     ? "bg-emerald-500 text-black shadow-md shadow-emerald-950/50"

@@ -8,7 +8,7 @@ import { fetchYouTubeVideoMetadataAction } from "@/app/youtube/actions";
 interface AddEasyGermanModalProps {
   isOpen: boolean;
   onClose: () => void;
-  level: "B1" | "B2" | "C1";
+  level: "A1" | "A2" | "B1" | "B2" | "C1";
   onAddVideo: (video: EasyGermanVideo) => void;
 }
 

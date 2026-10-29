@@ -28,7 +28,7 @@ export interface EasyGermanVideo {
   id: string;              // уникальный ID записи
   youtube_id: string;      // 11 символов ID YouTube
   title: string;           // название
-  level: 'B1' | 'B2' | 'C1';
+  level: 'A1' | 'A2' | 'B1' | 'B2' | 'C1';
   duration_str?: string;   // например, "14:20"
   duration?: string;       // синоним duration_str
   order_index?: number;    // порядковый номер серии/шага
