@@ -405,16 +405,19 @@ export async function getEasyGermanStateAction(): Promise<{
 
   // 3. Попытка чтения пользовательских видео из easy_german_videos / global_settings
   try {
-    const { data } = await supabase
-      .from("global_settings")
-      .select("value")
-      .eq("key", "easy_german_custom_videos")
-      .maybeSingle();
-    if (data?.value && Array.isArray(data.value)) {
-      for (const v of data.value) {
-        if (v && v.youtube_id) {
-          customMap.set(v.youtube_id, v);
-        }
+    const [{ data: customData }, { data: videosData }] = await Promise.all([
+      supabase.from("global_settings").select("value").eq("key", "easy_german_custom_videos").maybeSingle(),
+      supabase.from("global_settings").select("value").eq("key", "easy_german_videos").maybeSingle(),
+    ]);
+
+    const allCustom = [
+      ...(Array.isArray(customData?.value) ? customData.value : []),
+      ...(Array.isArray(videosData?.value) ? videosData.value : []),
+    ];
+
+    for (const v of allCustom) {
+      if (v && v.youtube_id) {
+        customMap.set(v.youtube_id, v);
       }
     }
   } catch {}
@@ -476,7 +479,7 @@ export async function addEasyGermanVideoAction(
       youtube_id: video.youtube_id,
       title: video.title,
       level: video.level,
-      duration_str: video.duration_str || "",
+      duration_str: video.duration_str || video.duration || "",
       is_watched: Boolean(video.is_watched),
       created_at: video.created_at || new Date().toISOString(),
     });
@@ -491,9 +494,10 @@ export async function addEasyGermanVideoAction(
     const current: EasyGermanVideo[] = Array.isArray(data?.value) ? data.value : [];
     const filtered = current.filter((v) => v.youtube_id !== video.youtube_id);
     const updated = [...filtered, video];
-    await supabase
-      .from("global_settings")
-      .upsert({ key: "easy_german_custom_videos", value: updated });
+    await Promise.all([
+      supabase.from("global_settings").upsert({ key: "easy_german_custom_videos", value: updated }),
+      supabase.from("global_settings").upsert({ key: "easy_german_videos", value: updated }),
+    ]);
   } catch {}
 
   return { success: true };
@@ -523,9 +527,10 @@ export async function deleteEasyGermanVideoAction(
         (v: EasyGermanVideo) =>
           v.id !== videoIdOrYoutubeId && v.youtube_id !== videoIdOrYoutubeId
       );
-      await supabase
-        .from("global_settings")
-        .upsert({ key: "easy_german_custom_videos", value: filtered });
+      await Promise.all([
+        supabase.from("global_settings").upsert({ key: "easy_german_custom_videos", value: filtered }),
+        supabase.from("global_settings").upsert({ key: "easy_german_videos", value: filtered }),
+      ]);
     }
   } catch {}
 

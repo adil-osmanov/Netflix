@@ -495,21 +495,18 @@ export default function YouTubeCatalogPage() {
 
   return (
     <div className="relative min-h-screen bg-black text-white pb-24 px-4 md:px-12 pt-1 transition-colors duration-500 overflow-x-hidden">
-      {/* Глубокий изумрудный кинотеатральный эмбиент (Cinema Emerald Aura) */}
+      {/* Потолочный рассеянный свет Easy German */}
       <div 
-        className={`fixed inset-0 pointer-events-none transition-opacity duration-1000 ease-in-out z-0 ${
-          activeCategory === "youtube" && activeTab === "easy_german" ? "opacity-100" : "opacity-0"
+        className={`fixed -top-48 left-1/2 -translate-x-1/2 w-[900px] h-[320px] pointer-events-none transition-opacity duration-700 ease-out z-0 blur-[130px] ${
+          activeCategory === "youtube" && activeTab === "easy_german"
+            ? "opacity-25 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.6),transparent_75%)]"
+            : "opacity-0"
         }`}
-      >
-        {/* Верхний рассеянный изумрудный градиент */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[500px] bg-[radial-gradient(ellipse_at_top,rgba(5,150,105,0.18),rgba(6,78,59,0.08)_45%,transparent_75%)] blur-[90px]" />
-        {/* Тонкая изумрудная линия на самом верху экрана */}
-        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
-      </div>
+      />
 
       {/* Обычный потолочный свет (Cinema Vignette) */}
       <div 
-        className={`fixed -top-32 left-1/2 -translate-x-1/2 w-[900px] h-[360px] pointer-events-none transition-opacity duration-700 ease-out z-0 blur-[120px] ${
+        className={`fixed -top-48 left-1/2 -translate-x-1/2 w-[900px] h-[320px] pointer-events-none transition-opacity duration-700 ease-out z-0 blur-[130px] ${
           activeCategory === "youtube" && activeTab === "easy_german"
             ? "opacity-0"
             : "opacity-10 bg-[radial-gradient(ellipse_at_top,rgba(220,38,38,0.4),transparent_75%)]"

@@ -43,16 +43,28 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
       } catch {}
 
       try {
+        const rawVideos = localStorage.getItem("easy_german_videos");
         const rawCustom = localStorage.getItem("easy_german_custom_videos");
-        if (rawCustom) {
-          const parsed = JSON.parse(rawCustom);
-          if (Array.isArray(parsed)) localCustom = parsed;
+        const parsedVideos = rawVideos ? JSON.parse(rawVideos) : null;
+        const parsedCustom = rawCustom ? JSON.parse(rawCustom) : null;
+        const mergedLocal = [
+          ...(Array.isArray(parsedCustom) ? parsedCustom : []),
+          ...(Array.isArray(parsedVideos) ? parsedVideos : []),
+        ];
+        if (mergedLocal.length > 0) {
+          const localMap = new Map<string, EasyGermanVideo>();
+          for (const v of mergedLocal) {
+            if (v && v.youtube_id) localMap.set(v.youtube_id, v);
+          }
+          localCustom = Array.from(localMap.values());
         }
       } catch {}
     }
 
     setWatchedIds(new Set(localWatched));
-    setCustomVideos(localCustom);
+    if (localCustom.length > 0) {
+      setCustomVideos(localCustom);
+    }
 
     // Асинхронная синхронизация с Supabase
     getEasyGermanStateAction()
@@ -67,24 +79,28 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
 
         if (res.customVideos.length > 0 || localCustom.length > 0) {
           const map = new Map<string, EasyGermanVideo>();
-          for (const v of [...localCustom, ...res.customVideos]) {
+          // Сначала Supabase, затем localCustom поверх — локальный стейт никогда не затирается!
+          for (const v of [...res.customVideos, ...localCustom]) {
             if (v && v.youtube_id) {
               const existing = map.get(v.youtube_id);
               map.set(v.youtube_id, {
                 ...existing,
                 ...v,
                 duration_str: v.duration_str || existing?.duration_str || "",
+                duration: v.duration || v.duration_str || existing?.duration || existing?.duration_str || "",
+                order_index: v.order_index ?? existing?.order_index,
               });
             }
           }
           const mergedCustom = Array.from(map.values());
           setCustomVideos(mergedCustom);
           try {
+            localStorage.setItem("easy_german_videos", JSON.stringify(mergedCustom));
             localStorage.setItem("easy_german_custom_videos", JSON.stringify(mergedCustom));
           } catch {}
 
           // Фоновая подгрузка длительности, если у каких-то роликов она отсутствует
-          const missing = mergedCustom.filter((v) => !v.duration_str && v.youtube_id);
+          const missing = mergedCustom.filter((v) => !v.duration_str && !v.duration && v.youtube_id);
           if (missing.length > 0) {
             Promise.all(
               missing.map(async (v) => {
@@ -102,10 +118,15 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
                   const durMap = new Map(valid.map((r) => [r.youtube_id, r.duration_str]));
                   const updated = prev.map((item) =>
                     durMap.has(item.youtube_id)
-                      ? { ...item, duration_str: durMap.get(item.youtube_id) || item.duration_str }
+                      ? {
+                          ...item,
+                          duration_str: durMap.get(item.youtube_id) || item.duration_str,
+                          duration: durMap.get(item.youtube_id) || item.duration || item.duration_str,
+                        }
                       : item
                   );
                   try {
+                    localStorage.setItem("easy_german_videos", JSON.stringify(updated));
                     localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
                   } catch {}
                   return updated;
@@ -198,9 +219,24 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
   // Добавление нового видео вручную (строго в конец списка)
   const handleAddVideo = (newVideo: EasyGermanVideo) => {
     setCustomVideos((prev) => {
-      const filtered = prev.filter((v) => v.youtube_id !== newVideo.youtube_id);
-      const updated = [...filtered, newVideo];
+      const currentLevelVideos = prev.filter((v) => v.level === newVideo.level);
+      const nextOrder = currentLevelVideos.length > 0
+        ? Math.max(...currentLevelVideos.map((v) => v.order_index || 0)) + 1
+        : 1;
+
+      const videoWithOrder: EasyGermanVideo = {
+        ...newVideo,
+        order_index: newVideo.order_index || nextOrder,
+        title: newVideo.title || `Easy German ${newVideo.level} #${nextOrder}`,
+        duration: newVideo.duration || newVideo.duration_str || "",
+        duration_str: newVideo.duration_str || newVideo.duration || "",
+        quiz: newVideo.quiz || [],
+      };
+
+      const filtered = prev.filter((v) => v.youtube_id !== videoWithOrder.youtube_id);
+      const updated = [...filtered, videoWithOrder];
       try {
+        localStorage.setItem("easy_german_videos", JSON.stringify(updated));
         localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
       } catch {}
       return updated;
@@ -214,6 +250,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
     setCustomVideos((prev) => {
       const updated = prev.filter((v) => v.id !== videoId && v.youtube_id !== videoId);
       try {
+        localStorage.setItem("easy_german_videos", JSON.stringify(updated));
         localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
       } catch {}
       return updated;

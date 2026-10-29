@@ -30,6 +30,8 @@ export interface EasyGermanVideo {
   title: string;           // название
   level: 'B1' | 'B2' | 'C1';
   duration_str?: string;   // например, "14:20"
+  duration?: string;       // синоним duration_str
+  order_index?: number;    // порядковый номер серии/шага
   is_watched?: boolean;    // статус просмотра
   created_at?: string;
   quiz?: QuizItem[];

@@ -7,7 +7,7 @@ import FullscreenToggle from "@/components/layout/FullscreenToggle";
 
 export default function YouTubeHeader() {
   return (
-    <header className="fixed top-0 left-0 w-full z-40 bg-[#141414]/95 backdrop-blur-md px-4 sm:px-6 md:px-10 py-3 flex items-center justify-between">
+    <header className="fixed top-0 left-0 w-full z-40 bg-black/95 backdrop-blur-md px-4 sm:px-6 md:px-10 py-3 flex items-center justify-between">
       {/* Слева: кнопка Назад */}
       <div className="flex items-center z-10">
         <Link

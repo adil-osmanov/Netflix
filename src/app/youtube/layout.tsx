@@ -9,7 +9,7 @@ export default function YouTubeLayout({
 }) {
   return (
     <YouTubeProvider>
-      <div className="min-h-screen bg-[#141414] text-white flex flex-col">
+      <div className="min-h-screen bg-black text-white flex flex-col">
         <YouTubeHeader />
         <main className="flex-1 pt-14">{children}</main>
       </div>
