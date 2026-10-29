@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Check, X, Sparkles, AlertCircle } from "lucide-react";
 import { EasyGermanVideo, QuizItem } from "@/types/youtube";
 import VideoQuiz from "./VideoQuiz";
@@ -64,9 +65,14 @@ export default function EasyGermanPlayerModal({
   onUpdateQuiz,
   onSaveQuiz,
 }: EasyGermanPlayerModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [jsonInput, setJsonInput] = useState("");
   const [jsonError, setJsonError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Блокировка фонового скролла сайта при открытом окне
   useEffect(() => {
@@ -90,7 +96,7 @@ export default function EasyGermanPlayerModal({
     };
   }, [video, onClose]);
 
-  if (!video) return null;
+  if (!mounted || !video) return null;
 
   const watched = isWatched !== undefined ? isWatched : Boolean(video.is_watched);
   const saveQuizHandler = onUpdateQuiz || onSaveQuiz;
@@ -109,27 +115,39 @@ export default function EasyGermanPlayerModal({
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/90 backdrop-blur-md flex justify-center items-start sm:items-center p-4 sm:p-6 md:p-8"
+      className="fixed inset-0 z-[100] overflow-y-auto bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 sm:p-6 md:p-10 animate-in fade-in duration-200"
       onClick={onClose}
     >
       {/* Единая карточка модалки (все идет единым потоком сверху вниз, без вложенных скроллов) */}
       <div
-        className="relative w-full max-w-4xl bg-zinc-950 border border-zinc-800/90 rounded-2xl overflow-hidden shadow-2xl my-auto animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-4xl bg-zinc-950 border border-zinc-800/90 rounded-2xl overflow-hidden shadow-2xl my-auto animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Кнопка закрытия модалки */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute top-3 right-3 z-20 p-2 rounded-full bg-black/75 hover:bg-zinc-800 text-zinc-400 hover:text-white transition backdrop-blur-md outline-none focus:outline-none focus:ring-0 active:outline-none cursor-pointer [-webkit-tap-highlight-color:transparent]"
-          title="Закрыть (Esc)"
-        >
-          <X size={16} />
-        </button>
+        {/* 1. Верхняя панель модалки над видео (как на референсе) */}
+        <div className="px-5 py-3.5 bg-zinc-900/70 border-b border-zinc-800/80 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+            <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 shrink-0 font-mono">
+              {video.level || "B2"}
+            </span>
+            <h3 className="text-xs sm:text-sm font-semibold text-zinc-200 truncate">
+              {video.title}
+            </h3>
+          </div>
 
-        {/* 1. Плеер 16:9 строго сверху */}
+          {/* Кнопка закрытия ✕ */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-full bg-zinc-800/60 hover:bg-zinc-800 text-zinc-400 hover:text-white transition outline-none focus:outline-none focus:ring-0 active:outline-none shrink-0 cursor-pointer [-webkit-tap-highlight-color:transparent]"
+            title="Закрыть (Esc)"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* 2. Плеер 16:9 строго под шапкой */}
         <div className="relative aspect-video w-full bg-black">
           <iframe
             src={`https://www.youtube.com/embed/${video.youtube_id}?autoplay=1&rel=0`}
@@ -139,33 +157,24 @@ export default function EasyGermanPlayerModal({
           />
         </div>
 
-        {/* 2. Панель под видео: Уровень, Название и статус */}
-        <div className="p-4 sm:p-5 bg-zinc-950 border-b border-zinc-900 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0 pr-2">
-            <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-500/30 shrink-0 font-mono">
-              {video.level || "B2"}
-            </span>
-            <h3 className="text-sm sm:text-base font-semibold text-zinc-100 truncate">
-              {video.title}
-            </h3>
+        {/* 3. Блок под видео: кнопка выполнения и интерактив */}
+        <div className="p-4 sm:p-5 bg-zinc-950 space-y-4">
+          <div className="flex items-center justify-between border-b border-zinc-900/80 pb-4">
+            <button
+              type="button"
+              onClick={() => onToggleWatched(video.youtube_id || video.id)}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition outline-none focus:outline-none focus:ring-0 active:outline-none shrink-0 cursor-pointer [-webkit-tap-highlight-color:transparent] ${
+                watched
+                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/50"
+                  : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+              }`}
+            >
+              <Check size={14} strokeWidth={2.5} />
+              <span>{watched ? "Выполнено" : "Отметить как выполненное"}</span>
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => onToggleWatched(video.youtube_id || video.id)}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition outline-none shrink-0 cursor-pointer [-webkit-tap-highlight-color:transparent] ${
-              watched
-                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/50"
-                : "bg-zinc-900 text-zinc-300 hover:text-white border border-zinc-800"
-            }`}
-          >
-            <Check size={14} strokeWidth={2.5} />
-            <span>{watched ? "Выполнено" : "Отметить как выполненное"}</span>
-          </button>
-        </div>
-
-        {/* 3. Блок интерактива: идет прямо следом, без вложенных скроллов */}
-        <div className="p-4 sm:p-6 bg-zinc-950">
+          {/* Блок интерактива: идет прямо следом, без вложенных скроллов */}
           {isImporting ? (
             <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-3 animate-in fade-in duration-200">
               <div className="flex items-center justify-between">
@@ -250,7 +259,9 @@ export default function EasyGermanPlayerModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
+
 export { EasyGermanPlayerModal };
