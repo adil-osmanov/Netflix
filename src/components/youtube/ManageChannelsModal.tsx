@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Tv, Trash2, Plus, AlertCircle, Check, Sparkles } from "lucide-react";
+import { X, Tv, Trash2, Plus, AlertCircle, Loader2 } from "lucide-react";
 import { extractYouTubeChannelId } from "@/data/youtubeVideos";
 
 export interface SubscribedChannel {
@@ -26,30 +26,75 @@ export default function ManageChannelsModal({
 }: ManageChannelsModalProps) {
   const [channelInput, setChannelInput] = useState<string>("");
   const [channelName, setChannelName] = useState<string>("");
+  const [isAdding, setIsAdding] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    const channelId = extractYouTubeChannelId(channelInput);
-    if (!channelId) {
-      setError("Укажите валидный ID канала (начинается с UC...) или ссылку на канал (youtube.com/channel/UC...).");
+    const trimmedInput = channelInput.trim();
+    if (!trimmedInput) {
+      setError("Введите ссылку на канал (@handle), youtube.com/channel/UC... или ID канала.");
       return;
     }
 
-    if (channels.some((c) => c.id === channelId)) {
-      setError("Этот канал уже добавлен в ваши подписки.");
-      return;
+    setIsAdding(true);
+    try {
+      let resolvedChannelId = extractYouTubeChannelId(trimmedInput);
+      let resolvedTitle = "";
+
+      if (!resolvedChannelId) {
+        const res = await fetch("/api/youtube/resolve-channel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input: trimmedInput }),
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.channelId) {
+          setError(
+            data.error ||
+              "Не удалось найти канал. Проверьте ссылку (@handle или youtube.com/channel/UC...)."
+          );
+          setIsAdding(false);
+          return;
+        }
+
+        resolvedChannelId = data.channelId;
+        resolvedTitle = data.channelTitle || "";
+      }
+
+      if (!resolvedChannelId) {
+        setError("Не удалось определить ID канала.");
+        setIsAdding(false);
+        return;
+      }
+
+      if (channels.some((c) => c.id === resolvedChannelId)) {
+        setError("Этот канал уже добавлен в ваши подписки.");
+        setIsAdding(false);
+        return;
+      }
+
+      const handleFallback = trimmedInput.match(/@([\w.-]+)/)?.[1]
+        ? `@${trimmedInput.match(/@([\w.-]+)/)?.[1]}`
+        : `Канал (${resolvedChannelId.slice(0, 8)}...)`;
+
+      const name =
+        channelName.trim() || resolvedTitle || handleFallback;
+
+      onAddChannel({ id: resolvedChannelId, name });
+
+      setChannelInput("");
+      setChannelName("");
+    } catch {
+      setError("Ошибка сети при проверке канала. Попробуйте ещё раз.");
+    } finally {
+      setIsAdding(false);
     }
-
-    const name = channelName.trim() || `Канал (${channelId.slice(0, 8)}...)`;
-    onAddChannel({ id: channelId, name });
-
-    setChannelInput("");
-    setChannelName("");
   };
 
   return (
@@ -83,12 +128,13 @@ export default function ManageChannelsModal({
               <input
                 type="text"
                 value={channelInput}
+                disabled={isAdding}
                 onChange={(e) => {
                   setChannelInput(e.target.value);
                   if (error) setError(null);
                 }}
-                placeholder="Ссылка на канал или ID (UC...)"
-                className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs sm:text-sm text-white placeholder:text-zinc-500 outline-none focus:border-[#E50914]"
+                placeholder="Ссылка (@handle, youtube.com/@...) или ID (UC...)"
+                className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs sm:text-sm text-white placeholder:text-zinc-500 outline-none focus:border-[#E50914] disabled:opacity-60"
               />
             </div>
 
@@ -96,17 +142,28 @@ export default function ManageChannelsModal({
               <input
                 type="text"
                 value={channelName}
+                disabled={isAdding}
                 onChange={(e) => setChannelName(e.target.value)}
-                placeholder="Название канала (например: Easy German)"
-                className="flex-1 bg-zinc-950 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs sm:text-sm text-white placeholder:text-zinc-500 outline-none focus:border-[#E50914]"
+                placeholder="Название канала (необязательно)"
+                className="flex-1 bg-zinc-950 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs sm:text-sm text-white placeholder:text-zinc-500 outline-none focus:border-[#E50914] disabled:opacity-60"
               />
 
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-[#E50914] hover:bg-[#b80710] text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 flex-shrink-0 cursor-pointer active:scale-95"
+                disabled={isAdding}
+                className="px-4 py-2 rounded-xl bg-[#E50914] hover:bg-[#b80710] disabled:opacity-60 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 flex-shrink-0 cursor-pointer active:scale-95"
               >
-                <Plus size={14} />
-                <span>Добавить</span>
+                {isAdding ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Поиск...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus size={14} />
+                    <span>Добавить</span>
+                  </>
+                )}
               </button>
             </div>
 
