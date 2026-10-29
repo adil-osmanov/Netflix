@@ -494,7 +494,7 @@ export default function YouTubeCatalogPage() {
   );
 
   return (
-    <div className="relative min-h-screen bg-black text-white pb-24 px-4 md:px-12 pt-4 transition-colors duration-500 overflow-x-hidden">
+    <div className="relative min-h-screen bg-black text-white pb-24 px-4 md:px-12 pt-1 transition-colors duration-500 overflow-x-hidden">
       {/* Глубокий изумрудный кинотеатральный эмбиент (Cinema Emerald Aura) */}
       <div 
         className={`fixed inset-0 pointer-events-none transition-opacity duration-1000 ease-in-out z-0 ${
@@ -518,7 +518,7 @@ export default function YouTubeCatalogPage() {
 
       <div className="relative z-10">
         {/* 1. Верхняя навигация: вынос «Избранного» на первый уровень */}
-        <div className="max-w-7xl mx-auto mb-6 pt-2 flex items-center justify-center">
+        <div className="max-w-7xl mx-auto mb-6 pt-1 flex items-center justify-center">
           <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap justify-center">
             {/* YouTube */}
             <button
