@@ -593,12 +593,12 @@ export default function YouTubeCatalogPage() {
       ) : (
         <>
           {/* Top Controls: Centered Clean Search Bar */}
-          <div className="max-w-3xl mx-auto mb-6 pt-2">
+          <div className="max-w-2xl mx-auto my-5 px-4 sm:px-0">
             <form
               onSubmit={handleSearchOrWatch}
-              className="relative bg-zinc-900/80 border border-zinc-800/80 focus-within:border-zinc-700 rounded-full px-4 py-2 flex items-center gap-2 transition-all duration-300 select-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent]"
+              className="relative flex items-center w-full h-[50px] bg-zinc-900/80 border border-zinc-800/80 rounded-full pl-4 pr-1.5 shadow-lg backdrop-blur-md focus-within:border-zinc-700 transition-all select-none outline-none [-webkit-tap-highlight-color:transparent]"
             >
-              <Search size={17} className="text-zinc-500 ml-3 flex-shrink-0" />
+              <Search className="text-zinc-500 shrink-0 mr-3" size={18} />
               <input
                 type="text"
                 value={searchInput}
@@ -606,24 +606,28 @@ export default function YouTubeCatalogPage() {
                   setSearchInput(e.target.value);
                   if (inputError) setInputError(null);
                 }}
-                placeholder=""
-                className="bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-500 outline-none w-full px-2"
+                placeholder={
+                  activeTab === "easy_german"
+                    ? "Поиск по урокам Easy German..."
+                    : "Поиск видео YouTube..."
+                }
+                className="w-full bg-transparent border-none text-white text-sm placeholder-zinc-500 focus:outline-none"
               />
               {searchInput && (
                 <button
                   type="button"
                   onClick={() => setSearchInput("")}
-                  className="text-zinc-500 hover:text-white p-0.5 cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent]"
+                  className="text-zinc-500 hover:text-white mr-2 p-1 cursor-pointer outline-none [-webkit-tap-highlight-color:transparent]"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
               <button
                 type="submit"
-                className={`hidden sm:inline-block px-5 py-2.5 rounded-full text-xs font-semibold text-white transition-all duration-500 cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] ${
+                className={`h-[38px] px-6 rounded-full text-white text-xs font-bold tracking-wide transition-all shadow-md active:scale-95 shrink-0 cursor-pointer select-none outline-none focus:outline-none [-webkit-tap-highlight-color:transparent] ${
                   activeTab === "easy_german"
-                    ? "bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-950/50"
-                    : "bg-red-600 hover:bg-red-700 shadow-lg shadow-red-950/40"
+                    ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50"
+                    : "bg-[#E50914] hover:bg-[#b81d24]"
                 }`}
               >
                 Поиск
