@@ -532,4 +532,72 @@ export async function deleteEasyGermanVideoAction(
   return { success: true };
 }
 
+/**
+ * Получение названия и длительности ролика YouTube по его ID
+ */
+export async function fetchYouTubeVideoMetadataAction(videoId: string): Promise<{
+  title: string;
+  duration_str: string;
+}> {
+  let title = `Easy German Video (${videoId})`;
+  let duration_str = "";
+
+  try {
+    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      next: { revalidate: 86400 },
+    });
+    if (res.ok) {
+      const html = await res.text();
+      // 1. Извлечение длительности
+      const durMsMatch = html.match(/"approxDurationMs":"(\d+)"/);
+      const lenSecMatch = html.match(/"lengthSeconds":"(\d+)"/);
+      let sec = 0;
+      if (durMsMatch) sec = Math.round(Number(durMsMatch[1]) / 1000);
+      else if (lenSecMatch) sec = Number(lenSecMatch[1]);
+
+      if (sec > 0) {
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = Math.floor(sec % 60);
+        duration_str =
+          h > 0
+            ? `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
+            : `${m}:${s.toString().padStart(2, "0")}`;
+      }
+
+      // 2. Извлечение названия
+      const titleMatch =
+        html.match(/<title>([^<]+)<\/title>/i) ||
+        html.match(/"title":"([^"]+)"/);
+      if (titleMatch && titleMatch[1]) {
+        let cleanTitle = titleMatch[1].replace(/ - YouTube$/i, "").trim();
+        if (cleanTitle) {
+          title = cleanTitle;
+        }
+      }
+    }
+  } catch {}
+
+  // Запасной вариант для названия через noembed, если название не определилось
+  if (title.startsWith("Easy German Video")) {
+    try {
+      const fallbackRes = await fetch(
+        `https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`
+      );
+      if (fallbackRes.ok) {
+        const data = await fallbackRes.json();
+        if (data.title) title = data.title;
+      }
+    } catch {}
+  }
+
+  return { title, duration_str };
+}
+
+
 

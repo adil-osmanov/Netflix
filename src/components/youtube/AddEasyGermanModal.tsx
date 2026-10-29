@@ -4,22 +4,13 @@ import React, { useState, useEffect } from "react";
 import { X, Plus, Video, AlertCircle, Loader2 } from "lucide-react";
 import { EasyGermanVideo } from "@/types/youtube";
 import { extractYouTubeId } from "@/data/youtubeVideos";
+import { fetchYouTubeVideoMetadataAction } from "@/app/youtube/actions";
 
 interface AddEasyGermanModalProps {
   isOpen: boolean;
   onClose: () => void;
   level: "B1" | "B2" | "C1";
   onAddVideo: (video: EasyGermanVideo) => void;
-}
-
-async function fetchYouTubeTitle(videoId: string): Promise<string> {
-  try {
-    const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
-    const data = await res.json();
-    return data.title || `Easy German Video (${videoId})`;
-  } catch {
-    return `Easy German Video (${videoId})`;
-  }
 }
 
 export default function AddEasyGermanModal({
@@ -63,12 +54,13 @@ export default function AddEasyGermanModal({
 
     setIsLoading(true);
     try {
-      const title = await fetchYouTubeTitle(ytId);
+      const meta = await fetchYouTubeVideoMetadataAction(ytId);
 
       const newVideo: EasyGermanVideo = {
         id: `eg-custom-${Date.now()}`,
         youtube_id: ytId,
-        title,
+        title: meta.title,
+        duration_str: meta.duration_str,
         level,
         is_watched: false,
         created_at: new Date().toISOString(),

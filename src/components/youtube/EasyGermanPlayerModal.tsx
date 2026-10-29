@@ -131,6 +131,11 @@ export default function EasyGermanPlayerModal({
             <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 shrink-0 font-mono">
               {video.level || "B2"}
             </span>
+            {video.duration_str && (
+              <span className="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-zinc-800/80 text-zinc-300 border border-zinc-700/60 shrink-0">
+                {video.duration_str}
+              </span>
+            )}
             <h3 className="text-xs sm:text-sm font-semibold text-zinc-200 truncate">
               {video.title}
             </h3>

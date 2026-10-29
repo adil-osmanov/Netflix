@@ -9,6 +9,7 @@ import {
   toggleEasyGermanWatchedAction,
   addEasyGermanVideoAction,
   deleteEasyGermanVideoAction,
+  fetchYouTubeVideoMetadataAction,
 } from "@/app/youtube/actions";
 import EasyGermanPlayerModal from "./EasyGermanPlayerModal";
 import AddEasyGermanModal from "./AddEasyGermanModal";
@@ -68,7 +69,12 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
           const map = new Map<string, EasyGermanVideo>();
           for (const v of [...localCustom, ...res.customVideos]) {
             if (v && v.youtube_id) {
-              map.set(v.youtube_id, v);
+              const existing = map.get(v.youtube_id);
+              map.set(v.youtube_id, {
+                ...existing,
+                ...v,
+                duration_str: v.duration_str || existing?.duration_str || "",
+              });
             }
           }
           const mergedCustom = Array.from(map.values());
@@ -76,6 +82,37 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
           try {
             localStorage.setItem("easy_german_custom_videos", JSON.stringify(mergedCustom));
           } catch {}
+
+          // Фоновая подгрузка длительности, если у каких-то роликов она отсутствует
+          const missing = mergedCustom.filter((v) => !v.duration_str && v.youtube_id);
+          if (missing.length > 0) {
+            Promise.all(
+              missing.map(async (v) => {
+                try {
+                  const meta = await fetchYouTubeVideoMetadataAction(v.youtube_id);
+                  return { youtube_id: v.youtube_id, duration_str: meta.duration_str };
+                } catch {
+                  return null;
+                }
+              })
+            ).then((results) => {
+              const valid = results.filter(Boolean) as { youtube_id: string; duration_str: string }[];
+              if (valid.length > 0) {
+                setCustomVideos((prev) => {
+                  const durMap = new Map(valid.map((r) => [r.youtube_id, r.duration_str]));
+                  const updated = prev.map((item) =>
+                    durMap.has(item.youtube_id)
+                      ? { ...item, duration_str: durMap.get(item.youtube_id) || item.duration_str }
+                      : item
+                  );
+                  try {
+                    localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
+                  } catch {}
+                  return updated;
+                });
+              }
+            });
+          }
         }
       })
       .catch(() => {});

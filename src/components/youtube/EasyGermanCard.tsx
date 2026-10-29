@@ -95,9 +95,9 @@ export default function EasyGermanCard({
           />
         </div>
 
-        {/* В правом нижнем углу — длительность ролика (если есть) */}
+        {/* В правом нижнем углу — длительность ролика (стиль Netflix) */}
         {video.duration_str && (
-          <span className="absolute bottom-2.5 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] font-mono text-white z-10">
+          <span className="absolute bottom-2.5 right-2 px-1.5 py-0.5 rounded bg-black/85 backdrop-blur-md border border-white/10 text-[11px] font-mono font-medium text-zinc-200 z-10 shadow-sm">
             {video.duration_str}
           </span>
         )}
