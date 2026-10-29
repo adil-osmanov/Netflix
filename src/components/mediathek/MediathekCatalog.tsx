@@ -58,7 +58,13 @@ function getFallbackPoster(channel: string, topic: string): string {
   const safeChannel = ch.replace(/[<>&"']/g, "");
   const safeTopic = (topic || "Mediathek").slice(0, 35).replace(/[<>&"']/g, "");
 
-  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" fill="%2318181b"/><rect width="640" height="360" fill="${encodeURIComponent(bg)}" opacity="0.35"/><text x="40" y="80" fill="%23ffffff" font-family="sans-serif" font-weight="900" font-size="28">${encodeURIComponent(safeChannel)}</text><text x="40" y="140" fill="%23e4e4e7" font-family="sans-serif" font-weight="bold" font-size="22">${encodeURIComponent(safeTopic)}</text></svg>`;
+  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" fill="%2318181b"/><rect width="640" height="360" fill="${encodeURIComponent(
+    bg
+  )}" opacity="0.35"/><text x="40" y="80" fill="%23ffffff" font-family="sans-serif" font-weight="900" font-size="28">${encodeURIComponent(
+    safeChannel
+  )}</text><text x="40" y="140" fill="%23e4e4e7" font-family="sans-serif" font-weight="bold" font-size="22">${encodeURIComponent(
+    safeTopic
+  )}</text></svg>`;
 }
 
 export default function MediathekCatalog() {
@@ -73,14 +79,30 @@ export default function MediathekCatalog() {
   const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  const [isFetchingMore, setIsFetchingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const activeRequestIdRef = useRef<number>(0);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
+  const itemsRef = useRef<MediathekMediaItem[]>([]);
+  itemsRef.current = items;
 
-  // Мгновенный запрос медиа-элементов с защитой от кэширования (Cache-Busting)
+  const activeRequestIdRef = useRef<number>(0);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Дедупликация при склейке новой пачки карточек
+  const handleAppend = useCallback((newItems: MediathekMediaItem[]) => {
+    setItems((prev) => {
+      const existingIds = new Set(prev.map((i) => (i as any).youtube_id || i.id));
+      const existingUrls = new Set(prev.map((i) => i.url_website));
+      const filtered = newItems.filter(
+        (i) =>
+          !existingIds.has((i as any).youtube_id || i.id) &&
+          !existingUrls.has(i.url_website)
+      );
+      return [...prev, ...filtered];
+    });
+  }, []);
+
+  // Запрос медиа-элементов с передачей excludeIds и защитой от кэширования
   const fetchMediaItems = useCallback(
     async ({
       newCategory,
@@ -105,10 +127,14 @@ export default function MediathekCatalog() {
         setIsLoading(true);
         setError(null);
       } else {
-        setIsLoadingMore(true);
+        setIsFetchingMore(true);
       }
 
       try {
+        const excludeIds = append
+          ? itemsRef.current.flatMap((i) => [i.id, i.url_website].filter(Boolean))
+          : [];
+
         const res = await fetch(`/api/mediathek?t=${Date.now()}&rnd=${Math.random()}`, {
           method: "POST",
           cache: "no-store",
@@ -119,6 +145,7 @@ export default function MediathekCatalog() {
             category: catToUse,
             level: lvlToUse,
             query: queryToUse,
+            excludeIds,
             timestamp: Date.now(),
           }),
         });
@@ -135,15 +162,11 @@ export default function MediathekCatalog() {
           posterUrl: it.posterUrl || it.thumbnailUrl || getFallbackPoster(it.channel, it.topic),
         }));
 
-        setItems((prev) => {
-          if (!append) return newItems;
-          const existingIds = new Set(prev.map((p) => p.id));
-          const existingUrls = new Set(prev.map((p) => p.url_website));
-          const uniqueNext = newItems.filter(
-            (n) => !existingIds.has(n.id) && !existingUrls.has(n.url_website)
-          );
-          return [...prev, ...uniqueNext];
-        });
+        if (!append) {
+          setItems(newItems);
+        } else {
+          handleAppend(newItems);
+        }
 
         setHasMore(Boolean(data.hasMore));
       } catch (err: any) {
@@ -154,11 +177,11 @@ export default function MediathekCatalog() {
       } finally {
         if (requestId === activeRequestIdRef.current) {
           setIsLoading(false);
-          setIsLoadingMore(false);
+          setIsFetchingMore(false);
         }
       }
     },
-    [category, level, activeQuery]
+    [category, level, activeQuery, handleAppend]
   );
 
   // Первоначальная загрузка
@@ -215,40 +238,28 @@ export default function MediathekCatalog() {
   };
 
   // Подгрузка следующей пачки (честный шаг offset: 0 -> 24 -> 48 -> 72...)
-  const loadMore = useCallback(() => {
-    if (isLoading || isLoadingMore || !hasMore) return;
+  const loadMoreVideos = useCallback(() => {
+    if (isLoading || isFetchingMore || !hasMore) return;
     const nextOffset = offset + 24;
     setOffset(nextOffset);
     fetchMediaItems({ newOffset: nextOffset, append: true });
-  }, [isLoading, isLoadingMore, hasMore, offset, fetchMediaItems]);
+  }, [isLoading, isFetchingMore, hasMore, offset, fetchMediaItems]);
 
-  // Infinite scroll observer
+  // Intersection Sentinel (rootMargin: 400px)
   useEffect(() => {
-    if (isLoading || isLoadingMore || !hasMore) return;
-
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-    }
-
-    observerRef.current = new IntersectionObserver(
+    if (!sentinelRef.current || !hasMore || isFetchingMore || isLoading) return;
+    const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isLoading && !isLoadingMore) {
-          loadMore();
+        if (entries[0]?.isIntersecting) {
+          loadMoreVideos();
         }
       },
-      { rootMargin: "350px" }
+      { rootMargin: "400px" }
     );
 
-    if (loadMoreRef.current) {
-      observerRef.current.observe(loadMoreRef.current);
-    }
-
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-      }
-    };
-  }, [loadMore, hasMore, isLoading, isLoadingMore]);
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, isFetchingMore, isLoading, loadMoreVideos]);
 
   const handleCardClick = (url: string) => {
     window.location.href = url;
@@ -494,11 +505,11 @@ export default function MediathekCatalog() {
         </div>
       )}
 
-      {/* Триггер бесконечной ленты */}
-      <div ref={loadMoreRef} className="h-16 flex items-center justify-center my-6">
-        {isLoadingMore && (
-          <div className="flex items-center gap-2 text-xs text-zinc-400">
-            <Loader2 className="w-4 h-4 animate-spin text-red-600" />
+      {/* Intersection Sentinel */}
+      <div ref={sentinelRef} className="h-24 flex items-center justify-center my-4">
+        {isFetchingMore && (
+          <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-zinc-900/90 border border-zinc-800 shadow-lg text-zinc-300 text-xs sm:text-sm font-medium">
+            <Loader2 className="w-4 h-4 animate-spin text-[#E50914]" />
             <span>Загрузка следующих передач...</span>
           </div>
         )}

@@ -13,13 +13,11 @@ import {
   Plus,
   Sparkles
 } from "lucide-react";
-import { 
-  RECOMMENDED_YOUTUBE_VIDEOS, 
-  extractYouTubeId 
-} from "@/data/youtubeVideos";
+import { extractYouTubeId } from "@/data/youtubeVideos";
 import { YouTubeRecommendedVideo } from "@/types/youtube";
 import { useYouTube } from "@/context/YouTubeContext";
 import VideoCard from "@/components/youtube/VideoCard";
+import InfiniteVideoFeed, { appendUniqueVideos } from "@/components/youtube/InfiniteVideoFeed";
 import ManageChannelsModal, { SubscribedChannel } from "@/components/youtube/ManageChannelsModal";
 import EasyGermanCatalog from "@/components/youtube/EasyGermanCatalog";
 import MediathekCatalog from "@/components/mediathek/MediathekCatalog";
@@ -35,33 +33,38 @@ const DEFAULT_SUBSCRIPTIONS: SubscribedChannel[] = [
 ];
 
 /**
- * Strict duration validator: strictly >= 10 minutes (>= 600 seconds)
+ * Duration validator:
+ * - For Recommendations: >= 10 minutes (600s)
+ * - For Subscriptions: >= 3 min 20 sec (200s, filters out Shorts while keeping all normal channel videos)
  */
-function isValidDuration(durationStr?: string, seconds?: number): boolean {
-  if (typeof seconds === "number" && seconds < 600) return false;
+function isValidDuration(
+  durationStr?: string,
+  seconds?: number,
+  minSeconds: number = 600
+): boolean {
+  if (typeof seconds === "number") {
+    return seconds >= minSeconds;
+  }
   if (!durationStr) return false;
 
+  const minMinutes = Math.ceil(minSeconds / 60);
   const minMatch = durationStr.match(/(\d+)\s*(?:мин|min)/i);
   if (minMatch) {
-    return parseInt(minMatch[1], 10) >= 10;
+    return parseInt(minMatch[1], 10) >= minMinutes;
   }
 
   const parts = durationStr.split(":").map(Number);
   if (parts.some(isNaN)) return false;
   if (parts.length === 2) {
-    // MM:SS -> отсекаем всё, где минут меньше 10
-    return parts[0] >= 10;
+    const totalSec = parts[0] * 60 + parts[1];
+    return totalSec >= minSeconds;
   }
   if (parts.length === 3) {
-    // HH:MM:SS -> видео идет больше часа, подходит на 100%
     return true;
   }
   return false;
 }
 
-/**
- * Filter out YouTube Shorts, live streams, broken videos, and videos under 10 minutes:
- */
 const BLOCKED_PATTERNS = [
   /winnetou/i,
   /die\s+entzifferung/i,
@@ -71,29 +74,31 @@ const BLOCKED_PATTERNS = [
   /testosteron/i,
 ];
 
-function isYouTubeShort(video: {
-  title?: string;
-  description?: string;
-  id?: string;
-  duration?: number;
-  durationText?: string;
-}): boolean {
+function isYouTubeShort(
+  video: {
+    title?: string;
+    description?: string;
+    id?: string;
+    duration?: number;
+    duration_seconds?: number;
+    durationText?: string;
+    duration_str?: string;
+  },
+  minDurationSeconds: number = 600
+): boolean {
   const title = (video.title || "").toLowerCase();
   const desc = (video.description || "").toLowerCase();
   const id = (video.id || "").toLowerCase();
   const combined = `${id} ${title} ${desc}`;
 
-  // 1. Blacklisted broken videos
   if (BLOCKED_PATTERNS.some((p) => p.test(combined))) {
     return true;
   }
 
-  // 2. Direct shorts URL or ID
   if (id.includes("shorts") || id.includes("/shorts/")) {
     return true;
   }
 
-  // 3. Keywords and hashtag patterns (#shorts, #short, Shorts, vertical, etc.)
   if (
     /\b(shorts?|short|vertical|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(title) ||
     /#(shorts?|short|vertical|tiktok|reels?)/i.test(title) ||
@@ -104,12 +109,14 @@ function isYouTubeShort(video: {
     return true;
   }
 
-  // 4. Strict duration filter: exclude videos under 10 minutes (600 seconds)
-  if (video.duration && video.duration < 600) {
+  const sec = video.duration_seconds ?? video.duration;
+  const durStr = video.durationText || video.duration_str;
+
+  if (typeof sec === "number" && sec < minDurationSeconds) {
     return true;
   }
 
-  if (video.durationText && !isValidDuration(video.durationText, video.duration)) {
+  if (durStr && !isValidDuration(durStr, sec, minDurationSeconds)) {
     return true;
   }
 
@@ -122,7 +129,7 @@ export default function YouTubeCatalogPage() {
   // 1. Главная трехуровневая навигация: 'youtube' | 'mediathek' | 'favorites'
   const [activeCategory, setActiveCategory] = useState<TopCategory>("youtube");
 
-  // Подвкладки YouTube: 'recommendations' | 'subscriptions'
+  // Подвкладки YouTube: 'recommendations' | 'subscriptions' | 'easy_german'
   const [activeTab, setActiveTab] = useState<MainTab>("recommendations");
 
   // Search & Direct Watch
@@ -132,18 +139,12 @@ export default function YouTubeCatalogPage() {
   // Recommendations: Difficulty Level Filter: 'ALL' | 'B1' | 'B2'
   const [selectedLevel, setSelectedLevel] = useState<"ALL" | "B1" | "B2">("ALL");
 
-  // Subscriptions: Filter by specific channel ('ALL' | channel name / id)
+  // Subscriptions: Filter by specific channel ('ALL' | channelId)
   const [selectedSubscribedChannel, setSelectedSubscribedChannel] = useState<string>("ALL");
 
   // Subscriptions Management Modal
   const [isManageModalOpen, setIsManageModalOpen] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-
-  // Random seed generated on initial load (randomizes order on every load / refresh)
-  const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1000000) + 1);
-
-  // Infinite Scroll Trigger Ref
-  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
 
   // Subscriptions state
   const [subscriptions, setSubscriptions] = useState<SubscribedChannel[]>(DEFAULT_SUBSCRIPTIONS);
@@ -151,14 +152,22 @@ export default function YouTubeCatalogPage() {
   const [subPage, setSubPage] = useState<number>(1);
   const [hasMoreSub, setHasMoreSub] = useState<boolean>(true);
   const [isLoadingSubs, setIsLoadingSubs] = useState<boolean>(false);
-  const [isLoadingMoreSub, setIsLoadingMoreSub] = useState<boolean>(false);
+  const [isFetchingMoreSub, setIsFetchingMoreSub] = useState<boolean>(false);
+
+  // Токены пагинации (continuationToken) по каналам
+  const channelTokensRef = useRef<Record<string, string | null>>({});
+  const subVideosRef = useRef<YouTubeRecommendedVideo[]>([]);
+  subVideosRef.current = subVideos;
 
   // Recommendations state
   const [recommendations, setRecommendations] = useState<YouTubeRecommendedVideo[]>([]);
   const [recPage, setRecPage] = useState<number>(1);
   const [hasMoreRec, setHasMoreRec] = useState<boolean>(true);
   const [isLoadingRec, setIsLoadingRec] = useState<boolean>(false);
-  const [isLoadingMoreRec, setIsLoadingMoreRec] = useState<boolean>(false);
+  const [isFetchingMoreRec, setIsFetchingMoreRec] = useState<boolean>(false);
+
+  const recommendationsRef = useRef<YouTubeRecommendedVideo[]>([]);
+  recommendationsRef.current = recommendations;
 
   // Load subscriptions from localStorage on mount
   useEffect(() => {
@@ -179,135 +188,200 @@ export default function YouTubeCatalogPage() {
     } catch {}
   };
 
-  // Fetch subscriptions videos (with cache-busting for iPad / Safari WebKit)
+  // Загрузка видео подписок (без лимита в 15 роликов, с поддержкой continuationToken и excludeIds)
   const fetchSubscriptionVideos = useCallback(
-    async (pageToLoad: number, append: boolean = false) => {
+    async (
+      pageToLoad: number,
+      append: boolean = false,
+      targetChannelOverride?: string
+    ) => {
       if (subscriptions.length === 0) {
         setSubVideos([]);
         setHasMoreSub(false);
         return;
       }
 
+      const activeChannel =
+        targetChannelOverride !== undefined
+          ? targetChannelOverride
+          : selectedSubscribedChannel;
+
       if (append) {
-        setIsLoadingMoreSub(true);
+        setIsFetchingMoreSub(true);
       } else {
         setIsLoadingSubs(true);
+        channelTokensRef.current = {};
       }
 
       try {
-        const channelIds = subscriptions.map((s) => s.id).join(",");
-        const res = await fetch(
-          `/api/youtube/subscriptions?channels=${encodeURIComponent(channelIds)}&page=${pageToLoad}&limit=16&seed=${seed}&t=${Date.now()}&rnd=${Math.random()}`,
-          { cache: "no-store" }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          const newVideos = data.videos || [];
-          setSubVideos((prev) => (append ? [...prev, ...newVideos] : newVideos));
-          setHasMoreSub(data.hasMore ?? false);
-          setSubPage(pageToLoad);
+        const excludeIds = append
+          ? subVideosRef.current.map((v) => (v as any).youtube_id || v.id)
+          : [];
+
+        if (activeChannel !== "ALL") {
+          // Прямая загрузка 35–60 роликов конкретного канала + пагинация по continuationToken
+          const chObj = subscriptions.find((s) => s.id === activeChannel);
+          const token = append ? channelTokensRef.current[activeChannel] || null : null;
+
+          const res = await fetch(
+            `/api/youtube/channel-videos?t=${Date.now()}&rnd=${Math.random()}`,
+            {
+              method: "POST",
+              cache: "no-store",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                channelId: activeChannel,
+                channelName: chObj?.name || "Канал",
+                continuationToken: token,
+                excludeIds,
+              }),
+            }
+          );
+
+          if (res.ok) {
+            const data = await res.json();
+            const newVideos: YouTubeRecommendedVideo[] = data.items || data.videos || [];
+            channelTokensRef.current[activeChannel] = data.continuationToken || null;
+
+            setSubVideos((prev) =>
+              append ? appendUniqueVideos(prev, newVideos) : newVideos
+            );
+            setHasMoreSub(Boolean(data.continuationToken));
+            setSubPage(pageToLoad);
+          }
+        } else {
+          // Загрузка ленты по всем каналам подписок
+          const channelIds = subscriptions.map((s) => s.id);
+          const res = await fetch(
+            `/api/youtube/subscriptions?t=${Date.now()}&rnd=${Math.random()}`,
+            {
+              method: "POST",
+              cache: "no-store",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                channelIds,
+                page: pageToLoad,
+                limit: 24,
+                excludeIds,
+                continuationTokens: append ? channelTokensRef.current : {},
+              }),
+            }
+          );
+
+          if (res.ok) {
+            const data = await res.json();
+            const newVideos: YouTubeRecommendedVideo[] = data.videos || data.items || [];
+            if (data.continuationTokens) {
+              channelTokensRef.current = data.continuationTokens;
+            }
+            setSubVideos((prev) =>
+              append ? appendUniqueVideos(prev, newVideos) : newVideos
+            );
+            setHasMoreSub(data.hasMore ?? true);
+            setSubPage(pageToLoad);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch subscriptions feed:", err);
       } finally {
         setIsLoadingSubs(false);
-        setIsLoadingMoreSub(false);
+        setIsFetchingMoreSub(false);
       }
     },
-    [subscriptions, seed]
+    [subscriptions, selectedSubscribedChannel]
   );
 
-  // Fetch recommendations (with POST + cache-busting for iPad / Safari WebKit)
+  // Загрузка рекомендаций с передачей excludeIds и динамическими кластерами тем
   const fetchRecommendations = useCallback(
-    async (pageToLoad: number, append: boolean = false) => {
+    async (pageToLoad: number, append: boolean = false, levelOverride?: "ALL" | "B1" | "B2") => {
       if (append) {
-        setIsLoadingMoreRec(true);
+        setIsFetchingMoreRec(true);
       } else {
         setIsLoadingRec(true);
       }
 
+      const lvl = levelOverride !== undefined ? levelOverride : selectedLevel;
+      const excludeIds = append
+        ? recommendationsRef.current.map((v) => (v as any).youtube_id || v.id)
+        : [];
+
       try {
-        const res = await fetch(`/api/youtube/recommendations?t=${Date.now()}&rnd=${Math.random()}`, {
-          method: "POST",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            page: pageToLoad,
-            limit: 16,
-            timestamp: Date.now(),
-          }),
-        });
+        const res = await fetch(
+          `/api/youtube/recommendations?t=${Date.now()}&rnd=${Math.random()}`,
+          {
+            method: "POST",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              page: pageToLoad,
+              limit: 16,
+              level: lvl,
+              excludeIds,
+              timestamp: Date.now(),
+            }),
+          }
+        );
         if (res.ok) {
           const data = await res.json();
-          const newVideos = data.videos || [];
-          setRecommendations((prev) => (append ? [...prev, ...newVideos] : newVideos));
-          setHasMoreRec(data.hasMore ?? false);
+          const newVideos: YouTubeRecommendedVideo[] = data.videos || data.items || [];
+          setRecommendations((prev) =>
+            append ? appendUniqueVideos(prev, newVideos) : newVideos
+          );
+          setHasMoreRec(true);
           setRecPage(pageToLoad);
         }
       } catch (err) {
         console.error("Failed to fetch recommendations:", err);
       } finally {
         setIsLoadingRec(false);
-        setIsLoadingMoreRec(false);
+        setIsFetchingMoreRec(false);
       }
     },
-    []
+    [selectedLevel]
   );
 
   // Initial fetch for recommendations on mount
   useEffect(() => {
     fetchRecommendations(1, false);
-  }, [fetchRecommendations]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Initial fetch for subscriptions
+  // Fetch subscriptions when subscriptions list or selected channel changes
   useEffect(() => {
     fetchSubscriptionVideos(1, false);
-  }, [fetchSubscriptionVideos]);
+  }, [subscriptions, selectedSubscribedChannel]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Infinite Scroll IntersectionObserver
-  useEffect(() => {
-    const trigger = loadMoreTriggerRef.current;
-    if (!trigger) return;
+  // Load more handler for InfiniteVideoFeed
+  const handleLoadMoreYouTube = useCallback(() => {
+    if (activeCategory !== "youtube") return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const first = entries[0];
-        if (first.isIntersecting) {
-          if (activeCategory !== "youtube") return;
-
-          if (activeTab === "recommendations" && hasMoreRec && !isLoadingRec && !isLoadingMoreRec) {
-            fetchRecommendations(recPage + 1, true);
-          } else if (activeTab === "subscriptions" && hasMoreSub && !isLoadingSubs && !isLoadingMoreSub) {
-            fetchSubscriptionVideos(subPage + 1, true);
-          }
-        }
-      },
-      { threshold: 0.1, rootMargin: "250px" }
-    );
-
-    observer.observe(trigger);
-    return () => observer.disconnect();
+    if (activeTab === "recommendations" && hasMoreRec && !isLoadingRec && !isFetchingMoreRec) {
+      fetchRecommendations(recPage + 1, true);
+    } else if (
+      activeTab === "subscriptions" &&
+      hasMoreSub &&
+      !isLoadingSubs &&
+      !isFetchingMoreSub
+    ) {
+      fetchSubscriptionVideos(subPage + 1, true);
+    }
   }, [
     activeCategory,
     activeTab,
     hasMoreRec,
     isLoadingRec,
-    isLoadingMoreRec,
+    isFetchingMoreRec,
     recPage,
     fetchRecommendations,
     hasMoreSub,
     isLoadingSubs,
-    isLoadingMoreSub,
+    isFetchingMoreSub,
     subPage,
     fetchSubscriptionVideos,
   ]);
 
-  // Refresh feed with new random seed
+  // Refresh feed
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    const newSeed = Math.floor(Math.random() * 1000000) + 1;
-    setSeed(newSeed);
-
     if (activeTab === "recommendations") {
       await fetchRecommendations(1, false);
     } else if (activeTab === "subscriptions") {
@@ -339,20 +413,22 @@ export default function YouTubeCatalogPage() {
     const updated = subscriptions.filter((s) => s.id !== channelId);
     saveSubscriptions(updated);
     setSubVideos((prev) => prev.filter((v) => v.channelId !== channelId));
+    if (selectedSubscribedChannel === channelId) {
+      setSelectedSubscribedChannel("ALL");
+    }
   };
 
   // Base videos for YouTube subtabs
   const baseVideos = activeTab === "recommendations" ? recommendations : subVideos;
+  const minDurSec = activeTab === "subscriptions" ? 200 : 600;
 
   // Filter YouTube videos
   const query = searchInput.trim().toLowerCase();
   const isSearchQuery = query.length > 0 && !extractYouTubeId(searchInput.trim());
 
   const currentVideos = baseVideos.filter((video) => {
-    // 0. Filter out Shorts, streams and durations under 4 min
-    if (isYouTubeShort(video)) return false;
+    if (isYouTubeShort(video, minDurSec)) return false;
 
-    // 1. Поиск по текущей активной вкладке
     const matchesSearch =
       !isSearchQuery ||
       (video.title || "").toLowerCase().includes(query) ||
@@ -361,7 +437,6 @@ export default function YouTubeCatalogPage() {
 
     if (!matchesSearch) return false;
 
-    // 2. Контекстные фильтры вкладок
     if (activeTab === "recommendations") {
       const l = (video.level || "B1").toUpperCase();
       const isB2 = l.startsWith("B2") || l === "C1" || l === "C2";
@@ -399,7 +474,9 @@ export default function YouTubeCatalogPage() {
 
   // Client-side deduplication of favorites
   const uniqueFavorites = Array.from(
-    new Map(favorites.map((v) => [(v as any).youtube_id || v.id || (v as any).url_website, v])).values()
+    new Map(
+      favorites.map((v) => [(v as any).youtube_id || v.id || (v as any).url_website, v])
+    ).values()
   );
 
   return (
@@ -433,7 +510,7 @@ export default function YouTubeCatalogPage() {
             <span>ARD & ZDF Mediathek</span>
           </button>
 
-          {/* Избранное (Общее) - Выделяется золотистым/янтарным акцентом */}
+          {/* Избранное (Общее) */}
           <button
             onClick={() => setActiveCategory("favorites")}
             className={`px-5 py-2.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 border cursor-pointer ${
@@ -464,12 +541,13 @@ export default function YouTubeCatalogPage() {
 
       {/* RENDER ACTIVE TOP CATEGORY */}
       {activeCategory === "favorites" ? (
-        /* 4. Раздел «Избранное» (Общая сетка YouTube + ARD/ZDF) */
         <div className="max-w-7xl mx-auto">
           {uniqueFavorites.length === 0 ? (
             <div className="py-24 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl text-center flex flex-col items-center justify-center p-8 gap-3 max-w-lg mx-auto">
               <Bookmark className="w-12 h-12 text-zinc-600" />
-              <h3 className="text-base font-bold text-white">Здесь будут ваши сохраненные фильмы и ролики</h3>
+              <h3 className="text-base font-bold text-white">
+                Здесь будут ваши сохраненные фильмы и ролики
+              </h3>
               <p className="text-xs text-zinc-400 leading-relaxed">
                 Нажмите на значок закладки на любой карточке в YouTube или ARD & ZDF, чтобы добавить видео в этот список.
               </p>
@@ -487,10 +565,8 @@ export default function YouTubeCatalogPage() {
           )}
         </div>
       ) : activeCategory === "mediathek" ? (
-        /* ARD & ZDF Mediathek Catalog */
         <MediathekCatalog />
       ) : (
-        /* YouTube DE Feed with Sub-navigation */
         <>
           {/* Top Controls: Centered Clean Search Bar */}
           <div className="max-w-3xl mx-auto mb-6 pt-2">
@@ -592,7 +668,6 @@ export default function YouTubeCatalogPage() {
               {/* Controls right side (only for Recommendations & Subscriptions) */}
               {activeTab !== "easy_german" && (
                 <div className="flex items-center gap-2 sm:gap-3">
-                  {/* Contextual Filters: Recommendations Difficulty (B1 / B2) */}
                   {activeTab === "recommendations" && (
                     <div className="flex items-center gap-1 bg-zinc-900/90 p-1 rounded-full border border-zinc-800">
                       <button
@@ -696,14 +771,18 @@ export default function YouTubeCatalogPage() {
               (activeTab === "recommendations" && isLoadingRec && recommendations.length === 0) ? (
               <div className="py-24 flex flex-col items-center justify-center gap-3 text-zinc-400">
                 <Loader2 className="w-8 h-8 animate-spin text-[#E50914]" />
-                <span className="text-sm font-medium">Загрузка свежих видео из немецких каналов...</span>
+                <span className="text-sm font-medium">
+                  Загрузка свежих видео из немецких каналов...
+                </span>
               </div>
             ) : uniqueVideos.length === 0 ? (
               <div className="py-20 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl text-center flex flex-col items-center justify-center p-8 gap-3 max-w-lg mx-auto">
                 {activeTab === "subscriptions" ? (
                   <>
                     <Tv className="w-10 h-10 text-zinc-600" />
-                    <h3 className="text-base font-bold text-white">В ваших подписках пока нет доступных видео</h3>
+                    <h3 className="text-base font-bold text-white">
+                      В ваших подписках пока нет доступных видео
+                    </h3>
                     <p className="text-xs text-zinc-400 leading-relaxed">
                       Добавьте больше немецких YouTube-каналов или выберите другой канал в списке.
                     </p>
@@ -727,30 +806,15 @@ export default function YouTubeCatalogPage() {
                 )}
               </div>
             ) : (
-              /* Video Grid (Strictly non-Shorts, >= 10 min, deduplicated) */
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-                  {uniqueVideos.map((video) => (
-                    <VideoCard
-                      key={(video as any).youtube_id || video.id || (video as any).url_website}
-                      video={video}
-                    />
-                  ))}
-                </div>
-
-                {/* Infinite Scroll Trigger Target */}
-                <div
-                  ref={loadMoreTriggerRef}
-                  className="h-20 w-full flex items-center justify-center mt-6 pointer-events-none"
-                >
-                  {(isLoadingMoreRec || isLoadingMoreSub) && (
-                    <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm">
-                      <Loader2 className="w-5 h-5 animate-spin text-[#E50914]" />
-                      <span>Загрузка новых видео...</span>
-                    </div>
-                  )}
-                </div>
-              </>
+              /* Бесконечная лента YouTube (Рекомендации и Подписки) */
+              <InfiniteVideoFeed
+                items={uniqueVideos}
+                hasMore={activeTab === "recommendations" ? hasMoreRec : hasMoreSub}
+                isFetchingMore={
+                  activeTab === "recommendations" ? isFetchingMoreRec : isFetchingMoreSub
+                }
+                onLoadMore={handleLoadMoreYouTube}
+              />
             )}
           </div>
         </>
