@@ -30,14 +30,14 @@ export default function EasyGermanCard({
           onOpen(video);
         }
       }}
-      className={`group relative flex flex-col cursor-pointer text-left select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] transition-transform duration-300 hover:-translate-y-1 rounded-2xl p-1 ${
+      className={`group relative flex flex-col cursor-pointer text-left select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] transition-all duration-300 hover:-translate-y-1 rounded-2xl p-1.5 ${
         isWatched
           ? "border-2 border-emerald-500 shadow-lg shadow-emerald-950/30"
-          : "border border-transparent hover:border-zinc-800/60"
+          : "border border-transparent group-hover:border-emerald-500/50 group-hover:shadow-[0_0_25px_rgba(16,185,129,0.15)]"
       }`}
     >
       {/* Превью контейнер с мягким изумрудным ховер-эффектом */}
-      <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 transition-colors duration-300 group-hover:border-emerald-500/40 group-hover:shadow-lg group-hover:shadow-emerald-950/30">
+      <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 transition-all duration-300 group-hover:border-emerald-500/50 group-hover:shadow-[0_0_25px_rgba(16,185,129,0.15)]">
         <img
           src={`https://i.ytimg.com/vi/${video.youtube_id}/hqdefault.jpg`}
           alt={video.title}
@@ -91,8 +91,8 @@ export default function EasyGermanCard({
 
         {/* Всплывающая кнопка Play при наведении */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-          <div className="w-12 h-12 rounded-full bg-emerald-500 text-black flex items-center justify-center shadow-xl shadow-emerald-950/60 transform group-hover:scale-110 transition-transform duration-300">
-            <Play className="fill-black ml-0.5" size={22} />
+          <div className="w-12 h-12 rounded-full bg-emerald-500 text-black flex items-center justify-center shadow-lg shadow-emerald-950/80 transform group-hover:scale-110 transition-transform duration-300">
+            <Play className="fill-black ml-0.5" size={20} />
           </div>
         </div>
 

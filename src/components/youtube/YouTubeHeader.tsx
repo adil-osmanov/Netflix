@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import FullscreenToggle from "@/components/layout/FullscreenToggle";
 
 export default function YouTubeHeader() {
   return (
@@ -23,8 +24,10 @@ export default function YouTubeHeader() {
         <span className="text-red-600 font-black tracking-widest text-lg sm:text-xl">NETFLIX</span>
       </div>
 
-      {/* Справа (сбалансированный пустой блок) */}
-      <div className="w-20 hidden sm:block" />
+      {/* Справа: переключатель полного экрана */}
+      <div className="flex items-center justify-end">
+        <FullscreenToggle />
+      </div>
     </header>
   );
 }

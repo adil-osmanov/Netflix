@@ -5,6 +5,7 @@ import { Search, Menu, X } from "lucide-react";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
 import { useSearch } from "./SearchContext";
+import FullscreenToggle from "@/components/layout/FullscreenToggle";
 
 function NavbarContent() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -102,6 +103,9 @@ function NavbarContent() {
                 if (!searchTerm) setShowSearch(false);
               }}
             />
+          </div>
+          <div className="ml-3 flex-shrink-0">
+            <FullscreenToggle />
           </div>
         </div>
       </div>
