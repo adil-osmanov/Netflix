@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { Play, Check, Plus, Video, Trash2 } from "lucide-react";
-import { EasyGermanVideo } from "@/types/youtube";
+import { EasyGermanVideo, QuizItem } from "@/types/youtube";
 import { INITIAL_EASY_GERMAN_VIDEOS } from "@/data/easyGermanVideos";
 import {
   getEasyGermanStateAction,
@@ -81,13 +81,23 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
       .catch(() => {});
   }, []);
 
-  // Объединенный список видео (пользовательские + начальные без дублей)
+  // Объединенный список видео (пользовательские + начальные без дублей) с подгрузкой квизов
   const allVideos = useMemo(() => {
+    let quizMap: Record<string, QuizItem[]> = {};
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("easy_german_quizzes");
+        if (raw) quizMap = JSON.parse(raw);
+      } catch {}
+    }
+
     const map = new Map<string, EasyGermanVideo>();
     for (const v of [...customVideos, ...INITIAL_EASY_GERMAN_VIDEOS]) {
       if (v && v.youtube_id && !map.has(v.youtube_id)) {
+        const assignedQuiz = quizMap[v.youtube_id] || quizMap[v.id] || v.quiz;
         map.set(v.youtube_id, {
           ...v,
+          quiz: assignedQuiz,
           is_watched: watchedIds.has(v.youtube_id),
         });
       }
@@ -119,6 +129,33 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
       toggleEasyGermanWatchedAction(youtubeId, willBeWatched).catch(() => {});
       return next;
     });
+  };
+
+  // Обновление/сохранение квиза для видео
+  const handleUpdateQuiz = (videoIdOrYoutubeId: string, quiz: QuizItem[]) => {
+    // 1. Сохранение в dedicated localStorage map
+    try {
+      const stored = JSON.parse(localStorage.getItem("easy_german_quizzes") || "{}");
+      stored[videoIdOrYoutubeId] = quiz;
+      localStorage.setItem("easy_german_quizzes", JSON.stringify(stored));
+    } catch {}
+
+    // 2. Обновление customVideos если это кастомное видео
+    setCustomVideos((prev) => {
+      const updated = prev.map((v) => {
+        if (v.id === videoIdOrYoutubeId || v.youtube_id === videoIdOrYoutubeId) {
+          return { ...v, quiz };
+        }
+        return v;
+      });
+      try {
+        localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 3. Немедленное обновление активного видео в плеере
+    setActiveVideo((prev) => (prev ? { ...prev, quiz } : null));
   };
 
   // Добавление нового видео вручную (строго в конец списка)
@@ -242,6 +279,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
         isWatched={activeVideo ? watchedIds.has(activeVideo.youtube_id) : false}
         onClose={() => setActiveVideo(null)}
         onToggleWatched={(ytId) => handleToggleWatched(ytId)}
+        onUpdateQuiz={handleUpdateQuiz}
       />
 
       {/* Модальное окно ручного добавления видео */}

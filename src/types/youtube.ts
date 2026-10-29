@@ -16,6 +16,14 @@ export interface YouTubeRecommendedVideo {
   published?: string;
 }
 
+export interface QuizItem {
+  id: number;
+  type: 'cloze' | 'vocab' | 'context';
+  question: string;
+  options: string[];
+  correct: number; // индекс правильного ответа (0, 1, 2...)
+}
+
 export interface EasyGermanVideo {
   id: string;              // уникальный ID записи
   youtube_id: string;      // 11 символов ID YouTube
@@ -24,6 +32,7 @@ export interface EasyGermanVideo {
   duration_str?: string;   // например, "14:20"
   is_watched?: boolean;    // статус просмотра
   created_at?: string;
+  quiz?: QuizItem[];
 }
 
 export interface UserWord {
