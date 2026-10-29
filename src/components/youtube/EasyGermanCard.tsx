@@ -32,13 +32,13 @@ export default function EasyGermanCard({
           onOpen(video);
         }
       }}
-      className={`group relative flex flex-col cursor-pointer text-left select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] transition-all duration-300 hover:-translate-y-1 rounded-2xl p-1.5 ${
+      className={`group relative flex flex-col cursor-pointer text-left select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] rounded-2xl p-1.5 transition-all duration-300 hover:-translate-y-1 border border-zinc-800/80 ${
         isWatched
-          ? "border-2 border-emerald-500 shadow-lg shadow-emerald-950/30"
-          : "border border-transparent group-hover:border-emerald-500/50 group-hover:shadow-[0_0_25px_rgba(16,185,129,0.15)]"
+          ? "opacity-50 hover:opacity-100 filter grayscale-[25%] hover:grayscale-0"
+          : "hover:border-emerald-500/50 hover:shadow-[0_0_25px_rgba(16,185,129,0.15)]"
       }`}
     >
-      {/* Превью контейнер с мягким изумрудным ховер-эффектом */}
+      {/* Превью контейнер с мягким ховер-эффектом */}
       <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 transition-all duration-300 group-hover:border-emerald-500/50 group-hover:shadow-[0_0_25px_rgba(16,185,129,0.15)]">
         <img
           src={`https://i.ytimg.com/vi/${video.youtube_id}/hqdefault.jpg`}
@@ -47,21 +47,17 @@ export default function EasyGermanCard({
           loading="lazy"
         />
 
-        {/* Левый верхний угол: номерной бейдж серии (#01, #02) или статус завершения */}
-        {isWatched ? (
-          <>
-            <div className="absolute inset-0 bg-emerald-950/20 pointer-events-none" />
-            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[11px] font-bold shadow-md flex items-center gap-1 z-10">
-              <Check size={12} strokeWidth={3} />
-              <span>#{String(index).padStart(2, "0")}</span>
-            </div>
-          </>
-        ) : (
-          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md border border-white/10 text-[11px] font-mono font-bold text-zinc-200 shadow-md flex items-center gap-1.5 z-10">
-            <span className="text-emerald-400">#</span>
-            <span>{String(index).padStart(2, "0")}</span>
-          </div>
-        )}
+        {/* Левый верхний угол: лаконичный бейдж эпизода Netflix */}
+        <div
+          className={`absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md backdrop-blur-md text-[11px] font-mono font-bold flex items-center gap-1.5 z-10 transition-colors ${
+            isWatched
+              ? "bg-black/75 text-emerald-400 border border-emerald-500/30"
+              : "bg-black/80 text-zinc-300 border border-white/10"
+          }`}
+        >
+          <span>#{String(index).padStart(2, "0")}</span>
+          {isWatched && <Check className="text-emerald-400" size={11} strokeWidth={3} />}
+        </div>
 
         {/* В правом верхнем углу: кнопка удаления и кнопка-галочка «Просмотрено» */}
         <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
@@ -84,15 +80,19 @@ export default function EasyGermanCard({
           {/* Кнопка-галочка «Просмотрено» */}
           <button
             type="button"
-            onClick={(e) => onToggleWatched(video.youtube_id, e)}
-            title={isWatched ? "Отметить как непросмотренное" : "Отметить как просмотренное"}
-            className={`w-7 h-7 rounded-full flex items-center justify-center transition cursor-pointer backdrop-blur-md select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleWatched(video.youtube_id, e);
+            }}
+            className={`p-1.5 rounded-full transition-all outline-none focus:outline-none focus:ring-0 active:outline-none cursor-pointer select-none [-webkit-tap-highlight-color:transparent] ${
               isWatched
-                ? "bg-emerald-500 text-black shadow-md font-bold"
-                : "bg-black/60 text-zinc-400 hover:text-white"
+                ? "bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-900"
+                : "bg-black/60 text-zinc-500 hover:text-white border border-white/10"
             }`}
+            title={isWatched ? "Отметить как непросмотренное" : "Отметить как выполненное"}
           >
-            <Check className="w-4 h-4 stroke-[2.5]" />
+            <Check size={13} strokeWidth={2.5} />
           </button>
         </div>
 
@@ -103,9 +103,18 @@ export default function EasyGermanCard({
           </div>
         </div>
 
+        {/* Полоса завершения внизу превью (стиль Netflix) */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-950/80 overflow-hidden">
+          <div
+            className={`h-full transition-all duration-500 ${
+              isWatched ? "w-full bg-emerald-500" : "w-0"
+            }`}
+          />
+        </div>
+
         {/* В правом нижнем углу — длительность ролика (если есть) */}
         {video.duration_str && (
-          <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] font-mono text-white">
+          <span className="absolute bottom-2.5 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] font-mono text-white z-10">
             {video.duration_str}
           </span>
         )}
