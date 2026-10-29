@@ -492,71 +492,71 @@ export default function YouTubeCatalogPage() {
 
   return (
     <div className="relative min-h-screen bg-black text-white pb-24 px-4 md:px-12 pt-4 transition-colors duration-500 overflow-x-hidden">
-      {/* Верхний рассеянный свет (Ambient Glow) */}
+      {/* Верхний рассеянный свет (Ambient Ceiling Light) */}
       <div 
-        className={`fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-[420px] pointer-events-none transition-all duration-700 ease-out z-0 blur-3xl ${
+        className={`fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[460px] pointer-events-none transition-all duration-700 ease-out z-0 blur-3xl ${
           activeCategory === "youtube" && activeTab === "easy_german"
-            ? "opacity-100 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.14),transparent_70%)]"
+            ? "opacity-100 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.10),transparent_70%)]"
             : "opacity-100 bg-[radial-gradient(ellipse_at_top,rgba(220,38,38,0.06),transparent_70%)]"
         }`}
       />
 
       <div className="relative z-10">
         {/* 1. Верхняя навигация: вынос «Избранного» на первый уровень */}
-      <div className="max-w-7xl mx-auto mb-6 pt-2 flex items-center justify-center">
-        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap justify-center">
-          {/* YouTube */}
-          <button
-            onClick={() => setActiveCategory("youtube")}
-            className={`px-4 py-2 rounded-full text-xs font-semibold transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
-              activeCategory === "youtube"
-                ? "bg-white text-black"
-                : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
-            }`}
-          >
-            YouTube
-          </button>
+        <div className="max-w-7xl mx-auto mb-6 pt-2 flex items-center justify-center">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap justify-center">
+            {/* YouTube */}
+            <button
+              onClick={() => setActiveCategory("youtube")}
+              className={`px-4 py-2 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 ${
+                activeCategory === "youtube"
+                  ? "bg-white text-black"
+                  : "bg-zinc-900 text-zinc-400 hover:text-white"
+              }`}
+            >
+              YouTube
+            </button>
 
-          {/* Mediathek */}
-          <button
-            onClick={() => setActiveCategory("mediathek")}
-            className={`px-4 py-2 rounded-full text-xs font-semibold transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
-              activeCategory === "mediathek"
-                ? "bg-white text-black"
-                : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
-            }`}
-          >
-            Mediathek
-          </button>
+            {/* Mediathek */}
+            <button
+              onClick={() => setActiveCategory("mediathek")}
+              className={`px-4 py-2 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 ${
+                activeCategory === "mediathek"
+                  ? "bg-white text-black"
+                  : "bg-zinc-900 text-zinc-400 hover:text-white"
+              }`}
+            >
+              Mediathek
+            </button>
 
-          {/* Избранное (Общее) - строго иконка и бейдж счетчика */}
-          <button
-            onClick={() => setActiveCategory("favorites")}
-            className={`px-3.5 py-2 rounded-full text-xs font-semibold transition-all flex items-center gap-2 border cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
-              activeCategory === "favorites"
-                ? "bg-amber-500 text-black border-amber-400 shadow-lg shadow-amber-500/20"
-                : "bg-zinc-900 text-zinc-300 hover:text-white border-zinc-800 hover:border-amber-500/40"
-            }`}
-            title="Избранное"
-          >
-            <Bookmark
-              size={15}
-              className={activeCategory === "favorites" ? "fill-black text-black" : "text-amber-400"}
-            />
-            {favorites.length > 0 && (
-              <span
-                className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold ${
-                  activeCategory === "favorites"
-                    ? "bg-black text-amber-400"
-                    : "bg-amber-500/20 text-amber-300"
-                }`}
-              >
-                {favorites.length}
-              </span>
-            )}
-          </button>
+            {/* Избранное (Общее) - строго иконка и бейдж счетчика */}
+            <button
+              onClick={() => setActiveCategory("favorites")}
+              className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-2 cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] transition-colors duration-200 ${
+                activeCategory === "favorites"
+                  ? "bg-amber-500 text-black border border-amber-400 shadow-lg shadow-amber-500/20"
+                  : "bg-zinc-900 text-zinc-300 hover:text-white border border-zinc-800 hover:border-amber-500/40"
+              }`}
+              title="Избранное"
+            >
+              <Bookmark
+                size={15}
+                className={activeCategory === "favorites" ? "fill-black text-black" : "text-amber-400"}
+              />
+              {favorites.length > 0 && (
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold ${
+                    activeCategory === "favorites"
+                      ? "bg-black text-amber-400"
+                      : "bg-amber-500/20 text-amber-300"
+                  }`}
+                >
+                  {favorites.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
-      </div>
 
       {/* RENDER ACTIVE TOP CATEGORY */}
       {activeCategory === "favorites" ? (
@@ -591,13 +591,13 @@ export default function YouTubeCatalogPage() {
           <div className="max-w-3xl mx-auto mb-6 pt-2">
             <form
               onSubmit={handleSearchOrWatch}
-              className={`relative bg-zinc-900/90 border rounded-full px-4 py-2.5 flex items-center gap-2.5 transition-all duration-500 shadow-xl select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+              className={`relative bg-zinc-900/90 border rounded-full px-4 py-2 flex items-center gap-2 transition-all duration-500 select-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] ${
                 activeTab === "easy_german"
-                  ? "border-zinc-800/80 focus-within:border-emerald-500/50 shadow-emerald-950/20"
-                  : "border-zinc-800 focus-within:border-zinc-500 shadow-xl"
+                  ? "border-zinc-800/80 focus-within:border-emerald-500/50"
+                  : "border-zinc-800 focus-within:border-zinc-500"
               }`}
             >
-              <Search className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+              <Search size={17} className="text-zinc-500 ml-3 flex-shrink-0" />
               <input
                 type="text"
                 value={searchInput}
@@ -605,21 +605,21 @@ export default function YouTubeCatalogPage() {
                   setSearchInput(e.target.value);
                   if (inputError) setInputError(null);
                 }}
-                placeholder="Поиск..."
-                className="bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-500 outline-none w-full"
+                placeholder=""
+                className="bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-500 outline-none w-full px-2"
               />
               {searchInput && (
                 <button
                   type="button"
                   onClick={() => setSearchInput("")}
-                  className="text-zinc-500 hover:text-white p-0.5 cursor-pointer outline-none [-webkit-tap-highlight-color:transparent]"
+                  className="text-zinc-500 hover:text-white p-0.5 cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent]"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
               <button
                 type="submit"
-                className={`hidden sm:inline-block px-5 py-2.5 rounded-full text-xs font-semibold text-white transition-all duration-500 select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
+                className={`hidden sm:inline-block px-5 py-2.5 rounded-full text-xs font-semibold text-white transition-all duration-500 cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] ${
                   activeTab === "easy_german"
                     ? "bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-950/50"
                     : "bg-red-600 hover:bg-red-700 shadow-lg shadow-red-950/40"
@@ -644,10 +644,10 @@ export default function YouTubeCatalogPage() {
                 {/* Таб 1: Рекомендации */}
                 <button
                   onClick={() => setActiveTab("recommendations")}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-500 outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+                  className={`px-4 py-2 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
                     activeTab === "recommendations"
                       ? "bg-red-600 text-white shadow-lg shadow-red-950/40"
-                      : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+                      : "bg-zinc-900 text-zinc-400 hover:text-white"
                   }`}
                 >
                   Рекомендации
@@ -656,10 +656,10 @@ export default function YouTubeCatalogPage() {
                 {/* Таб 2: Подписки с бейджем количества каналов */}
                 <button
                   onClick={() => setActiveTab("subscriptions")}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-500 outline-none flex items-center gap-2 select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+                  className={`px-4 py-2 rounded-full text-xs font-semibold outline-none flex items-center gap-2 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
                     activeTab === "subscriptions"
                       ? "bg-red-600 text-white shadow-lg shadow-red-950/40"
-                      : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+                      : "bg-zinc-900 text-zinc-400 hover:text-white"
                   }`}
                 >
                   <span>Подписки</span>
@@ -677,9 +677,9 @@ export default function YouTubeCatalogPage() {
                 {/* Таб 3: Easy German */}
                 <button
                   onClick={() => setActiveTab("easy_german")}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-500 outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
+                  className={`px-4 py-2 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
                     activeTab === "easy_german"
-                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/60 ring-1 ring-emerald-400/40"
+                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/60"
                       : "bg-zinc-900/90 text-zinc-400 hover:text-white border border-zinc-800 hover:border-emerald-500/30"
                   }`}
                 >
@@ -699,7 +699,7 @@ export default function YouTubeCatalogPage() {
                           <button
                             key={lvl.id}
                             onClick={() => handleLevelChange(lvl.id)}
-                            className={`px-3 py-1 text-xs rounded-full transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+                            className={`px-3 py-1 text-xs rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
                               isActive
                                 ? "bg-white text-black font-semibold"
                                 : "text-zinc-400 hover:text-white"
@@ -716,7 +716,7 @@ export default function YouTubeCatalogPage() {
                   <button
                     onClick={handleRefresh}
                     disabled={isRefreshing || isLoadingRec || isLoadingSubs}
-                    className="p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] disabled:opacity-50 cursor-pointer shadow"
+                    className="p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] transition-colors duration-200 disabled:opacity-50 cursor-pointer shadow"
                     title="Обновить"
                   >
                     <RotateCw
@@ -736,10 +736,10 @@ export default function YouTubeCatalogPage() {
                   </span>
                   <button
                     onClick={() => setSelectedSubscribedChannel("ALL")}
-                    className={`px-3 py-1 rounded-full text-xs transition outline-none cursor-pointer whitespace-nowrap select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+                    className={`px-3 py-1 rounded-full text-xs outline-none cursor-pointer whitespace-nowrap focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 ${
                       selectedSubscribedChannel === "ALL"
                         ? "bg-white text-black font-semibold"
-                        : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+                        : "bg-zinc-900 text-zinc-400 hover:text-white"
                     }`}
                   >
                     Все каналы
@@ -748,10 +748,10 @@ export default function YouTubeCatalogPage() {
                     <button
                       key={ch.id}
                       onClick={() => setSelectedSubscribedChannel(ch.id)}
-                      className={`px-3 py-1 rounded-full text-xs transition outline-none cursor-pointer whitespace-nowrap select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+                      className={`px-3 py-1 rounded-full text-xs outline-none cursor-pointer whitespace-nowrap focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 ${
                         selectedSubscribedChannel === ch.id
                           ? "bg-white text-black font-semibold"
-                          : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+                          : "bg-zinc-900 text-zinc-400 hover:text-white"
                       }`}
                     >
                       {ch.name}
@@ -762,7 +762,7 @@ export default function YouTubeCatalogPage() {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button
                     onClick={() => setIsManageModalOpen(true)}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold cursor-pointer shadow transition active:scale-95 select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold cursor-pointer shadow transition active:scale-95 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent]"
                   >
                     <Plus size={14} />
                     <span>Добавить канал</span>

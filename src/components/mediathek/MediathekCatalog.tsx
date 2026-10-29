@@ -329,10 +329,10 @@ export default function MediathekCatalog() {
             <button
               key={cat.id}
               onClick={() => handleCategoryChange(cat.id as CategoryType)}
-              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
                 category === cat.id
                   ? "bg-red-600 text-white shadow-md"
-                  : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+                  : "bg-zinc-900 text-zinc-400 hover:text-white"
               }`}
             >
               {cat.label}
@@ -354,7 +354,7 @@ export default function MediathekCatalog() {
               <button
                 key={lvl.id}
                 onClick={() => handleLevelChange(lvl.id as LevelType)}
-                className={`px-3 py-1 text-xs rounded-full transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+                className={`px-3 py-1 text-xs rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
                   level === lvl.id
                     ? "bg-white text-black font-semibold"
                     : "text-zinc-400 hover:text-white"
@@ -369,7 +369,7 @@ export default function MediathekCatalog() {
           <button
             onClick={handleRefresh}
             disabled={isLoading}
-            className="p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] disabled:opacity-40"
+            className="p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] transition-colors duration-200 disabled:opacity-40 cursor-pointer"
             title="Обновить"
           >
             <RotateCw className={`w-4 h-4 text-red-500 ${isLoading ? "animate-spin" : ""}`} />

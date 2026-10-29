@@ -66,11 +66,9 @@ function NavbarContent() {
             <Link 
               href="/youtube" 
               onClick={() => setSearchTerm('')} 
-              className="group flex items-center gap-1.5 text-base md:text-[14px] font-medium text-zinc-300 hover:text-white transition-colors cursor-pointer"
+              className="text-red-600 hover:text-red-500 font-bold tracking-wide text-sm transition-all duration-200 select-none outline-none [-webkit-tap-highlight-color:transparent]"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-red-600 group-hover:shadow-[0_0_8px_#E50914] transition-all" />
-              <span>YouTube</span>
-              <span className="text-[10px] font-bold tracking-wider px-1 py-0.2 rounded bg-zinc-800 text-red-500 border border-red-900/40">DE</span>
+              YouTube
             </Link>
           </div>
         </div>
@@ -118,11 +116,9 @@ function NavbarContent() {
           <Link 
             href="/youtube" 
             onClick={() => { setSearchTerm(''); setMobileMenuOpen(false); }} 
-            className="group flex items-center gap-2 text-base font-medium text-zinc-300 hover:text-white transition-colors cursor-pointer py-1"
+            className="text-red-600 hover:text-red-500 font-bold tracking-wide text-sm transition-all duration-200 select-none outline-none [-webkit-tap-highlight-color:transparent] py-1"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-red-600 group-hover:shadow-[0_0_8px_#E50914] transition-all" />
-            <span>YouTube</span>
-            <span className="text-[10px] font-bold tracking-wider px-1 py-0.2 rounded bg-zinc-800 text-red-500 border border-red-900/40">DE</span>
+            YouTube
           </Link>
         </div>
       </div>

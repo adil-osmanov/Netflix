@@ -89,10 +89,10 @@ export default function EasyGermanCard({
           </button>
         </div>
 
-        {/* Всплывающая красная кнопка Play по центру при наведении */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-12 h-12 bg-red-600/90 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-lg translate-y-2 group-hover:translate-y-0">
-            <Play className="w-5 h-5 fill-current ml-0.5" />
+        {/* Всплывающая кнопка Play при наведении */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+          <div className="w-12 h-12 rounded-full bg-emerald-500 text-black flex items-center justify-center shadow-xl shadow-emerald-950/60 transform group-hover:scale-110 transition-transform duration-300">
+            <Play className="fill-black ml-0.5" size={22} />
           </div>
         </div>
 

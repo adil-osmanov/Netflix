@@ -175,10 +175,10 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
           <button
             type="button"
             onClick={() => setSelectedLevel("B1")}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
               selectedLevel === "B1"
                 ? "bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-950/50"
-                : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+                : "bg-zinc-900 text-zinc-400 hover:text-white"
             }`}
           >
             B1
@@ -188,10 +188,10 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
           <button
             type="button"
             onClick={() => setSelectedLevel("B2")}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
               selectedLevel === "B2"
                 ? "bg-sky-600 text-white font-bold shadow-lg shadow-sky-950/50"
-                : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+                : "bg-zinc-900 text-zinc-400 hover:text-white"
             }`}
           >
             B2
@@ -201,34 +201,34 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
           <button
             type="button"
             onClick={() => setSelectedLevel("C1")}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
               selectedLevel === "C1"
-                ? "bg-red-600 text-white font-bold border border-red-600 shadow-md"
-                : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+                ? "bg-red-600 text-white font-bold shadow-md"
+                : "bg-zinc-900 text-zinc-400 hover:text-white"
             }`}
           >
             C1
           </button>
         </div>
 
-        {/* Центр: Счетчик прогресса в стиле Netflix (строго по центру) */}
+        {/* Центр: Счетчик прогресса в стиле Netflix (строго по центру с микро-эффектом свечения) */}
         <div className="flex-1 max-w-xs mx-auto flex flex-col items-center">
           <span className="text-[11px] text-zinc-400 font-medium mb-1">
             {watchedCount} из {totalCount} • {progressPercent}%
           </span>
           <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-emerald-500 transition-all duration-300" 
+              className="h-full bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-300" 
               style={{ width: `${progressPercent}%` }}
             />
           </div>
         </div>
 
-        {/* Правая часть: Кнопка «+ Видео» */}
+        {/* Правая часть: Кнопка «+ Видео» с мягким градиентом */}
         <button
           type="button"
           onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition-all duration-300 shadow-md shadow-emerald-950/50 cursor-pointer flex-shrink-0 select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
+          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-b from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-medium text-xs transition-all duration-300 shadow-md shadow-emerald-950/50 border-t border-emerald-400/30 cursor-pointer flex-shrink-0 select-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent]"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Видео</span>
