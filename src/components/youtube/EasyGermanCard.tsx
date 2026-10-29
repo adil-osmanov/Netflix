@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Play, Check, Trash2 } from "lucide-react";
+import { Play, Check } from "lucide-react";
 import { EasyGermanVideo } from "@/types/youtube";
 
 interface EasyGermanCardProps {
@@ -10,7 +10,7 @@ interface EasyGermanCardProps {
   index?: number;
   onOpen: (video: EasyGermanVideo) => void;
   onToggleWatched: (youtubeId: string, e?: React.MouseEvent) => void;
-  onDelete: (videoId: string) => void;
+  onDelete?: (videoId: string) => void;
 }
 
 export default function EasyGermanCard({
@@ -59,25 +59,8 @@ export default function EasyGermanCard({
           {isWatched && <Check className="text-emerald-400" size={11} strokeWidth={3} />}
         </div>
 
-        {/* В правом верхнем углу: кнопка удаления и кнопка-галочка «Просмотрено» */}
-        <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
-          {/* Кнопка удаления ролика */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (confirm("Удалить это видео из списка?")) {
-                onDelete(video.id);
-              }
-            }}
-            className="p-1.5 rounded-lg bg-black/70 hover:bg-red-600/80 text-zinc-400 hover:text-white transition opacity-0 group-hover:opacity-100 cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
-            title="Удалить видео"
-          >
-            <Trash2 size={14} />
-          </button>
-
-          {/* Кнопка-галочка «Просмотрено» */}
+        {/* В правом верхнем углу: кнопка-галочка «Просмотрено» */}
+        <div className="absolute top-2.5 right-2.5 z-10">
           <button
             type="button"
             onClick={(e) => {
