@@ -7,6 +7,7 @@ import { EasyGermanVideo } from "@/types/youtube";
 interface EasyGermanCardProps {
   video: EasyGermanVideo;
   isWatched: boolean;
+  index?: number;
   onOpen: (video: EasyGermanVideo) => void;
   onToggleWatched: (youtubeId: string, e?: React.MouseEvent) => void;
   onDelete: (videoId: string) => void;
@@ -15,6 +16,7 @@ interface EasyGermanCardProps {
 export default function EasyGermanCard({
   video,
   isWatched,
+  index = 1,
   onOpen,
   onToggleWatched,
   onDelete,
@@ -45,15 +47,20 @@ export default function EasyGermanCard({
           loading="lazy"
         />
 
-        {/* Если просмотрено: легкий изумрудный оверлей + плашка завершения в левом верхнем углу */}
-        {isWatched && (
+        {/* Левый верхний угол: номерной бейдж серии (#01, #02) или статус завершения */}
+        {isWatched ? (
           <>
             <div className="absolute inset-0 bg-emerald-950/20 pointer-events-none" />
-            <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-emerald-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md z-10">
-              <Check size={13} strokeWidth={3} />
-              <span>Выполнено</span>
+            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[11px] font-bold shadow-md flex items-center gap-1 z-10">
+              <Check size={12} strokeWidth={3} />
+              <span>#{String(index).padStart(2, "0")}</span>
             </div>
           </>
+        ) : (
+          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md border border-white/10 text-[11px] font-mono font-bold text-zinc-200 shadow-md flex items-center gap-1.5 z-10">
+            <span className="text-emerald-400">#</span>
+            <span>{String(index).padStart(2, "0")}</span>
+          </div>
         )}
 
         {/* В правом верхнем углу: кнопка удаления и кнопка-галочка «Просмотрено» */}

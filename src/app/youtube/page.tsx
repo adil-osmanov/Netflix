@@ -20,7 +20,6 @@ import InfiniteVideoFeed, { appendUniqueVideos } from "@/components/youtube/Infi
 import ManageChannelsModal, { SubscribedChannel } from "@/components/youtube/ManageChannelsModal";
 import EasyGermanCatalog from "@/components/youtube/EasyGermanCatalog";
 import MediathekCatalog from "@/components/mediathek/MediathekCatalog";
-import FullscreenToggle from "@/components/layout/FullscreenToggle";
 
 export type TopCategory = "youtube" | "mediathek" | "favorites";
 export type MainTab = "recommendations" | "subscriptions" | "easy_german";
@@ -571,9 +570,6 @@ export default function YouTubeCatalogPage() {
                 </span>
               )}
             </button>
-
-            {/* Кнопка Fullscreen рядом с Избранным */}
-            <FullscreenToggle />
           </div>
         </div>
 

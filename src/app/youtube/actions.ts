@@ -490,7 +490,7 @@ export async function addEasyGermanVideoAction(
       .maybeSingle();
     const current: EasyGermanVideo[] = Array.isArray(data?.value) ? data.value : [];
     const filtered = current.filter((v) => v.youtube_id !== video.youtube_id);
-    const updated = [video, ...filtered];
+    const updated = [...filtered, video];
     await supabase
       .from("global_settings")
       .upsert({ key: "easy_german_custom_videos", value: updated });

@@ -121,11 +121,11 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
     });
   };
 
-  // Добавление нового видео вручную
+  // Добавление нового видео вручную (строго в конец списка)
   const handleAddVideo = (newVideo: EasyGermanVideo) => {
     setCustomVideos((prev) => {
       const filtered = prev.filter((v) => v.youtube_id !== newVideo.youtube_id);
-      const updated = [newVideo, ...filtered];
+      const updated = [...filtered, newVideo];
       try {
         localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
       } catch {}
@@ -170,7 +170,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
       {/* Премиальный статус-блок Easy German */}
       <div className="relative z-10 mb-6 p-4 rounded-2xl bg-gradient-to-b from-zinc-900/60 to-zinc-950/80 border border-emerald-500/20 backdrop-blur-xl shadow-2xl shadow-emerald-950/20">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Левая часть: Уровни B1, B2, C1 в капсуле */}
+          {/* Левая часть: Уровни B1, B2, C1 в капсуле (все изумрудные при выборе) */}
           <div className="flex items-center gap-1.5 p-1 bg-black/50 rounded-xl border border-emerald-950/60">
             {(["B1", "B2", "C1"] as const).map((lvl) => (
               <button
@@ -178,9 +178,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
                 onClick={() => setSelectedLevel(lvl)}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
                   selectedLevel === lvl
-                    ? lvl === "C1"
-                      ? "bg-red-600 text-white shadow-md shadow-red-950/50"
-                      : "bg-emerald-500 text-black shadow-md shadow-emerald-950/50"
+                    ? "bg-emerald-500 text-black shadow-md shadow-emerald-950/50"
                     : "text-zinc-400 hover:text-white"
                 }`}
               >
@@ -191,14 +189,9 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
 
           {/* Центральная часть: Статус усвоения и неоновый прогресс */}
           <div className="flex-1 max-w-xs mx-auto flex flex-col items-center">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-[10px] tracking-wider uppercase font-extrabold text-emerald-400">
-                Lernfortschritt
-              </span>
-              <span className="text-xs font-mono font-bold text-zinc-300">
-                {watchedCount} / {totalCount}
-              </span>
-            </div>
+            <span className="text-xs font-mono font-bold text-zinc-300 mb-1.5">
+              {watchedCount} / {totalCount}
+            </span>
             <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden p-[1px] border border-zinc-800">
               <div
                 className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(16,185,129,0.7)]"
@@ -207,18 +200,18 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
             </div>
           </div>
 
-          {/* Правая часть: Кнопка «+ Видео» */}
+          {/* Правая часть: Кнопка «+ Видео» (без дублирования знака +) */}
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shadow-lg shadow-emerald-950/50 flex items-center gap-2 border border-emerald-400/20 active:scale-95 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shadow-lg shadow-emerald-950/50 flex items-center gap-1.5 border border-emerald-400/20 active:scale-95 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] cursor-pointer"
           >
             <Plus size={14} strokeWidth={2.5} />
-            <span>+ Видео</span>
+            <span>Видео</span>
           </button>
         </div>
       </div>
 
-      {/* Сетка карточек Easy German */}
+      {/* Сетка карточек Easy German с порядковой нумерацией (#01, #02...) */}
       {filteredVideos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-3 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl p-8 max-w-lg mx-auto">
           <Video className="w-10 h-10 text-zinc-600" />
@@ -229,10 +222,11 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-          {filteredVideos.map((video) => (
+          {filteredVideos.map((video, index) => (
             <EasyGermanCard
               key={video.id}
               video={video}
+              index={index + 1}
               isWatched={Boolean(video.is_watched)}
               onOpen={setActiveVideo}
               onToggleWatched={handleToggleWatched}
