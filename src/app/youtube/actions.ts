@@ -1,7 +1,7 @@
 "use server";
 
 import { supabase } from "@/utils/supabase";
-import { UserWord, YouTubeRecommendedVideo } from "@/types/youtube";
+import { UserWord, YouTubeRecommendedVideo, EasyGermanVideo } from "@/types/youtube";
 
 export async function saveWordAction(wordData: {
   word: string;
@@ -366,3 +366,136 @@ export async function removeFavoriteAction(videoId: string): Promise<{ success: 
   } catch {}
   return { success: true };
 }
+
+/**
+ * Easy German: получение просмотренных ID и добавленных пользователем видео из Supabase
+ */
+export async function getEasyGermanStateAction(): Promise<{
+  watchedIds: string[];
+  customVideos: EasyGermanVideo[];
+}> {
+  const watchedSet = new Set<string>();
+  const customMap = new Map<string, EasyGermanVideo>();
+
+  // 1. Попытка чтения из таблицы easy_german_watched
+  try {
+    const { data, error } = await supabase.from("easy_german_watched").select("*");
+    if (!error && Array.isArray(data)) {
+      for (const row of data) {
+        if (row.youtube_id && row.is_watched !== false) {
+          watchedSet.add(row.youtube_id);
+        }
+      }
+    }
+  } catch {}
+
+  // 2. Синхронизация из global_settings (easy_german_watched_ids)
+  try {
+    const { data } = await supabase
+      .from("global_settings")
+      .select("value")
+      .eq("key", "easy_german_watched_ids")
+      .maybeSingle();
+    if (data?.value && Array.isArray(data.value)) {
+      for (const id of data.value) {
+        if (typeof id === "string") watchedSet.add(id);
+      }
+    }
+  } catch {}
+
+  // 3. Попытка чтения пользовательских видео из easy_german_videos / global_settings
+  try {
+    const { data } = await supabase
+      .from("global_settings")
+      .select("value")
+      .eq("key", "easy_german_custom_videos")
+      .maybeSingle();
+    if (data?.value && Array.isArray(data.value)) {
+      for (const v of data.value) {
+        if (v && v.youtube_id) {
+          customMap.set(v.youtube_id, v);
+        }
+      }
+    }
+  } catch {}
+
+  return {
+    watchedIds: Array.from(watchedSet),
+    customVideos: Array.from(customMap.values()),
+  };
+}
+
+/**
+ * Easy German: переключение статуса is_watched в Supabase
+ */
+export async function toggleEasyGermanWatchedAction(
+  youtubeId: string,
+  isWatched: boolean
+): Promise<{ success: boolean }> {
+  try {
+    if (isWatched) {
+      await supabase.from("easy_german_watched").upsert({
+        youtube_id: youtubeId,
+        is_watched: true,
+        updated_at: new Date().toISOString(),
+      });
+    } else {
+      await supabase.from("easy_german_watched").delete().eq("youtube_id", youtubeId);
+    }
+  } catch {}
+
+  try {
+    const { data } = await supabase
+      .from("global_settings")
+      .select("value")
+      .eq("key", "easy_german_watched_ids")
+      .maybeSingle();
+    let current: string[] = Array.isArray(data?.value) ? data.value : [];
+    if (isWatched) {
+      if (!current.includes(youtubeId)) current = [youtubeId, ...current];
+    } else {
+      current = current.filter((id) => id !== youtubeId);
+    }
+    await supabase
+      .from("global_settings")
+      .upsert({ key: "easy_german_watched_ids", value: current });
+  } catch {}
+
+  return { success: true };
+}
+
+/**
+ * Easy German: сохранение нового ролика в Supabase
+ */
+export async function addEasyGermanVideoAction(
+  video: EasyGermanVideo
+): Promise<{ success: boolean }> {
+  try {
+    await supabase.from("easy_german_videos").insert({
+      id: video.id,
+      youtube_id: video.youtube_id,
+      title: video.title,
+      level: video.level,
+      duration_str: video.duration_str || "",
+      is_watched: Boolean(video.is_watched),
+      created_at: video.created_at || new Date().toISOString(),
+    });
+  } catch {}
+
+  try {
+    const { data } = await supabase
+      .from("global_settings")
+      .select("value")
+      .eq("key", "easy_german_custom_videos")
+      .maybeSingle();
+    const current: EasyGermanVideo[] = Array.isArray(data?.value) ? data.value : [];
+    const filtered = current.filter((v) => v.youtube_id !== video.youtube_id);
+    const updated = [video, ...filtered];
+    await supabase
+      .from("global_settings")
+      .upsert({ key: "easy_german_custom_videos", value: updated });
+  } catch {}
+
+  return { success: true };
+}
+

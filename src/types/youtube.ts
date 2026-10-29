@@ -16,6 +16,16 @@ export interface YouTubeRecommendedVideo {
   published?: string;
 }
 
+export interface EasyGermanVideo {
+  id: string;              // уникальный ID записи
+  youtube_id: string;      // 11 символов ID YouTube
+  title: string;           // название
+  level: 'B1' | 'B2' | 'C1';
+  duration_str?: string;   // например, "14:20"
+  is_watched?: boolean;    // статус просмотра
+  created_at?: string;
+}
+
 export interface UserWord {
   id?: string;
   word: string;

@@ -20,10 +20,11 @@ import { YouTubeRecommendedVideo } from "@/types/youtube";
 import { useYouTube } from "@/context/YouTubeContext";
 import VideoCard from "@/components/youtube/VideoCard";
 import ManageChannelsModal, { SubscribedChannel } from "@/components/youtube/ManageChannelsModal";
+import EasyGermanCatalog from "@/components/youtube/EasyGermanCatalog";
 import MediathekCatalog from "@/components/mediathek/MediathekCatalog";
 
 export type TopCategory = "youtube" | "mediathek" | "favorites";
-export type MainTab = "recommendations" | "subscriptions";
+export type MainTab = "recommendations" | "subscriptions" | "easy_german";
 
 const DEFAULT_SUBSCRIPTIONS: SubscribedChannel[] = [
   { id: "UCbxb2fqe9oNgglAoYqsYOtQ", name: "Easy German" },
@@ -532,7 +533,7 @@ export default function YouTubeCatalogPage() {
             )}
           </div>
 
-          {/* YouTube Подменю: Только [ Рекомендации B1–B2 ] и [ Мои подписки ] */}
+          {/* YouTube Подменю: [ Рекомендации B1–B2 ] [ Мои подписки ] [ Easy German ] */}
           <div className="max-w-7xl mx-auto mb-6">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
               <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -568,58 +569,72 @@ export default function YouTubeCatalogPage() {
                     {subscriptions.length}
                   </span>
                 </button>
-              </div>
 
-              {/* Controls right side */}
-              <div className="flex items-center gap-2 sm:gap-3">
-                {/* Contextual Filters: Recommendations Difficulty (B1 / B2) */}
-                {activeTab === "recommendations" && (
-                  <div className="flex items-center gap-1 bg-zinc-900/90 p-1 rounded-full border border-zinc-800">
-                    <button
-                      onClick={() => setSelectedLevel("ALL")}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                        selectedLevel === "ALL"
-                          ? "bg-white text-black shadow"
-                          : "text-zinc-400 hover:text-white"
-                      }`}
-                    >
-                      Все
-                    </button>
-                    <button
-                      onClick={() => setSelectedLevel("B1")}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                        selectedLevel === "B1"
-                          ? "bg-emerald-500 text-black shadow font-bold"
-                          : "text-zinc-400 hover:text-white"
-                      }`}
-                    >
-                      B1
-                    </button>
-                    <button
-                      onClick={() => setSelectedLevel("B2")}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                        selectedLevel === "B2"
-                          ? "bg-sky-500 text-black shadow font-bold"
-                          : "text-zinc-400 hover:text-white"
-                      }`}
-                    >
-                      B2
-                    </button>
-                  </div>
-                )}
-
-                {/* Refresh Feed Button */}
+                {/* Таб 3: Easy German */}
                 <button
-                  onClick={handleRefresh}
-                  disabled={isRefreshing || isLoadingRec || isLoadingSubs}
-                  className="p-2 rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition disabled:opacity-50 cursor-pointer shadow"
-                  title="Перемешать и обновить ленту"
+                  onClick={() => setActiveTab("easy_german")}
+                  className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm transition-all cursor-pointer ${
+                    activeTab === "easy_german"
+                      ? "bg-red-600 text-white font-semibold shadow-lg shadow-red-950/40"
+                      : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
+                  }`}
                 >
-                  <RotateCw
-                    className={`w-4 h-4 text-red-500 ${isRefreshing ? "animate-spin" : ""}`}
-                  />
+                  Easy German
                 </button>
               </div>
+
+              {/* Controls right side (only for Recommendations & Subscriptions) */}
+              {activeTab !== "easy_german" && (
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {/* Contextual Filters: Recommendations Difficulty (B1 / B2) */}
+                  {activeTab === "recommendations" && (
+                    <div className="flex items-center gap-1 bg-zinc-900/90 p-1 rounded-full border border-zinc-800">
+                      <button
+                        onClick={() => setSelectedLevel("ALL")}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                          selectedLevel === "ALL"
+                            ? "bg-white text-black shadow"
+                            : "text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        Все
+                      </button>
+                      <button
+                        onClick={() => setSelectedLevel("B1")}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                          selectedLevel === "B1"
+                            ? "bg-emerald-500 text-black shadow font-bold"
+                            : "text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        B1
+                      </button>
+                      <button
+                        onClick={() => setSelectedLevel("B2")}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                          selectedLevel === "B2"
+                            ? "bg-sky-500 text-black shadow font-bold"
+                            : "text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        B2
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Refresh Feed Button */}
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing || isLoadingRec || isLoadingSubs}
+                    className="p-2 rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition disabled:opacity-50 cursor-pointer shadow"
+                    title="Перемешать и обновить ленту"
+                  >
+                    <RotateCw
+                      className={`w-4 h-4 text-red-500 ${isRefreshing ? "animate-spin" : ""}`}
+                    />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Subscriptions sub-bar */}
@@ -669,8 +684,10 @@ export default function YouTubeCatalogPage() {
 
           {/* Main Video Feed Area */}
           <div className="max-w-7xl mx-auto">
-            {((activeTab === "subscriptions" && isLoadingSubs && subVideos.length === 0) ||
-              (activeTab === "recommendations" && isLoadingRec && recommendations.length === 0)) ? (
+            {activeTab === "easy_german" ? (
+              <EasyGermanCatalog searchQuery={isSearchQuery ? searchInput : ""} />
+            ) : (activeTab === "subscriptions" && isLoadingSubs && subVideos.length === 0) ||
+              (activeTab === "recommendations" && isLoadingRec && recommendations.length === 0) ? (
               <div className="py-24 flex flex-col items-center justify-center gap-3 text-zinc-400">
                 <Loader2 className="w-8 h-8 animate-spin text-[#E50914]" />
                 <span className="text-sm font-medium">Загрузка свежих видео из немецких каналов...</span>
@@ -704,7 +721,7 @@ export default function YouTubeCatalogPage() {
                 )}
               </div>
             ) : (
-              /* Video Grid (Strictly non-Shorts, >= 4 min, deduplicated) */
+              /* Video Grid (Strictly non-Shorts, >= 10 min, deduplicated) */
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                   {uniqueVideos.map((video) => (
