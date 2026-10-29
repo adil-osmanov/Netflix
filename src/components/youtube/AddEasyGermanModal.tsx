@@ -8,7 +8,7 @@ import { fetchYouTubeVideoMetadataAction } from "@/app/youtube/actions";
 interface AddEasyGermanModalProps {
   isOpen: boolean;
   onClose: () => void;
-  level: "A1" | "A2" | "B1" | "B2" | "C1";
+  level: "B1" | "B2" | "C1";
   onAddVideo: (video: EasyGermanVideo) => void;
 }
 
@@ -28,7 +28,6 @@ export default function AddEasyGermanModal({
   onAddVideo,
 }: AddEasyGermanModalProps) {
   const [urlOrId, setUrlOrId] = useState("");
-  const [customTitle, setCustomTitle] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,7 +62,7 @@ export default function AddEasyGermanModal({
 
     setIsLoading(true);
     try {
-      let resolvedTitle = customTitle.trim();
+      let resolvedTitle = "";
       let resolvedDuration = "";
 
       // Пытаемся получить метаданные с таймаутом, чтобы не блокировать сохранение при сетевых задержках
@@ -74,7 +73,7 @@ export default function AddEasyGermanModal({
             setTimeout(() => reject(new Error("Timeout")), 3000)
           ),
         ]);
-        if (!resolvedTitle && meta?.title) {
+        if (meta?.title) {
           resolvedTitle = meta.title;
         }
         if (meta?.duration_str) {
@@ -98,7 +97,6 @@ export default function AddEasyGermanModal({
 
       // Сброс формы и закрытие
       setUrlOrId("");
-      setCustomTitle("");
       onClose();
     } catch (err: any) {
       setError(err?.message || "Ошибка при добавлении видео");
@@ -140,7 +138,7 @@ export default function AddEasyGermanModal({
             </div>
           )}
 
-          {/* Поле ввода: Ссылка или ID YouTube */}
+          {/* Единственное поле ввода: Ссылка на YouTube */}
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-zinc-300">
               Ссылка на YouTube
@@ -172,21 +170,6 @@ export default function AddEasyGermanModal({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Поле ввода: Название (необязательно) */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-zinc-300">
-              Название (необязательно)
-            </label>
-            <input
-              type="text"
-              value={customTitle}
-              disabled={isLoading}
-              onChange={(e) => setCustomTitle(e.target.value)}
-              placeholder="Оставьте пустым для автоопределения"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-emerald-500 text-sm text-white placeholder:text-zinc-500 outline-none transition disabled:opacity-50"
-            />
           </div>
 
           {/* Кнопка сохранения */}

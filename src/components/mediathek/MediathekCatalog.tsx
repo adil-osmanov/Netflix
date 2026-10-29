@@ -284,36 +284,34 @@ export default function MediathekCatalog() {
   return (
     <div className="w-full">
       {/* Поисковая строка для медиатек */}
-      <div className="max-w-3xl mx-auto mb-6">
-        <form
-          onSubmit={handleSearchSubmit}
-          className="relative bg-zinc-900/90 border border-zinc-800 rounded-full px-4 py-2.5 flex items-center gap-2.5 focus-within:border-zinc-500 transition-all shadow-xl select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
-        >
-          <Search className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Поиск..."
-            className="bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-500 outline-none w-full"
-          />
-          {searchInput && (
-            <button
-              type="button"
-              onClick={handleClearSearch}
-              className="text-zinc-500 hover:text-white p-0.5 cursor-pointer outline-none [-webkit-tap-highlight-color:transparent]"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+      <form
+        onSubmit={handleSearchSubmit}
+        className="max-w-2xl mx-auto mb-6 relative bg-zinc-900/80 border border-zinc-800/80 rounded-full p-1.5 flex items-center shadow-lg focus-within:border-zinc-700 select-none outline-none [-webkit-tap-highlight-color:transparent]"
+      >
+        <Search size={18} className="text-zinc-500 ml-3.5 shrink-0" />
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Поиск передач и фильмов Mediathek..."
+          className="bg-transparent border-0 text-white placeholder-zinc-500 text-sm focus:outline-none flex-1 px-3"
+        />
+        {searchInput && (
           <button
-            type="submit"
-            className="hidden sm:inline-block bg-red-600 hover:bg-red-700 text-white font-medium text-xs px-5 py-2.5 rounded-full transition-colors cursor-pointer shadow select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
+            type="button"
+            onClick={handleClearSearch}
+            className="text-zinc-500 hover:text-white mr-2 p-1 cursor-pointer outline-none [-webkit-tap-highlight-color:transparent]"
           >
-            Поиск
+            <X className="w-3.5 h-3.5" />
           </button>
-        </form>
-      </div>
+        )}
+        <button
+          type="submit"
+          className="px-5 py-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold transition cursor-pointer select-none outline-none focus:outline-none [-webkit-tap-highlight-color:transparent]"
+        >
+          Поиск
+        </button>
+      </form>
 
       {/* Панель управления в одну строку (One-Row Layout) */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">

@@ -495,11 +495,11 @@ export default function YouTubeCatalogPage() {
 
   return (
     <div className="relative min-h-screen bg-black text-white pb-24 px-4 md:px-12 pt-1 transition-colors duration-500 overflow-x-hidden">
-      {/* Потолочный рассеянный свет Easy German */}
+      {/* Потолочный изумрудный свет (Ambient Ceiling Glow) */}
       <div 
-        className={`fixed -top-48 left-1/2 -translate-x-1/2 w-[900px] h-[320px] pointer-events-none transition-opacity duration-700 ease-out z-0 blur-[130px] ${
+        className={`fixed -top-40 left-1/2 -translate-x-1/2 w-[1000px] h-[380px] pointer-events-none transition-opacity duration-700 ease-out z-0 blur-[130px] ${
           activeCategory === "youtube" && activeTab === "easy_german"
-            ? "opacity-25 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.6),transparent_75%)]"
+            ? "opacity-30 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.7),transparent_75%)]"
             : "opacity-0"
         }`}
       />
@@ -547,28 +547,18 @@ export default function YouTubeCatalogPage() {
             {/* Избранное (Общее) - строго иконка и бейдж счетчика */}
             <button
               onClick={() => setActiveCategory("favorites")}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] transition-all duration-200 ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors duration-200 flex items-center gap-1.5 outline-none select-none [-webkit-tap-highlight-color:transparent] active:scale-95 cursor-pointer ${
                 activeCategory === "favorites"
                   ? "bg-[#E50914] text-white shadow-lg shadow-red-950/60"
-                  : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
+                  : "bg-zinc-900/80 text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800"
               }`}
               title="Избранное"
             >
               <Bookmark
-                size={15}
+                size={13}
                 className={activeCategory === "favorites" ? "fill-white text-white" : "text-zinc-400"}
               />
-              {favorites.length > 0 && (
-                <span
-                  className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold ${
-                    activeCategory === "favorites"
-                      ? "bg-black/40 text-white"
-                      : "bg-zinc-800 text-zinc-300"
-                  }`}
-                >
-                  {favorites.length}
-                </span>
-              )}
+              <span>{favorites.length}</span>
             </button>
           </div>
         </div>
