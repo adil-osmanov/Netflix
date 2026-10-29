@@ -2,9 +2,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
-  Search, 
-  X, 
-  AlertCircle, 
   Loader2, 
   RotateCw,
   Video,
@@ -12,7 +9,7 @@ import {
   Tv,
   Plus
 } from "lucide-react";
-import { extractYouTubeId } from "@/data/youtubeVideos";
+import { NetflixLogo } from "@/components/common/NetflixLogo";
 import { YouTubeRecommendedVideo } from "@/types/youtube";
 import { useYouTube } from "@/context/YouTubeContext";
 import VideoCard from "@/components/youtube/VideoCard";
@@ -141,9 +138,6 @@ export default function YouTubeCatalogPage() {
   // Подвкладки YouTube: 'recommendations' | 'subscriptions' | 'easy_german'
   const [activeTab, setActiveTab] = useState<MainTab>("recommendations");
 
-  // Search & Direct Watch
-  const [searchInput, setSearchInput] = useState<string>("");
-  const [inputError, setInputError] = useState<string | null>(null);
 
   // Recommendations: Difficulty Level Filter: 'ALL' | 'A1' | 'A2' | 'B1' | 'B2' | 'C1'
   const [selectedLevel, setSelectedLevel] = useState<LevelType>("ALL");
@@ -407,19 +401,6 @@ export default function YouTubeCatalogPage() {
     setIsRefreshing(false);
   };
 
-  // Search input handler
-  const handleSearchOrWatch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = searchInput.trim();
-    if (!trimmed) return;
-
-    const directId = extractYouTubeId(trimmed);
-    if (directId) {
-      window.location.href = `https://www.youtube.com/watch?v=${directId}`;
-      return;
-    }
-  };
-
   // Channel management callbacks
   const handleAddChannel = (channel: SubscribedChannel) => {
     const updated = [...subscriptions.filter((s) => s.id !== channel.id), channel];
@@ -439,20 +420,8 @@ export default function YouTubeCatalogPage() {
   const baseVideos = activeTab === "recommendations" ? recommendations : subVideos;
   const minDurSec = activeTab === "subscriptions" ? 200 : 600;
 
-  // Filter YouTube videos
-  const query = searchInput.trim().toLowerCase();
-  const isSearchQuery = query.length > 0 && !extractYouTubeId(searchInput.trim());
-
   const currentVideos = baseVideos.filter((video) => {
     if (isYouTubeShort(video, minDurSec)) return false;
-
-    const matchesSearch =
-      !isSearchQuery ||
-      (video.title || "").toLowerCase().includes(query) ||
-      (video.channel || "").toLowerCase().includes(query) ||
-      (video.description || "").toLowerCase().includes(query);
-
-    if (!matchesSearch) return false;
 
     if (activeTab === "recommendations") {
       return selectedLevel === "ALL" || video.level === selectedLevel;
@@ -592,56 +561,6 @@ export default function YouTubeCatalogPage() {
         <MediathekCatalog />
       ) : (
         <>
-          {/* Top Controls: Centered Clean Search Bar */}
-          <div className="max-w-2xl mx-auto my-5 px-4 sm:px-0">
-            <form
-              onSubmit={handleSearchOrWatch}
-              className="relative flex items-center w-full h-[50px] bg-zinc-900/80 border border-zinc-800/80 rounded-full pl-4 pr-1.5 shadow-lg backdrop-blur-md focus-within:border-zinc-700 transition-all select-none outline-none [-webkit-tap-highlight-color:transparent]"
-            >
-              <Search className="text-zinc-500 shrink-0 mr-3" size={18} />
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => {
-                  setSearchInput(e.target.value);
-                  if (inputError) setInputError(null);
-                }}
-                placeholder={
-                  activeTab === "easy_german"
-                    ? "Поиск по урокам Easy German..."
-                    : "Поиск видео YouTube..."
-                }
-                className="w-full bg-transparent border-none text-white text-sm placeholder-zinc-500 focus:outline-none"
-              />
-              {searchInput && (
-                <button
-                  type="button"
-                  onClick={() => setSearchInput("")}
-                  className="text-zinc-500 hover:text-white mr-2 p-1 cursor-pointer outline-none [-webkit-tap-highlight-color:transparent]"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-              <button
-                type="submit"
-                className={`h-[38px] px-6 rounded-full text-white text-xs font-bold tracking-wide transition-all shadow-md active:scale-95 shrink-0 cursor-pointer select-none outline-none focus:outline-none [-webkit-tap-highlight-color:transparent] ${
-                  activeTab === "easy_german"
-                    ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50"
-                    : "bg-[#E50914] hover:bg-[#b81d24]"
-                }`}
-              >
-                Поиск
-              </button>
-            </form>
-
-            {inputError && (
-              <div className="flex items-center gap-1.5 text-red-400 text-xs mt-2 px-3">
-                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>{inputError}</span>
-              </div>
-            )}
-          </div>
-
           {/* YouTube Подменю: [ Рекомендации ] [ Подписки ] [ Easy German ] */}
           <div className="max-w-7xl mx-auto mb-6">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
@@ -778,7 +697,7 @@ export default function YouTubeCatalogPage() {
           {/* Main Video Feed Area */}
           <div className="max-w-7xl mx-auto">
             {activeTab === "easy_german" ? (
-              <EasyGermanCatalog searchQuery={isSearchQuery ? searchInput : ""} />
+              <EasyGermanCatalog />
             ) : (activeTab === "subscriptions" && isLoadingSubs && subVideos.length === 0) ||
               (activeTab === "recommendations" && isLoadingRec && recommendations.length === 0) ? (
               <div className="py-24 flex flex-col items-center justify-center gap-3 text-zinc-400">
@@ -810,9 +729,7 @@ export default function YouTubeCatalogPage() {
                     <Video className="w-10 h-10 text-zinc-600" />
                     <h3 className="text-base font-bold text-white">Видео не найдены</h3>
                     <p className="text-xs text-zinc-400 leading-relaxed">
-                      {isSearchQuery
-                        ? `По запросу «${searchInput}» ничего не найдено.`
-                        : "В каталоге пока нет видео по выбранным критериям."}
+                      В каталоге пока нет видео по выбранным критериям.
                     </p>
                   </>
                 )}

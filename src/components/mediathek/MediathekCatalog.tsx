@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
-  Search, 
-  X, 
   Loader2, 
   Play, 
   Film, 
@@ -75,8 +73,6 @@ export default function MediathekCatalog() {
   const [items, setItems] = useState<MediathekMediaItem[]>([]);
   const [category, setCategory] = useState<CategoryType>("all");
   const [level, setLevel] = useState<LevelType>("ALL");
-  const [searchInput, setSearchInput] = useState<string>("");
-  const [activeQuery, setActiveQuery] = useState<string>("");
 
   const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
@@ -121,7 +117,7 @@ export default function MediathekCatalog() {
     } = {}) => {
       const catToUse = newCategory !== undefined ? newCategory : category;
       const lvlToUse = newLevel !== undefined ? newLevel : level;
-      const queryToUse = newQuery !== undefined ? newQuery : activeQuery;
+      const queryToUse = newQuery !== undefined ? newQuery : "";
 
       const requestId = ++activeRequestIdRef.current;
 
@@ -183,7 +179,7 @@ export default function MediathekCatalog() {
         }
       }
     },
-    [category, level, activeQuery, handleAppend]
+    [category, level, handleAppend]
   );
 
   // Первоначальная загрузка
@@ -219,25 +215,7 @@ export default function MediathekCatalog() {
     fetchMediaItems({ newOffset: 0, append: false });
   };
 
-  // Поиск
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = searchInput.trim();
-    setActiveQuery(trimmed);
-    setItems([]);
-    setOffset(0);
-    setHasMore(true);
-    fetchMediaItems({ newQuery: trimmed, newOffset: 0, append: false });
-  };
 
-  const handleClearSearch = () => {
-    setSearchInput("");
-    setActiveQuery("");
-    setItems([]);
-    setOffset(0);
-    setHasMore(true);
-    fetchMediaItems({ newQuery: "", newOffset: 0, append: false });
-  };
 
   // Подгрузка следующей пачки
   const loadMoreVideos = useCallback(() => {
@@ -283,38 +261,6 @@ export default function MediathekCatalog() {
 
   return (
     <div className="w-full">
-      {/* Поисковая строка для медиатек 1-в-1 с YouTube */}
-      <div className="max-w-2xl mx-auto my-5 px-4 sm:px-0">
-        <form
-          onSubmit={handleSearchSubmit}
-          className="relative flex items-center w-full h-[50px] bg-zinc-900/80 border border-zinc-800/80 rounded-full pl-4 pr-1.5 shadow-lg backdrop-blur-md focus-within:border-zinc-700 transition-all select-none outline-none [-webkit-tap-highlight-color:transparent]"
-        >
-          <Search className="text-zinc-500 shrink-0 mr-3" size={18} />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Поиск передач и фильмов Mediathek..."
-            className="w-full bg-transparent border-none text-white text-sm placeholder-zinc-500 focus:outline-none"
-          />
-          {searchInput && (
-            <button
-              type="button"
-              onClick={handleClearSearch}
-              className="text-zinc-500 hover:text-white mr-2 p-1 cursor-pointer outline-none [-webkit-tap-highlight-color:transparent]"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-          <button
-            type="submit"
-            className="h-[38px] px-6 rounded-full bg-[#E50914] hover:bg-[#b81d24] text-white text-xs font-bold tracking-wide transition-all shadow-md active:scale-95 shrink-0 cursor-pointer select-none outline-none focus:outline-none [-webkit-tap-highlight-color:transparent]"
-          >
-            Поиск
-          </button>
-        </form>
-      </div>
-
       {/* Панель управления в одну строку (One-Row Layout) */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         {/* Категории слева */}
