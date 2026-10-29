@@ -35,6 +35,13 @@ const CATEGORY_EXPANSION_KEYWORDS: Record<string, string[]> = {
   ],
 };
 
+// Специфические ключевые слова под начальные уровни A1 и A2 для поиска в медиатеке
+const LEVEL_KEYWORDS_EXTRA: Record<string, string[]> = {
+  A1: ['Die Sendung mit der Maus', 'Maus', 'Elefant', 'Kinder'],
+  A2: ['logo!', 'Nachrichten für Kinder', 'Tiere', 'Märchen', 'Wissen'],
+  C1: ['Arte Kino', 'Philosophie', 'Debatte', 'Kulturzeit', 'Aspekte'],
+};
+
 // Черный список: новости, ток-шоу, тифлокомментарии, оригинальные иноязычные дорожки, мыльные оперы
 const TRASH_REGEX =
   /(tagesschau|heute-journal|heute journal|nachrichten|wetter|presseclub|talkshow|maischberger|markus lanz|hart aber fair|illner|kölner treff|riverboat|landesschau|abendschau|gottesdienst|audiodeskription|hörfassung|gebärdensprache|originalversion|rote rosen|sturm der liebe|in aller freundschaft|berlin direkt|morgenmagazin|mittagsmagazin|zeitzeugen|trailer|vorschau)/i;
@@ -69,6 +76,58 @@ export function getFallbackPoster(channel: string, topic: string): string {
   )}</text><text x="40" y="140" fill="%23e4e4e7" font-family="sans-serif" font-weight="bold" font-size="22">${encodeURIComponent(
     safeTopic
   )}</text></svg>`;
+}
+
+// Определение уровня программы по шкале CEFR (A1–C1)
+export function detectMediathekLevel(
+  channel: string,
+  topic: string,
+  title: string,
+  durationSec: number = 0
+): 'A1' | 'A2' | 'B1' | 'B2' | 'C1' {
+  const combined = `${channel} ${topic} ${title}`.toLowerCase();
+
+  // A1: Sendung mit der Maus, базовые детские передачи, медленный простой язык
+  if (
+    /\b(a1|maus|elefant|anfänger|slow german|erste schritte|grundstufe)\b/i.test(
+      combined
+    )
+  ) {
+    return 'A1';
+  }
+
+  // A2: Logo! (ZDF), легкий язык, короткие простые сюжеты, животные, сказки
+  if (
+    /\b(a2|logo!|leichte sprache|einfach|alltag|dialog|tiere|märchen|kinder)\b/i.test(
+      combined
+    )
+  ) {
+    return 'A2';
+  }
+
+  // C1: Arte, полнометражные фильмы, глубокие дискуссии, философия, наука, кино
+  if (
+    channel.toLowerCase().includes('arte') ||
+    /\b(c1|c2|arte|kino|spielfilm|philosophie|debatte|politik|wissenschaft|literatur|theater|analyse|aspekte|krimi)\b/i.test(
+      combined
+    ) ||
+    durationSec >= 3600
+  ) {
+    return 'C1';
+  }
+
+  // B2: аналитика, социальные темы, расследования, Terra X, ZDFinfo
+  if (
+    /\b(b2|terra x|zdfinfo|investigativ|geschichte|psychologie|zukunft|reportage|doku)\b/i.test(
+      combined
+    ) ||
+    durationSec >= 2400
+  ) {
+    return 'B2';
+  }
+
+  // B1: повседневные репортажи (WDR, SWR Handwerkskunst, путешествия, ремесло, быт, рынок)
+  return 'B1';
 }
 
 // ЖЕЛЕЗНОЕ ПРАВИЛО ДЛЯ СЕРИАЛОВ: только 1 сезон 1 серия (пилот) или основная страница сериала
@@ -181,8 +240,15 @@ function filterAndDeduplicateCandidates(
   level: string,
   excludeSet: Set<string>
 ): any[] {
+  // Для A1/A2 допускаем передачи от 10 мин (600с), для остальных — стандартные пороги
   const minDurationSec =
-    category === 'films' ? 2700 : category === 'docs' ? 1200 : 900;
+    level === 'A1' || level === 'A2'
+      ? 600
+      : category === 'films'
+      ? 2700
+      : category === 'docs'
+      ? 1200
+      : 900;
 
   const filtered = rawResults.filter((item: any) => {
     if (!item || typeof item.duration !== 'number' || item.duration < minDurationSec) {
@@ -211,10 +277,12 @@ function filterAndDeduplicateCandidates(
       return false;
     }
 
-    const isB1 =
-      item.duration < 2100 ||
-      /einfach|alltag|wissen|reise|handwerk|natur|markt/i.test(fullText);
-    const itemLevel = isB1 ? 'B1' : 'B2';
+    const itemLevel = detectMediathekLevel(
+      item.channel || 'ARD / ZDF',
+      item.topic || '',
+      item.title || '',
+      item.duration || 0
+    );
     if (level !== 'ALL' && itemLevel !== level) return false;
 
     return true;
@@ -273,7 +341,12 @@ export async function POST(req: Request) {
     if (query && query.trim()) {
       rawResults = await queryMediathekKeyword(query.trim(), cleanOffset, 70, ['title', 'topic']);
     } else {
-      const keywords = CATEGORY_KEYWORDS[category] || CATEGORY_KEYWORDS.all;
+      let keywords = CATEGORY_KEYWORDS[category] || CATEGORY_KEYWORDS.all;
+      // Если выбран специфический уровень A1 или A2, добавляем ключевые слова для детского/легкого немецкого
+      if (LEVEL_KEYWORDS_EXTRA[level]) {
+        keywords = [...keywords, ...LEVEL_KEYWORDS_EXTRA[level]];
+      }
+
       const perKeywordOffset = Math.floor(cleanOffset / 2);
       const perKeywordSize = category === 'series' ? 40 : 28;
 
@@ -287,8 +360,12 @@ export async function POST(req: Request) {
 
     // 2. Если на высоком оффсете кандидатов мало — плавно расширяем тему запроса!
     if (!query?.trim() && candidates.length < size) {
-      const expansionPool =
+      let expansionPool =
         CATEGORY_EXPANSION_KEYWORDS[category] || CATEGORY_EXPANSION_KEYWORDS.all;
+      if (LEVEL_KEYWORDS_EXTRA[level]) {
+        expansionPool = [...expansionPool, ...LEVEL_KEYWORDS_EXTRA[level]];
+      }
+
       const step = Math.floor(cleanOffset / 24);
       const pickedExpansion = [
         expansionPool[step % expansionPool.length],
@@ -316,11 +393,12 @@ export async function POST(req: Request) {
         const poster =
           realPoster || getFallbackPoster(item.channel || 'ARD / ZDF', item.topic || category);
 
-        const isB1 =
-          item.duration < 2100 ||
-          /einfach|alltag|wissen|reise|handwerk|natur|markt/i.test(
-            `${item.topic} ${item.title}`
-          );
+        const itemLevel = detectMediathekLevel(
+          item.channel || 'ARD / ZDF',
+          item.topic || '',
+          item.title || '',
+          item.duration || 0
+        );
 
         let displayTitle = item.title || '';
         if (
@@ -340,7 +418,7 @@ export async function POST(req: Request) {
           url_website: item.url_website,
           posterUrl: poster,
           thumbnailUrl: poster,
-          level: isB1 ? 'B1' : 'B2',
+          level: itemLevel,
           date: new Date(item.timestamp * 1000).toLocaleDateString('de-DE'),
         };
       })

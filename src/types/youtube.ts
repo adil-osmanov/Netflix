@@ -9,7 +9,7 @@ export interface YouTubeRecommendedVideo {
   title: string;
   channel: string;
   channelId?: string;
-  level: 'A2' | 'B1' | 'B2' | 'C1';
+  level: 'A1' | 'A2' | 'B1' | 'B2' | 'C1';
   thumbnailUrl: string;
   description?: string;
   durationText?: string;

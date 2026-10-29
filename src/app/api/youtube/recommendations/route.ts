@@ -5,7 +5,7 @@ import { YouTubeRecommendedVideo } from "@/types/youtube";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// Пул тем для бесконечной генерации немецких рекомендаций без повторов
+// Общий пул тем для бесконечной генерации немецких рекомендаций
 const SEARCH_CLUSTERS = [
   "Terra X Dokumentation",
   "Simplicissimus Analyse",
@@ -32,6 +32,112 @@ const SEARCH_CLUSTERS = [
   "STRG_F Dokumentation",
   "Kurzgesagt Dinge Erklärt",
 ];
+
+// Кластеры тем, прицельно подобранные под шкалу CEFR (A1–C1)
+const LEVEL_SEARCH_CLUSTERS: Record<"A1" | "A2" | "B1" | "B2" | "C1", string[]> = {
+  A1: [
+    "Die Sendung mit der Maus Sachgeschichten",
+    "ZDF logo! Kindernachrichten",
+    "Slow German Deutsch lernen A1",
+    "Nicos Weg A1 Deutsche Welle",
+    "Deutsch lernen für Anfänger A1",
+  ],
+  A2: [
+    "Easy German Alltag Deutsch A2",
+    "Deutsch lernen Dialoge A2",
+    "Logo! Nachrichten für Kinder ZDF",
+    "Slow German mit Annik",
+    "Nicos Weg A2 Deutsche Welle",
+  ],
+  B1: [
+    "SWR Handwerkskunst",
+    "WDR Doku Leben Alltag",
+    "Easy German Straßenumfrage",
+    "NDR Doku Reportage Reise",
+    "Galileo Experimente Wissen",
+    "Quarks Alltag Wissen",
+  ],
+  B2: [
+    "MrWissen2go Geschichte Analyse",
+    "Simplicissimus Video Essay",
+    "Terra X ZDF Dokumentation",
+    "ZDFinfo Kriminalität Ermittler",
+    "STRG_F Reportage Recherche",
+    "Y-Kollektiv Reportage",
+  ],
+  C1: [
+    "Arte Dokumentarfilm Kino",
+    "c’t uplink Technik Analyse",
+    "ZDF Aspekte Kultur Debatte",
+    "Spiegel TV Dokumentation",
+    "Deutschland Gesellschaft Politik Doku",
+    "Sternstunde Philosophie SRF Arte",
+  ],
+};
+
+// Определение уровня по контексту темы, канала и названия
+export function detectVideoLevel(
+  channelName: string,
+  title: string,
+  cluster: string = "",
+  durationText: string = ""
+): "A1" | "A2" | "B1" | "B2" | "C1" {
+  const combined = `${channelName} ${title} ${cluster}`.toLowerCase();
+
+  // A1: основы, детский немецкий, медленный темп, алфавит, базовые слова
+  if (
+    /\b(a1|anfänger|grundstufe|basics|slow german|kinder|maus|logo!|sendung mit der maus|deutsch lernen a1|lerne deutsch|erste schritte)\b/i.test(
+      combined
+    )
+  ) {
+    return "A1";
+  }
+
+  // A2: бытовой немецкий, простые диалоги, легкие опросы
+  if (
+    /\b(a2|alltag|einfach|leichte sprache|dialog|kurzgeschichte|deutsch a2|easy german a2)\b/i.test(
+      combined
+    )
+  ) {
+    return "A2";
+  }
+
+  // C1: сложный научный/философский/политический контекст, Arte, c't, кино без адаптаций, длинные дискуссии
+  if (
+    channelName.toLowerCase().includes("arte") ||
+    channelName.toLowerCase().includes("c't") ||
+    /\b(c1|c2|arte|kino|philosophie|debatte|politik|wissenschaft|analyse|spiegel tv|podcasts?|diskussion|vortrag|aspekte)\b/i.test(
+      combined
+    )
+  ) {
+    return "C1";
+  }
+
+  // B2: аналитика, социальные темы, расследования
+  if (
+    /\b(b2|mrwissen2go|simplicissimus|terra x|zdfinfo|investigativ|puls|strg_f|y-kollektiv|wirtschaft|geschichte)\b/i.test(
+      combined
+    )
+  ) {
+    return "B2";
+  }
+
+  // B1: повседневные репортажи (WDR, SWR Handwerkskunst, ремесло, путешествия, быт)
+  if (
+    /\b(b1|handwerk|swr|wdr|ndr|hr|br|mdr|reise|markt|kultur|leben)\b/i.test(
+      combined
+    )
+  ) {
+    return "B1";
+  }
+
+  // Fallback: если видео очень длинное — B2, иначе B1
+  const parts = durationText.split(":").map(Number);
+  if (parts.length === 3 || (parts.length === 2 && parts[0] >= 30)) {
+    return "B2";
+  }
+  return "B1";
+}
 
 // In-memory cache for aggregated channel feeds
 let cachedAllFeedVideos: YouTubeRecommendedVideo[] = [];
@@ -86,7 +192,7 @@ function shuffleArray<T>(array: T[]): T[] {
 async function fetchChannelVideosInnerTube(
   channelId: string,
   channelName: string,
-  level: "B1" | "B2"
+  defaultLevel: "B1" | "B2"
 ): Promise<YouTubeRecommendedVideo[]> {
   const results: YouTubeRecommendedVideo[] = [];
 
@@ -187,6 +293,8 @@ async function fetchChannelVideosInnerTube(
 
       if (isBlockedVideo({ id, title: cleanTitle })) continue;
 
+      const level = detectVideoLevel(channelName, cleanTitle, channelName, durationText);
+
       results.push({
         id,
         title: cleanTitle,
@@ -273,10 +381,7 @@ async function fetchSearchClusterVideos(clusterQuery: string): Promise<YouTubeRe
 
         if (isBlockedVideo({ id, title: cleanTitle })) continue;
 
-        const isB1 = /easy german|handwerk|quarks|galileo|alltag|wdr|ndr|swr/i.test(
-          `${channelName} ${clusterQuery}`
-        );
-        const level: "B1" | "B2" = isB1 ? "B1" : "B2";
+        const level = detectVideoLevel(channelName, cleanTitle, clusterQuery, durationText);
 
         results.push({
           id,
@@ -353,25 +458,29 @@ async function handleRecommendationsRequest(
 ) {
   const pool = await getRecommendationsPool();
 
-  // 1. Строго отсекаем все уже показанные на экране ролики (excludeIds)
+  // 1. Фильтруем уже показанные ролики и уровень CEFR (A1, A2, B1, B2, C1)
   let available = pool.filter((v) => {
     const vid = (v as any).youtube_id || v.id;
     if (excludeSet.has(vid)) return false;
     if (isBlockedVideo(v)) return false;
     if (!isValidDuration(v.durationText)) return false;
-    if (levelFilter === "B1" && v.level !== "B1") return false;
-    if (levelFilter === "B2" && v.level !== "B2") return false;
+    if (levelFilter !== "ALL" && v.level !== levelFilter) return false;
     return true;
   });
 
-  // 2. Если page > 1 или в пуле осталось мало непоказанных роликов —
-  // динамически подгружаем новые кластеры из SEARCH_CLUSTERS
+  // 2. Если роликов мало или page > 1 — динамически подгружаем кластеры
   if (page > 1 || available.length < limit) {
-    const startIdx = ((page - 1) * 3 + Math.floor(Math.random() * SEARCH_CLUSTERS.length)) % SEARCH_CLUSTERS.length;
+    const clusterPool =
+      levelFilter !== "ALL" && LEVEL_SEARCH_CLUSTERS[levelFilter as keyof typeof LEVEL_SEARCH_CLUSTERS]
+        ? LEVEL_SEARCH_CLUSTERS[levelFilter as keyof typeof LEVEL_SEARCH_CLUSTERS]
+        : SEARCH_CLUSTERS;
+
+    const startIdx =
+      ((page - 1) * 3 + Math.floor(Math.random() * clusterPool.length)) % clusterPool.length;
     const selectedClusters = [
-      SEARCH_CLUSTERS[startIdx % SEARCH_CLUSTERS.length],
-      SEARCH_CLUSTERS[(startIdx + 1) % SEARCH_CLUSTERS.length],
-      SEARCH_CLUSTERS[(startIdx + 2) % SEARCH_CLUSTERS.length],
+      clusterPool[startIdx % clusterPool.length],
+      clusterPool[(startIdx + 1) % clusterPool.length],
+      clusterPool[(startIdx + 2) % clusterPool.length],
     ];
 
     const clusterResults = await Promise.all(
@@ -386,11 +495,7 @@ async function handleRecommendationsRequest(
           cachedAllFeedVideos.push(v);
         }
         if (!excludeSet.has(v.id)) {
-          if (
-            levelFilter === "ALL" ||
-            (levelFilter === "B1" && v.level === "B1") ||
-            (levelFilter === "B2" && v.level === "B2")
-          ) {
+          if (levelFilter === "ALL" || v.level === levelFilter) {
             available.push(v);
           }
         }

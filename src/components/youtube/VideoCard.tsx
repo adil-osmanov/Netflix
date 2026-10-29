@@ -127,7 +127,18 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
   };
 
   const level = (video.level || "B1").toUpperCase();
-  const isB2 = level.startsWith("B2") || level === "C1" || level === "C2";
+  const getLevelBadgeClass = (lvl: string) => {
+    if (lvl.startsWith("A1") || lvl.startsWith("A2")) {
+      return "bg-emerald-500/20 border border-emerald-500/40 text-emerald-400";
+    }
+    if (lvl.startsWith("B1") || lvl.startsWith("B2")) {
+      return "bg-sky-500/20 border border-sky-500/40 text-sky-400";
+    }
+    if (lvl.startsWith("C1") || lvl.startsWith("C2")) {
+      return "bg-red-500/20 border border-red-500/40 text-red-400";
+    }
+    return "bg-sky-500/20 border border-sky-500/40 text-sky-400";
+  };
 
   if (isDead) return null;
 
@@ -142,7 +153,7 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
           handleOpenVideo(videoId);
         }
       }}
-      className="group relative flex flex-col cursor-pointer text-left select-none"
+      className="group relative flex flex-col cursor-pointer text-left select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent]"
     >
       {/* 1. Preview 16:9 */}
       <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-all duration-300">
@@ -163,13 +174,9 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
             </span>
           )}
           <span
-            className={
-              isB2
-                ? "bg-sky-500/20 border border-sky-500/40 text-sky-400 text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md"
-                : "bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md"
-            }
+            className={`${getLevelBadgeClass(level)} text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md`}
           >
-            {isB2 ? "B2" : "B1"}
+            {level}
           </span>
         </div>
 

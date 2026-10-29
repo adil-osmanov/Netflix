@@ -12,7 +12,6 @@ import {
   Lightbulb,
   Bookmark, 
   RotateCw,
-  Sparkles,
   AlertCircle
 } from "lucide-react";
 import { useYouTube } from "@/context/YouTubeContext";
@@ -26,25 +25,28 @@ export interface MediathekMediaItem {
   url_website: string;
   posterUrl: string;
   thumbnailUrl?: string;
-  level: "B1" | "B2";
+  level: "A1" | "A2" | "B1" | "B2" | "C1";
   date: string;
 }
 
 export type CategoryType = "all" | "films" | "docs" | "series" | "knowledge";
-export type LevelType = "ALL" | "B1" | "B2";
+export type LevelType = "ALL" | "A1" | "A2" | "B1" | "B2" | "C1";
 
-const CATEGORIES: { id: CategoryType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: "all", label: "Все", icon: Sparkles },
+const CATEGORIES: { id: CategoryType; label: string; icon?: React.ComponentType<{ className?: string }> }[] = [
+  { id: "all", label: "Рекомендации" },
   { id: "films", label: "Фильмы", icon: Film },
   { id: "docs", label: "Документальные фильмы", icon: Compass },
   { id: "series", label: "Сериалы", icon: Tv },
   { id: "knowledge", label: "Познавательное & Шоу", icon: Lightbulb },
 ];
 
-const LEVELS: { id: LevelType; label: string; desc: string }[] = [
-  { id: "ALL", label: "Все уровни", desc: "B1 и B2" },
-  { id: "B1", label: "B1", desc: "Средний темп, понятная речь" },
-  { id: "B2", label: "B2", desc: "Естественная речь, фильмы" },
+const LEVELS: { id: LevelType; label: string }[] = [
+  { id: "ALL", label: "Все уровни" },
+  { id: "A1", label: "A1" },
+  { id: "A2", label: "A2" },
+  { id: "B1", label: "B1" },
+  { id: "B2", label: "B2" },
+  { id: "C1", label: "C1" },
 ];
 
 function getFallbackPoster(channel: string, topic: string): string {
@@ -237,7 +239,7 @@ export default function MediathekCatalog() {
     fetchMediaItems({ newQuery: "", newOffset: 0, append: false });
   };
 
-  // Подгрузка следующей пачки (честный шаг offset: 0 -> 24 -> 48 -> 72...)
+  // Подгрузка следующей пачки
   const loadMoreVideos = useCallback(() => {
     if (isLoading || isFetchingMore || !hasMore) return;
     const nextOffset = offset + 24;
@@ -285,7 +287,7 @@ export default function MediathekCatalog() {
       <div className="max-w-3xl mx-auto mb-6">
         <form
           onSubmit={handleSearchSubmit}
-          className="relative bg-zinc-900/90 border border-zinc-800 rounded-full px-4 py-2.5 flex items-center gap-2.5 focus-within:border-zinc-500 transition-all shadow-xl"
+          className="relative bg-zinc-900/90 border border-zinc-800 rounded-full px-4 py-2.5 flex items-center gap-2.5 focus-within:border-zinc-500 transition-all shadow-xl select-none outline-none focus:outline-none focus:ring-0 [-webkit-tap-highlight-color:transparent]"
         >
           <Search className="w-4 h-4 text-zinc-400 flex-shrink-0" />
           <input
@@ -299,24 +301,24 @@ export default function MediathekCatalog() {
             <button
               type="button"
               onClick={handleClearSearch}
-              className="text-zinc-500 hover:text-white p-0.5 cursor-pointer"
+              className="text-zinc-500 hover:text-white p-0.5 cursor-pointer outline-none [-webkit-tap-highlight-color:transparent]"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           )}
           <button
             type="submit"
-            className="hidden sm:inline-block px-4 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-xs font-bold text-white transition-colors cursor-pointer shadow"
+            className="hidden sm:inline-block px-4 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-xs font-bold text-white transition-colors cursor-pointer shadow select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent]"
           >
             Найти
           </button>
         </form>
       </div>
 
-      {/* Панель фильтров: Категории и Уровни */}
+      {/* Панель фильтров: Категории слева, Уровни + ↻ справа (в точности как в YouTube) */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
-          {/* Категории + ↻ */}
+          {/* Список категорий слева: [ Рекомендации ] [ Фильмы ] [ Документальные фильмы ] [ Сериалы ] [ Познавательное & Шоу ] */}
           <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
             {CATEGORIES.map((cat) => {
               const Icon = cat.icon;
@@ -325,48 +327,59 @@ export default function MediathekCatalog() {
                 <button
                   key={cat.id}
                   onClick={() => handleCategoryChange(cat.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all cursor-pointer ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] ${
                     isActive
                       ? "bg-red-600 text-white font-semibold shadow-lg shadow-red-950/40"
                       : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700"
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  {Icon && <Icon className="w-3.5 h-3.5" />}
                   <span>{cat.label}</span>
                 </button>
               );
             })}
+          </div>
 
-            {/* Кнопка обновления ↻ */}
+          {/* Правый блок: уровни + кнопка обновления ↻ */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Группа переключателей уровней A1–C1 */}
+            <div className="flex items-center p-1 bg-zinc-900/90 rounded-full border border-zinc-800 flex-wrap">
+              {LEVELS.map((lvl) => {
+                const isActive = level === lvl.id;
+                let activeStyle = "bg-white text-black font-semibold";
+                if (lvl.id === "A1" || lvl.id === "A2") {
+                  activeStyle = "bg-emerald-600 text-white font-semibold shadow-md";
+                } else if (lvl.id === "B1" || lvl.id === "B2") {
+                  activeStyle = "bg-sky-600 text-white font-semibold shadow-md";
+                } else if (lvl.id === "C1") {
+                  activeStyle = "bg-red-600 text-white font-semibold shadow-md";
+                }
+
+                return (
+                  <button
+                    key={lvl.id}
+                    onClick={() => handleLevelChange(lvl.id)}
+                    className={`px-3 py-1 text-xs rounded-full transition-all cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] ${
+                      isActive
+                        ? activeStyle
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    {lvl.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Кнопка ↻ на том же месте, что и в YouTube */}
             <button
               onClick={handleRefresh}
               disabled={isLoading}
-              className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition disabled:opacity-50 cursor-pointer shadow"
-              title="Обновить ленту"
+              className="p-2 rounded-full bg-zinc-900/90 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] disabled:opacity-40 cursor-pointer shadow"
+              title="Обновить рекомендации"
             >
               <RotateCw className={`w-4 h-4 text-red-500 ${isLoading ? "animate-spin" : ""}`} />
             </button>
-          </div>
-
-          {/* Переключатель уровня (B1 / B2) */}
-          <div className="flex items-center gap-1.5 bg-zinc-900/90 p-1 rounded-full border border-zinc-800">
-            {LEVELS.map((lvl) => {
-              const isActive = level === lvl.id;
-              return (
-                <button
-                  key={lvl.id}
-                  onClick={() => handleLevelChange(lvl.id)}
-                  title={lvl.desc}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-white text-black shadow font-bold"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  {lvl.label}
-                </button>
-              );
-            })}
           </div>
         </div>
       </div>
@@ -378,7 +391,7 @@ export default function MediathekCatalog() {
           <p className="text-sm text-zinc-300">{error}</p>
           <button
             onClick={() => fetchMediaItems({ newOffset: 0, append: false })}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-600 hover:bg-red-700 text-xs font-bold text-white transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-600 hover:bg-red-700 text-xs font-bold text-white transition-colors cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent]"
           >
             <RotateCw className="w-3.5 h-3.5" />
             <span>Повторить</span>
@@ -405,7 +418,7 @@ export default function MediathekCatalog() {
           <Film className="w-10 h-10 text-zinc-600 mx-auto" />
           <h3 className="text-base font-bold text-white">Передачи не найдены</h3>
           <p className="text-xs text-zinc-400">
-            Попробуйте выбрать другую категорию или обновить ленту.
+            Попробуйте выбрать другой уровень или обновить ленту.
           </p>
         </div>
       )}
@@ -416,6 +429,14 @@ export default function MediathekCatalog() {
           {items.map((item) => {
             const isFav = isFavorite(item.url_website) || isFavorite(item.id);
             const fallbackSvg = getFallbackPoster(item.channel, item.topic);
+
+            // Цветовой бейдж уровня на карточке
+            let levelBadgeClass = "bg-sky-500/20 text-sky-400 border border-sky-500/30";
+            if (item.level === "A1" || item.level === "A2") {
+              levelBadgeClass = "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+            } else if (item.level === "C1") {
+              levelBadgeClass = "bg-red-500/20 text-red-400 border border-red-500/30";
+            }
 
             return (
               <div
@@ -429,7 +450,7 @@ export default function MediathekCatalog() {
                     handleCardClick(item.url_website);
                   }
                 }}
-                className="group relative flex flex-col cursor-pointer text-left select-none"
+                className="group relative flex flex-col cursor-pointer text-left select-none outline-none [-webkit-tap-highlight-color:transparent]"
               >
                 {/* 1. Превью 16:9 с наложением */}
                 <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800">
@@ -451,13 +472,9 @@ export default function MediathekCatalog() {
                     {item.channel}
                   </span>
 
-                  {/* Бейдж B1 / B2 */}
+                  {/* Бейдж CEFR (A1 / A2 / B1 / B2 / C1) */}
                   <span
-                    className={`absolute top-2 left-14 px-2 py-0.5 rounded text-[10px] font-bold backdrop-blur-md ${
-                      item.level === "B1"
-                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                        : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
-                    }`}
+                    className={`absolute top-2 left-14 px-2 py-0.5 rounded text-[10px] font-bold backdrop-blur-md ${levelBadgeClass}`}
                   >
                     {item.level}
                   </span>
@@ -466,7 +483,7 @@ export default function MediathekCatalog() {
                   <button
                     type="button"
                     onClick={(e) => handleToggleFavorite(e, item)}
-                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/90 text-white transition z-10 cursor-pointer backdrop-blur-md"
+                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/90 text-white transition z-10 cursor-pointer backdrop-blur-md select-none outline-none focus:outline-none focus:ring-0 [-webkit-tap-highlight-color:transparent]"
                     title={isFav ? "Удалить из избранного" : "Сохранить в избранное"}
                   >
                     <Bookmark
@@ -487,7 +504,7 @@ export default function MediathekCatalog() {
                   </div>
 
                   {/* Длительность */}
-                  <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] text-white">
+                  <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] text-white font-mono">
                     {item.duration} Min.
                   </span>
                 </div>

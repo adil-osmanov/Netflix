@@ -10,8 +10,7 @@ import {
   Video,
   Bookmark,
   Tv,
-  Plus,
-  Sparkles
+  Plus
 } from "lucide-react";
 import { extractYouTubeId } from "@/data/youtubeVideos";
 import { YouTubeRecommendedVideo } from "@/types/youtube";
@@ -24,6 +23,16 @@ import MediathekCatalog from "@/components/mediathek/MediathekCatalog";
 
 export type TopCategory = "youtube" | "mediathek" | "favorites";
 export type MainTab = "recommendations" | "subscriptions" | "easy_german";
+export type LevelType = "ALL" | "A1" | "A2" | "B1" | "B2" | "C1";
+
+const LEVELS: { id: LevelType; label: string }[] = [
+  { id: "ALL", label: "Все" },
+  { id: "A1", label: "A1" },
+  { id: "A2", label: "A2" },
+  { id: "B1", label: "B1" },
+  { id: "B2", label: "B2" },
+  { id: "C1", label: "C1" },
+];
 
 const DEFAULT_SUBSCRIPTIONS: SubscribedChannel[] = [
   { id: "UCbxb2fqe9oNgglAoYqsYOtQ", name: "Easy German" },
@@ -136,8 +145,8 @@ export default function YouTubeCatalogPage() {
   const [searchInput, setSearchInput] = useState<string>("");
   const [inputError, setInputError] = useState<string | null>(null);
 
-  // Recommendations: Difficulty Level Filter: 'ALL' | 'B1' | 'B2'
-  const [selectedLevel, setSelectedLevel] = useState<"ALL" | "B1" | "B2">("ALL");
+  // Recommendations: Difficulty Level Filter: 'ALL' | 'A1' | 'A2' | 'B1' | 'B2' | 'C1'
+  const [selectedLevel, setSelectedLevel] = useState<LevelType>("ALL");
 
   // Subscriptions: Filter by specific channel ('ALL' | channelId)
   const [selectedSubscribedChannel, setSelectedSubscribedChannel] = useState<string>("ALL");
@@ -188,7 +197,7 @@ export default function YouTubeCatalogPage() {
     } catch {}
   };
 
-  // Загрузка видео подписок (без лимита в 15 роликов, с поддержкой continuationToken и excludeIds)
+  // Загрузка видео подписок
   const fetchSubscriptionVideos = useCallback(
     async (
       pageToLoad: number,
@@ -219,7 +228,6 @@ export default function YouTubeCatalogPage() {
           : [];
 
         if (activeChannel !== "ALL") {
-          // Прямая загрузка 35–60 роликов конкретного канала + пагинация по continuationToken
           const chObj = subscriptions.find((s) => s.id === activeChannel);
           const token = append ? channelTokensRef.current[activeChannel] || null : null;
 
@@ -250,7 +258,6 @@ export default function YouTubeCatalogPage() {
             setSubPage(pageToLoad);
           }
         } else {
-          // Загрузка ленты по всем каналам подписок
           const channelIds = subscriptions.map((s) => s.id);
           const res = await fetch(
             `/api/youtube/subscriptions?t=${Date.now()}&rnd=${Math.random()}`,
@@ -291,9 +298,9 @@ export default function YouTubeCatalogPage() {
     [subscriptions, selectedSubscribedChannel]
   );
 
-  // Загрузка рекомендаций с передачей excludeIds и динамическими кластерами тем
+  // Загрузка рекомендаций
   const fetchRecommendations = useCallback(
-    async (pageToLoad: number, append: boolean = false, levelOverride?: "ALL" | "B1" | "B2") => {
+    async (pageToLoad: number, append: boolean = false, levelOverride?: LevelType) => {
       if (append) {
         setIsFetchingMoreRec(true);
       } else {
@@ -350,6 +357,16 @@ export default function YouTubeCatalogPage() {
     fetchSubscriptionVideos(1, false);
   }, [subscriptions, selectedSubscribedChannel]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Смена уровня сложности
+  const handleLevelChange = (lvl: LevelType) => {
+    if (lvl === selectedLevel) return;
+    setSelectedLevel(lvl);
+    setRecommendations([]);
+    setRecPage(1);
+    setHasMoreRec(true);
+    fetchRecommendations(1, false, lvl);
+  };
+
   // Load more handler for InfiniteVideoFeed
   const handleLoadMoreYouTube = useCallback(() => {
     if (activeCategory !== "youtube") return;
@@ -390,7 +407,7 @@ export default function YouTubeCatalogPage() {
     setIsRefreshing(false);
   };
 
-  // Search input handler: direct URL watch or search query
+  // Search input handler
   const handleSearchOrWatch = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = searchInput.trim();
@@ -438,13 +455,7 @@ export default function YouTubeCatalogPage() {
     if (!matchesSearch) return false;
 
     if (activeTab === "recommendations") {
-      const l = (video.level || "B1").toUpperCase();
-      const isB2 = l.startsWith("B2") || l === "C1" || l === "C2";
-      return (
-        selectedLevel === "ALL" ||
-        (selectedLevel === "B1" && !isB2) ||
-        (selectedLevel === "B2" && isB2)
-      );
+      return selectedLevel === "ALL" || video.level === selectedLevel;
     }
 
     if (activeTab === "subscriptions") {
@@ -487,7 +498,7 @@ export default function YouTubeCatalogPage() {
           {/* YouTube DE */}
           <button
             onClick={() => setActiveCategory("youtube")}
-            className={`px-5 py-2.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-5 py-2.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] ${
               activeCategory === "youtube"
                 ? "bg-white text-black shadow-lg shadow-white/10"
                 : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
@@ -500,7 +511,7 @@ export default function YouTubeCatalogPage() {
           {/* ARD & ZDF Mediathek */}
           <button
             onClick={() => setActiveCategory("mediathek")}
-            className={`px-5 py-2.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-5 py-2.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] ${
               activeCategory === "mediathek"
                 ? "bg-white text-black shadow-lg shadow-white/10"
                 : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
@@ -510,10 +521,10 @@ export default function YouTubeCatalogPage() {
             <span>ARD & ZDF Mediathek</span>
           </button>
 
-          {/* Избранное (Общее) */}
+          {/* Избранное (Общее) - строго иконка и бейдж счетчика */}
           <button
             onClick={() => setActiveCategory("favorites")}
-            className={`px-3.5 py-2 rounded-full text-xs font-semibold transition-all flex items-center gap-2 border cursor-pointer ${
+            className={`px-3.5 py-2 rounded-full text-xs font-semibold transition-all flex items-center gap-2 border cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] ${
               activeCategory === "favorites"
                 ? "bg-amber-500 text-black border-amber-400 shadow-lg shadow-amber-500/20"
                 : "bg-zinc-900/80 text-zinc-300 hover:text-white border-zinc-800 hover:border-amber-500/40"
@@ -572,7 +583,7 @@ export default function YouTubeCatalogPage() {
           <div className="max-w-3xl mx-auto mb-6 pt-2">
             <form
               onSubmit={handleSearchOrWatch}
-              className="relative bg-zinc-900/90 border border-zinc-800 rounded-full px-4 py-2.5 flex items-center gap-2.5 focus-within:border-zinc-500 transition-all shadow-xl"
+              className="relative bg-zinc-900/90 border border-zinc-800 rounded-full px-4 py-2.5 flex items-center gap-2.5 focus-within:border-zinc-500 transition-all shadow-xl select-none outline-none focus:outline-none focus:ring-0 [-webkit-tap-highlight-color:transparent]"
             >
               <Search className="w-4 h-4 text-zinc-400 flex-shrink-0" />
               <input
@@ -589,14 +600,14 @@ export default function YouTubeCatalogPage() {
                 <button
                   type="button"
                   onClick={() => setSearchInput("")}
-                  className="text-zinc-500 hover:text-white p-0.5"
+                  className="text-zinc-500 hover:text-white p-0.5 cursor-pointer outline-none [-webkit-tap-highlight-color:transparent]"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
               <button
                 type="submit"
-                className="hidden sm:inline-block px-4 py-1.5 rounded-full bg-[#E50914] hover:bg-[#b80710] text-xs font-bold text-white transition-colors cursor-pointer shadow"
+                className="hidden sm:inline-block px-4 py-1.5 rounded-full bg-[#E50914] hover:bg-[#b80710] text-xs font-bold text-white transition-colors cursor-pointer shadow select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent]"
               >
                 Смотреть
               </button>
@@ -610,26 +621,26 @@ export default function YouTubeCatalogPage() {
             )}
           </div>
 
-          {/* YouTube Подменю: [ Рекомендации B1–B2 ] [ Мои подписки ] [ Easy German ] */}
+          {/* YouTube Подменю: [ Рекомендации ] [ Мои подписки ] [ Easy German ] */}
           <div className="max-w-7xl mx-auto mb-6">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
               <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                {/* Таб 1: Рекомендации B1–B2 */}
+                {/* Таб 1: Рекомендации */}
                 <button
                   onClick={() => setActiveTab("recommendations")}
-                  className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm transition-all cursor-pointer ${
+                  className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm transition-all cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] ${
                     activeTab === "recommendations"
                       ? "bg-red-600 text-white font-semibold shadow-lg shadow-red-950/40"
                       : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
                   }`}
                 >
-                  Рекомендации B1–B2
+                  Рекомендации
                 </button>
 
                 {/* Таб 2: Мои подписки с бейджем количества каналов */}
                 <button
                   onClick={() => setActiveTab("subscriptions")}
-                  className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-2 ${
+                  className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-2 select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] ${
                     activeTab === "subscriptions"
                       ? "bg-red-600 text-white font-semibold shadow-lg shadow-red-950/40"
                       : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
@@ -647,54 +658,51 @@ export default function YouTubeCatalogPage() {
                   </span>
                 </button>
 
-                {/* Таб 3: Easy German */}
+                {/* Таб 3: Easy German (перманентно зеленый акцент и выделение) */}
                 <button
                   onClick={() => setActiveTab("easy_german")}
-                  className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-medium transition-all cursor-pointer ${
+                  className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] cursor-pointer ${
                     activeTab === "easy_german"
-                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/40"
-                      : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
+                      ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/25 ring-2 ring-emerald-400"
+                      : "bg-emerald-950/40 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-900/50 hover:border-emerald-400"
                   }`}
                 >
-                  Easy German
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <span className={activeTab === "easy_german" ? "text-black" : "text-white"}>
+                    Easy German
+                  </span>
                 </button>
               </div>
 
               {/* Controls right side (only for Recommendations & Subscriptions) */}
               {activeTab !== "easy_german" && (
-                <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                  {/* Группа переключателей уровней A1–C1 для рекомендаций */}
                   {activeTab === "recommendations" && (
-                    <div className="flex items-center gap-1 bg-zinc-900/90 p-1 rounded-full border border-zinc-800">
-                      <button
-                        onClick={() => setSelectedLevel("ALL")}
-                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                          selectedLevel === "ALL"
-                            ? "bg-white text-black shadow"
-                            : "text-zinc-400 hover:text-white"
-                        }`}
-                      >
-                        Все
-                      </button>
-                      <button
-                        onClick={() => setSelectedLevel("B1")}
-                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                          selectedLevel === "B1"
-                            ? "bg-emerald-500 text-black shadow font-bold"
-                            : "text-zinc-400 hover:text-white"
-                        }`}
-                      >
-                        B1
-                      </button>
-                      <button
-                        onClick={() => setSelectedLevel("B2")}
-                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                          selectedLevel === "B2"
-                            ? "bg-sky-500 text-black shadow font-bold"
-                            : "text-zinc-400 hover:text-white"
-                        }`}
-                      >
-                        B2
-                      </button>
+                    <div className="flex items-center p-1 bg-zinc-900/90 rounded-full border border-zinc-800 flex-wrap">
+                      {LEVELS.map((lvl) => {
+                        const isActive = selectedLevel === lvl.id;
+                        let activeStyle = "bg-white text-black font-semibold";
+                        if (lvl.id === "A1" || lvl.id === "A2") {
+                          activeStyle = "bg-emerald-600 text-white font-semibold shadow-md";
+                        } else if (lvl.id === "B1" || lvl.id === "B2") {
+                          activeStyle = "bg-sky-600 text-white font-semibold shadow-md";
+                        } else if (lvl.id === "C1") {
+                          activeStyle = "bg-red-600 text-white font-semibold shadow-md";
+                        }
+
+                        return (
+                          <button
+                            key={lvl.id}
+                            onClick={() => handleLevelChange(lvl.id)}
+                            className={`px-3 py-1 text-xs rounded-full transition-all cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] ${
+                              isActive ? activeStyle : "text-zinc-400 hover:text-white"
+                            }`}
+                          >
+                            {lvl.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -702,7 +710,7 @@ export default function YouTubeCatalogPage() {
                   <button
                     onClick={handleRefresh}
                     disabled={isRefreshing || isLoadingRec || isLoadingSubs}
-                    className="p-2 rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition disabled:opacity-50 cursor-pointer shadow"
+                    className="p-2 rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] disabled:opacity-50 cursor-pointer shadow"
                     title="Перемешать и обновить ленту"
                   >
                     <RotateCw
@@ -722,7 +730,7 @@ export default function YouTubeCatalogPage() {
                   </span>
                   <button
                     onClick={() => setSelectedSubscribedChannel("ALL")}
-                    className={`px-3 py-1 rounded-full text-xs transition cursor-pointer whitespace-nowrap ${
+                    className={`px-3 py-1 rounded-full text-xs transition-all cursor-pointer whitespace-nowrap select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] ${
                       selectedSubscribedChannel === "ALL"
                         ? "bg-white text-black font-semibold"
                         : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
@@ -734,7 +742,7 @@ export default function YouTubeCatalogPage() {
                     <button
                       key={ch.id}
                       onClick={() => setSelectedSubscribedChannel(ch.id)}
-                      className={`px-3 py-1 rounded-full text-xs transition cursor-pointer whitespace-nowrap ${
+                      className={`px-3 py-1 rounded-full text-xs transition-all cursor-pointer whitespace-nowrap select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] ${
                         selectedSubscribedChannel === ch.id
                           ? "bg-white text-black font-semibold"
                           : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
@@ -748,7 +756,7 @@ export default function YouTubeCatalogPage() {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button
                     onClick={() => setIsManageModalOpen(true)}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold cursor-pointer shadow transition active:scale-95"
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold cursor-pointer shadow transition-all active:scale-95 select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent]"
                   >
                     <Plus size={14} />
                     <span>Добавить канал</span>
@@ -783,7 +791,7 @@ export default function YouTubeCatalogPage() {
                     </p>
                     <button
                       onClick={() => setIsManageModalOpen(true)}
-                      className="mt-2 px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors cursor-pointer"
+                      className="mt-2 px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent]"
                     >
                       Добавить немецкий YouTube-канал
                     </button>
