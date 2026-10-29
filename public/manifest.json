@@ -1,12 +1,18 @@
 {
   "name": "Netflix",
   "short_name": "Netflix",
-  "start_url": "/youtube",
+  "start_url": "/",
   "display": "fullscreen",
-  "display_override": ["fullscreen", "window-controls-overlay", "standalone"],
-  "background_color": "#000000",
+  "display_override": ["fullscreen"],
   "theme_color": "#000000",
+  "background_color": "#000000",
   "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",

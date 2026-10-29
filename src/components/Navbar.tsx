@@ -67,9 +67,15 @@ function NavbarContent() {
             <Link 
               href="/youtube" 
               onClick={() => setSearchTerm('')} 
-              className="text-red-600 hover:text-red-500 font-bold tracking-wide text-sm transition-all duration-200 select-none outline-none [-webkit-tap-highlight-color:transparent]"
+              className="flex items-center gap-1.5 opacity-90 hover:opacity-100 transition-opacity outline-none py-1"
+              title="YouTube"
             >
-              YouTube
+              <svg className="h-4 w-auto" viewBox="0 0 90 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M27.9727 3.12324C27.6435 1.89323 26.6768 0.926623 25.4468 0.597366C23.2197 0 14.285 0 14.285 0C14.285 0 5.35029 0 3.12324 0.597366C1.89323 0.926623 0.926623 1.89323 0.597366 3.12324C0 5.35029 0 10 0 10C0 10 0 14.6497 0.597366 16.8768C0.926623 18.1068 1.89323 19.0734 3.12324 19.4026C5.35029 20 14.285 20 14.285 20C14.285 20 23.2197 20 25.4468 19.4026C26.6768 19.0734 27.6435 18.1068 27.9727 16.8768C28.5701 14.6497 28.5701 10 28.5701 10C28.5701 10 28.5701 5.35029 27.9727 3.12324Z" fill="#FF0000"/>
+                <path d="M11.4253 14.2854L18.8477 10.0002L11.4253 5.71484V14.2854Z" fill="white"/>
+                <path d="M34.9752 18.9197V5.55664H37.8969V18.9197H34.9752ZM36.436 4.3101C35.4093 4.3101 34.6974 3.56064 34.6974 2.57143C34.6974 1.58221 35.4093 0.832764 36.436 0.832764C37.4628 0.832764 38.1747 1.58221 38.1747 2.57143C38.1747 3.56064 37.4628 4.3101 36.436 4.3101Z" fill="white"/>
+                <text x="40" y="15" fill="white" fontSize="13" fontWeight="bold" fontFamily="sans-serif">YouTube</text>
+              </svg>
             </Link>
           </div>
         </div>
@@ -120,9 +126,15 @@ function NavbarContent() {
           <Link 
             href="/youtube" 
             onClick={() => { setSearchTerm(''); setMobileMenuOpen(false); }} 
-            className="text-red-600 hover:text-red-500 font-bold tracking-wide text-sm transition-all duration-200 select-none outline-none [-webkit-tap-highlight-color:transparent] py-1"
+            className="flex items-center gap-1.5 opacity-90 hover:opacity-100 transition-opacity outline-none py-1"
+            title="YouTube"
           >
-            YouTube
+            <svg className="h-4 w-auto" viewBox="0 0 90 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M27.9727 3.12324C27.6435 1.89323 26.6768 0.926623 25.4468 0.597366C23.2197 0 14.285 0 14.285 0C14.285 0 5.35029 0 3.12324 0.597366C1.89323 0.926623 0.926623 1.89323 0.597366 3.12324C0 5.35029 0 10 0 10C0 10 0 14.6497 0.597366 16.8768C0.926623 18.1068 1.89323 19.0734 3.12324 19.4026C5.35029 20 14.285 20 14.285 20C14.285 20 23.2197 20 25.4468 19.4026C26.6768 19.0734 27.6435 18.1068 27.9727 16.8768C28.5701 14.6497 28.5701 10 28.5701 10C28.5701 10 28.5701 5.35029 27.9727 3.12324Z" fill="#FF0000"/>
+              <path d="M11.4253 14.2854L18.8477 10.0002L11.4253 5.71484V14.2854Z" fill="white"/>
+              <path d="M34.9752 18.9197V5.55664H37.8969V18.9197H34.9752ZM36.436 4.3101C35.4093 4.3101 34.6974 3.56064 34.6974 2.57143C34.6974 1.58221 35.4093 0.832764 36.436 0.832764C37.4628 0.832764 38.1747 1.58221 38.1747 2.57143C38.1747 3.56064 37.4628 4.3101 36.436 4.3101Z" fill="white"/>
+              <text x="40" y="15" fill="white" fontSize="13" fontWeight="bold" fontFamily="sans-serif">YouTube</text>
+            </svg>
           </Link>
         </div>
       </div>

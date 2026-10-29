@@ -16,23 +16,26 @@ export const viewport: Viewport = {
   themeColor: "#000000",
 };
 
+import { SearchProvider } from "@/components/SearchContext";
+import { WatchedProvider } from "@/context/WatchedContext";
+import AutoFullscreen from "@/components/layout/AutoFullscreen";
+
 export const metadata: Metadata = {
   title: "Netflix",
-  description: "B1-B2 German Video Curator",
+  description: "Watch TV Shows Online, Watch Movies Online",
   manifest: "/manifest.json",
   icons: {
     icon: [
-      { url: "/favicon.ico" },
+      { url: "/icon.svg", type: "image/svg+xml" },
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
       { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
-    shortcut: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
+    apple: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/apple-touch-icon.png" },
+    ],
   },
 };
-
-import { SearchProvider } from "@/components/SearchContext";
-import { WatchedProvider } from "@/context/WatchedContext";
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -41,6 +44,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[#141414] text-white">
+        <AutoFullscreen />
         <WatchedProvider>
           <SearchProvider>{children}</SearchProvider>
         </WatchedProvider>

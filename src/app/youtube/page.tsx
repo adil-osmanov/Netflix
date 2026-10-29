@@ -520,21 +520,24 @@ export default function YouTubeCatalogPage() {
             {/* YouTube */}
             <button
               onClick={() => setActiveCategory("youtube")}
-              className={`px-4 py-2 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 ${
+              className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] ${
                 activeCategory === "youtube"
-                  ? "bg-white text-black"
+                  ? "bg-white text-black shadow-md"
                   : "bg-zinc-900 text-zinc-400 hover:text-white"
               }`}
             >
-              YouTube
+              <svg className="w-3.5 h-3.5 fill-red-600 shrink-0" viewBox="0 0 24 24">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              </svg>
+              <span>YouTube</span>
             </button>
 
             {/* Mediathek */}
             <button
               onClick={() => setActiveCategory("mediathek")}
-              className={`px-4 py-2 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 ${
+              className={`px-4 py-1.5 rounded-full text-xs font-bold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 ${
                 activeCategory === "mediathek"
-                  ? "bg-white text-black"
+                  ? "bg-white text-black shadow-md"
                   : "bg-zinc-900 text-zinc-400 hover:text-white"
               }`}
             >
@@ -544,7 +547,7 @@ export default function YouTubeCatalogPage() {
             {/* Избранное (Общее) - строго иконка и бейдж счетчика */}
             <button
               onClick={() => setActiveCategory("favorites")}
-              className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-2 cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] transition-colors duration-200 ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] transition-colors duration-200 ${
                 activeCategory === "favorites"
                   ? "bg-amber-500 text-black border border-amber-400 shadow-lg shadow-amber-500/20"
                   : "bg-zinc-900 text-zinc-300 hover:text-white border border-zinc-800 hover:border-amber-500/40"
