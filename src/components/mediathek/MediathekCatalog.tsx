@@ -9,6 +9,7 @@ import {
   Film, 
   Tv, 
   Compass, 
+  Lightbulb,
   Bookmark, 
   RotateCw,
   Sparkles,
@@ -29,7 +30,7 @@ export interface MediathekMediaItem {
   date: string;
 }
 
-export type CategoryType = "all" | "films" | "docs" | "series";
+export type CategoryType = "all" | "films" | "docs" | "series" | "knowledge";
 export type LevelType = "ALL" | "B1" | "B2";
 
 const CATEGORIES: { id: CategoryType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -37,6 +38,7 @@ const CATEGORIES: { id: CategoryType; label: string; icon: React.ComponentType<{
   { id: "films", label: "Фильмы", icon: Film },
   { id: "docs", label: "Документальные фильмы", icon: Compass },
   { id: "series", label: "Сериалы", icon: Tv },
+  { id: "knowledge", label: "Познавательное & Шоу", icon: Lightbulb },
 ];
 
 const LEVELS: { id: LevelType; label: string; desc: string }[] = [
@@ -45,12 +47,24 @@ const LEVELS: { id: LevelType; label: string; desc: string }[] = [
   { id: "B2", label: "B2", desc: "Естественная речь, фильмы" },
 ];
 
+function getFallbackPoster(channel: string, topic: string): string {
+  const ch = channel || "ARD / ZDF";
+  const bg = ch.toUpperCase().includes("ZDF")
+    ? "#e05a10"
+    : ch.toUpperCase().includes("ARTE")
+    ? "#c82828"
+    : "#003366";
+
+  const safeChannel = ch.replace(/[<>&"']/g, "");
+  const safeTopic = (topic || "Mediathek").slice(0, 35).replace(/[<>&"']/g, "");
+
+  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" fill="%2318181b"/><rect width="640" height="360" fill="${encodeURIComponent(bg)}" opacity="0.35"/><text x="40" y="80" fill="%23ffffff" font-family="sans-serif" font-weight="900" font-size="28">${encodeURIComponent(safeChannel)}</text><text x="40" y="140" fill="%23e4e4e7" font-family="sans-serif" font-weight="bold" font-size="22">${encodeURIComponent(safeTopic)}</text></svg>`;
+}
+
 export default function MediathekCatalog() {
   const { isFavorite, toggleFavorite } = useYouTube();
 
   const [items, setItems] = useState<MediathekMediaItem[]>([]);
-  const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set());
-
   const [category, setCategory] = useState<CategoryType>("all");
   const [level, setLevel] = useState<LevelType>("ALL");
   const [searchInput, setSearchInput] = useState<string>("");
@@ -66,20 +80,20 @@ export default function MediathekCatalog() {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-  // Мгновенный запрос медиа-элементов
+  // Мгновенный запрос медиа-элементов с защитой от кэширования (Cache-Busting)
   const fetchMediaItems = useCallback(
     async ({
       newCategory,
       newLevel,
       newQuery,
       newOffset = 0,
-      reset = false,
+      append = false,
     }: {
       newCategory?: CategoryType;
       newLevel?: LevelType;
       newQuery?: string;
       newOffset?: number;
-      reset?: boolean;
+      append?: boolean;
     } = {}) => {
       const catToUse = newCategory !== undefined ? newCategory : category;
       const lvlToUse = newLevel !== undefined ? newLevel : level;
@@ -87,7 +101,7 @@ export default function MediathekCatalog() {
 
       const requestId = ++activeRequestIdRef.current;
 
-      if (reset) {
+      if (!append) {
         setIsLoading(true);
         setError(null);
       } else {
@@ -95,15 +109,17 @@ export default function MediathekCatalog() {
       }
 
       try {
-        const res = await fetch("/api/mediathek", {
+        const res = await fetch(`/api/mediathek?t=${Date.now()}&rnd=${Math.random()}`, {
           method: "POST",
+          cache: "no-store",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             offset: newOffset,
-            size: 28,
+            size: 24,
             category: catToUse,
             level: lvlToUse,
             query: queryToUse,
+            timestamp: Date.now(),
           }),
         });
 
@@ -114,13 +130,22 @@ export default function MediathekCatalog() {
         const data = await res.json();
         if (requestId !== activeRequestIdRef.current) return;
 
-        const newItems: MediathekMediaItem[] = (data.items || []).filter(
-          (it: MediathekMediaItem) => Boolean(it.posterUrl || it.thumbnailUrl)
-        );
+        const newItems: MediathekMediaItem[] = (data.items || []).map((it: MediathekMediaItem) => ({
+          ...it,
+          posterUrl: it.posterUrl || it.thumbnailUrl || getFallbackPoster(it.channel, it.topic),
+        }));
 
-        setItems((prev) => (reset ? newItems : [...prev, ...newItems]));
-        setHasMore(Boolean(data.hasMore && newItems.length > 0));
-        setOffset(newOffset + 45);
+        setItems((prev) => {
+          if (!append) return newItems;
+          const existingIds = new Set(prev.map((p) => p.id));
+          const existingUrls = new Set(prev.map((p) => p.url_website));
+          const uniqueNext = newItems.filter(
+            (n) => !existingIds.has(n.id) && !existingUrls.has(n.url_website)
+          );
+          return [...prev, ...uniqueNext];
+        });
+
+        setHasMore(Boolean(data.hasMore));
       } catch (err: any) {
         if (requestId === activeRequestIdRef.current) {
           console.error("Error loading Mediathek items:", err);
@@ -138,7 +163,7 @@ export default function MediathekCatalog() {
 
   // Первоначальная загрузка
   useEffect(() => {
-    fetchMediaItems({ newCategory: "all", newLevel: "ALL", newOffset: 0, reset: true });
+    fetchMediaItems({ newCategory: "all", newLevel: "ALL", newOffset: 0, append: false });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Мгновенная реакция при смене категории
@@ -146,10 +171,9 @@ export default function MediathekCatalog() {
     if (newCat === category) return;
     setCategory(newCat);
     setItems([]);
-    setBrokenIds(new Set());
     setOffset(0);
     setHasMore(true);
-    fetchMediaItems({ newCategory: newCat, newOffset: 0, reset: true });
+    fetchMediaItems({ newCategory: newCat, newOffset: 0, append: false });
   };
 
   // Мгновенная реакция при смене уровня
@@ -157,19 +181,17 @@ export default function MediathekCatalog() {
     if (newLevel === level) return;
     setLevel(newLevel);
     setItems([]);
-    setBrokenIds(new Set());
     setOffset(0);
     setHasMore(true);
-    fetchMediaItems({ newLevel, newOffset: 0, reset: true });
+    fetchMediaItems({ newLevel, newOffset: 0, append: false });
   };
 
   // Принудительное обновление
   const handleRefresh = () => {
     setItems([]);
-    setBrokenIds(new Set());
     setOffset(0);
     setHasMore(true);
-    fetchMediaItems({ newOffset: 0, reset: true });
+    fetchMediaItems({ newOffset: 0, append: false });
   };
 
   // Поиск
@@ -178,21 +200,27 @@ export default function MediathekCatalog() {
     const trimmed = searchInput.trim();
     setActiveQuery(trimmed);
     setItems([]);
-    setBrokenIds(new Set());
     setOffset(0);
     setHasMore(true);
-    fetchMediaItems({ newQuery: trimmed, newOffset: 0, reset: true });
+    fetchMediaItems({ newQuery: trimmed, newOffset: 0, append: false });
   };
 
   const handleClearSearch = () => {
     setSearchInput("");
     setActiveQuery("");
     setItems([]);
-    setBrokenIds(new Set());
     setOffset(0);
     setHasMore(true);
-    fetchMediaItems({ newQuery: "", newOffset: 0, reset: true });
+    fetchMediaItems({ newQuery: "", newOffset: 0, append: false });
   };
+
+  // Подгрузка следующей пачки (честный шаг offset: 0 -> 24 -> 48 -> 72...)
+  const loadMore = useCallback(() => {
+    if (isLoading || isLoadingMore || !hasMore) return;
+    const nextOffset = offset + 24;
+    setOffset(nextOffset);
+    fetchMediaItems({ newOffset: nextOffset, append: true });
+  }, [isLoading, isLoadingMore, hasMore, offset, fetchMediaItems]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -205,10 +233,10 @@ export default function MediathekCatalog() {
     observerRef.current = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !isLoading && !isLoadingMore) {
-          fetchMediaItems({ newOffset: offset, reset: false });
+          loadMore();
         }
       },
-      { rootMargin: "300px" }
+      { rootMargin: "350px" }
     );
 
     if (loadMoreRef.current) {
@@ -220,7 +248,7 @@ export default function MediathekCatalog() {
         observerRef.current.disconnect();
       }
     };
-  }, [fetchMediaItems, hasMore, isLoading, isLoadingMore, offset]);
+  }, [loadMore, hasMore, isLoading, isLoadingMore]);
 
   const handleCardClick = (url: string) => {
     window.location.href = url;
@@ -234,27 +262,11 @@ export default function MediathekCatalog() {
       title: item.title,
       channel: item.channel,
       level: item.level,
-      thumbnailUrl: item.posterUrl || item.thumbnailUrl || "",
+      thumbnailUrl: item.posterUrl || item.thumbnailUrl || getFallbackPoster(item.channel, item.topic),
       description: item.topic,
       durationText: `${item.duration} мин`,
     });
   };
-
-  // Устранение дублей серий и пустых обложек
-  const seenTitles = new Set<string>();
-  const displayedItems = items
-    .filter((it) => (it.posterUrl || it.thumbnailUrl) && !brokenIds.has(it.id))
-    .filter((item) => {
-      const clean = item.title
-        .replace(/\s*\(S\d+.*\)/gi, "")
-        .replace(/\s*\(Folge\s*\d+.*\)/gi, "")
-        .replace(/\s*\(Teil\s*\d+.*\)/gi, "")
-        .trim()
-        .toLowerCase();
-      if (seenTitles.has(clean)) return false;
-      seenTitles.add(clean);
-      return true;
-    });
 
   return (
     <div className="w-full">
@@ -293,7 +305,7 @@ export default function MediathekCatalog() {
       {/* Панель фильтров: Категории и Уровни */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
-          {/* Строгий список категорий: [ Все ] [ Фильмы ] [ Документальные фильмы ] [ Сериалы ] + ↻ */}
+          {/* Категории + ↻ */}
           <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
             {CATEGORIES.map((cat) => {
               const Icon = cat.icon;
@@ -354,7 +366,7 @@ export default function MediathekCatalog() {
           <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
           <p className="text-sm text-zinc-300">{error}</p>
           <button
-            onClick={() => fetchMediaItems({ newOffset: 0, reset: true })}
+            onClick={() => fetchMediaItems({ newOffset: 0, append: false })}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-600 hover:bg-red-700 text-xs font-bold text-white transition-colors cursor-pointer"
           >
             <RotateCw className="w-3.5 h-3.5" />
@@ -377,7 +389,7 @@ export default function MediathekCatalog() {
       )}
 
       {/* Пустое состояние */}
-      {!isLoading && !error && displayedItems.length === 0 && (
+      {!isLoading && !error && items.length === 0 && (
         <div className="max-w-md mx-auto my-16 text-center space-y-3">
           <Film className="w-10 h-10 text-zinc-600 mx-auto" />
           <h3 className="text-base font-bold text-white">Передачи не найдены</h3>
@@ -388,10 +400,11 @@ export default function MediathekCatalog() {
       )}
 
       {/* Сетка карточек медиатеки */}
-      {!isLoading && displayedItems.length > 0 && (
+      {!isLoading && items.length > 0 && (
         <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-          {displayedItems.map((item) => {
+          {items.map((item) => {
             const isFav = isFavorite(item.url_website) || isFavorite(item.id);
+            const fallbackSvg = getFallbackPoster(item.channel, item.topic);
 
             return (
               <div
@@ -410,10 +423,13 @@ export default function MediathekCatalog() {
                 {/* 1. Превью 16:9 с наложением */}
                 <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800">
                   <img
-                    src={item.posterUrl || item.thumbnailUrl}
+                    src={item.posterUrl || item.thumbnailUrl || fallbackSvg}
                     alt={item.title}
-                    onError={() => {
-                      setBrokenIds((prev) => new Set(prev).add(item.id));
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (target.src !== fallbackSvg) {
+                        target.src = fallbackSvg;
+                      }
                     }}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     loading="lazy"
@@ -485,9 +501,6 @@ export default function MediathekCatalog() {
             <Loader2 className="w-4 h-4 animate-spin text-red-600" />
             <span>Загрузка следующих передач...</span>
           </div>
-        )}
-        {!hasMore && displayedItems.length > 0 && !isLoading && (
-          <span className="text-xs text-zinc-600">Вы просмотрели все доступные передачи</span>
         )}
       </div>
     </div>

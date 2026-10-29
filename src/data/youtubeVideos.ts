@@ -93,25 +93,6 @@ export const RECOMMENDED_YOUTUBE_VIDEOS: YouTubeRecommendedVideo[] = [
     description: "Живое обсуждение актуальных тем и немецкой культуры в формате подкаста с четким произношением.",
     durationText: "24 мин",
   },
-  // 2. DW Deutsch lernen (B1)
-  {
-    id: "_buguiVte80",
-    title: "Deutsch lernen mit Videos: Nachrichten leicht verständlich",
-    channel: "DW Deutsch lernen",
-    level: "B1",
-    thumbnailUrl: "https://i.ytimg.com/vi/_buguiVte80/hqdefault.jpg",
-    description: "Краткий новостной выпуск на понятном немецком языке с идеальной дикцией дикторов Deutsche Welle.",
-    durationText: "4 мин",
-  },
-  {
-    id: "sXeHoU9fbkA",
-    title: "Top-Thema mit Vokabeln: Weltgeschehen verstehen",
-    channel: "DW Deutsch lernen",
-    level: "B1",
-    thumbnailUrl: "https://i.ytimg.com/vi/sXeHoU9fbkA/hqdefault.jpg",
-    description: "Образовательные сюжеты от DW с акцентом на понимание на слух и расширение словарного запаса.",
-    durationText: "6 мин",
-  },
 
   // 3. MrWissen2go (B2)
   {

@@ -5,11 +5,48 @@ import { Play, Bookmark } from "lucide-react";
 import { YouTubeRecommendedVideo } from "@/types/youtube";
 import { useYouTube } from "@/context/YouTubeContext";
 
+export function isValidDuration(durationStr?: string, seconds?: number): boolean {
+  if (typeof seconds === "number" && seconds < 600) return false;
+  if (!durationStr) return false;
+
+  const minMatch = durationStr.match(/(\d+)\s*(?:мин|min)/i);
+  if (minMatch) {
+    return parseInt(minMatch[1], 10) >= 10;
+  }
+
+  const parts = durationStr.split(":").map(Number);
+  if (parts.some(isNaN)) return false;
+  if (parts.length === 2) {
+    // MM:SS -> отсекаем всё, где минут меньше 10
+    return parts[0] >= 10;
+  }
+  if (parts.length === 3) {
+    // HH:MM:SS -> видео идет больше часа, подходит на 100%
+    return true;
+  }
+  return false;
+}
+
+function getFallbackPoster(channel: string, topic: string): string {
+  const ch = channel || "ARD / ZDF";
+  const bg = ch.toUpperCase().includes("ZDF")
+    ? "#e05a10"
+    : ch.toUpperCase().includes("ARTE")
+    ? "#c82828"
+    : "#003366";
+
+  const safeChannel = ch.replace(/[<>&"']/g, "");
+  const safeTopic = (topic || "Mediathek").slice(0, 35).replace(/[<>&"']/g, "");
+
+  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" fill="%2318181b"/><rect width="640" height="360" fill="${encodeURIComponent(bg)}" opacity="0.35"/><text x="40" y="80" fill="%23ffffff" font-family="sans-serif" font-weight="900" font-size="28">${encodeURIComponent(safeChannel)}</text><text x="40" y="140" fill="%23e4e4e7" font-family="sans-serif" font-weight="bold" font-size="22">${encodeURIComponent(safeTopic)}</text></svg>`;
+}
+
 interface VideoCardProps {
   video: YouTubeRecommendedVideo & {
     youtube_id?: string;
     url_website?: string;
     duration_str?: string;
+    duration?: number;
     sentenceCount?: number;
     wordCount?: number;
   };
@@ -20,7 +57,12 @@ interface VideoCardProps {
 export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
   const { isFavorite, toggleFavorite } = useYouTube();
   const videoId = video.youtube_id || video.id || video.url_website || "";
-  const isExternalUrl = videoId.startsWith("http://") || videoId.startsWith("https://") || Boolean(video.url_website);
+  const isExternalUrl =
+    videoId.startsWith("http://") ||
+    videoId.startsWith("https://") ||
+    Boolean(video.url_website);
+
+  const durationDisplay = video.durationText || video.duration_str;
 
   const [isDead, setIsDead] = useState(false);
   const [thumbUrl, setThumbUrl] = useState(() => {
@@ -28,20 +70,34 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
       return video.thumbnailUrl;
     }
     if (isExternalUrl) {
-      return video.thumbnailUrl || "";
+      return video.thumbnailUrl || getFallbackPoster(video.channel || "ARD / ZDF", video.title || "");
     }
     return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
   });
 
+  // Строгая клиентская проверка для YouTube: бан Shorts и видео короче 10 минут
+  if (!isExternalUrl) {
+    const combinedText = `${videoId} ${video.title || ""} ${video.description || ""}`.toLowerCase();
+    if (
+      /\b(shorts?|short|vertical|tiktok|reels?)\b/i.test(combinedText) ||
+      /#(shorts?|short|vertical|tiktok|reels?)/i.test(combinedText) ||
+      combinedText.includes("/shorts/")
+    ) {
+      return null;
+    }
+    if (durationDisplay && !isValidDuration(durationDisplay, video.duration)) {
+      return null;
+    }
+  }
+
   const handleImageError = () => {
     if (isExternalUrl) {
-      // Never hide external Mediathek videos on image load issue
+      setThumbUrl(getFallbackPoster(video.channel || "ARD / ZDF", video.title || ""));
       return;
     }
     if (thumbUrl.includes("maxresdefault")) {
       setThumbUrl(`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`);
     } else {
-      // If hqdefault also fails for YouTube, remove card from DOM
       setIsDead(true);
     }
   };
@@ -72,9 +128,7 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
 
   const level = (video.level || "B1").toUpperCase();
   const isB2 = level.startsWith("B2") || level === "C1" || level === "C2";
-  const durationDisplay = video.durationText || video.duration_str;
 
-  // Complete removal from grid only if YouTube video or thumbnail is completely broken
   if (isDead) return null;
 
   return (
@@ -92,19 +146,13 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
     >
       {/* 1. Preview 16:9 */}
       <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-all duration-300">
-        {thumbUrl ? (
-          <img
-            src={thumbUrl}
-            alt={video.title}
-            onError={handleImageError}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-500 text-xs font-medium">
-            {video.channel || "ARD / ZDF"}
-          </div>
-        )}
+        <img
+          src={thumbUrl || getFallbackPoster(video.channel || "ARD / ZDF", video.title || "")}
+          alt={video.title}
+          onError={handleImageError}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          loading="lazy"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
 
         {/* Top-Left: Channel Badge (if Mediathek) or Level Badge */}

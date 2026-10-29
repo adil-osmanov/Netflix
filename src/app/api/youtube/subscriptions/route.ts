@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { YouTubeRecommendedVideo } from "@/types/youtube";
+import { isValidDuration } from "../recommendations/route";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const YOUTUBE_ID_REGEX = /^[a-zA-Z0-9_-]{11}$/;
+
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const channelIdsParam = searchParams.get("channelIds") || "";
+    const channelIdsParam = searchParams.get("channelIds") || searchParams.get("channels") || "";
     const rawChannelIds = channelIdsParam.split(",").map((s) => s.trim()).filter(Boolean);
     const channelIds = Array.from(
       new Set(
@@ -19,12 +34,21 @@ export async function GET(request: NextRequest) {
     const excludeSet = new Set(excludeParam.split(",").map((s) => s.trim()).filter(Boolean));
 
     if (channelIds.length === 0) {
-      return NextResponse.json({
-        page,
-        limit,
-        videos: [],
-        hasMore: false,
-      });
+      return NextResponse.json(
+        {
+          page,
+          limit,
+          videos: [],
+          hasMore: false,
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      );
     }
 
     const allVideos: YouTubeRecommendedVideo[] = [];
@@ -32,59 +56,81 @@ export async function GET(request: NextRequest) {
     await Promise.all(
       channelIds.map(async (channelId) => {
         try {
-          let rssUrl = channelId.startsWith("UC")
-            ? `https://www.youtube.com/feeds/videos.xml?playlist_id=UULF${channelId.slice(2)}`
-            : `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
-
-          let resp = await fetch(rssUrl, {
-            next: { revalidate: 1800 },
-            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+          const resp = await fetch("https://www.youtube.com/youtubei/v1/browse?prettyPrint=false", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            },
+            body: JSON.stringify({
+              context: {
+                client: {
+                  clientName: "WEB",
+                  clientVersion: "2.20240101.01.00",
+                  hl: "de",
+                  gl: "DE",
+                },
+              },
+              browseId: channelId,
+              params: "EgZ2aWRlb3PyBgQKAjoA",
+            }),
+            next: { revalidate: 900 },
           });
-
-          if (!resp.ok && channelId.startsWith("UC")) {
-            rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
-            resp = await fetch(rssUrl, {
-              next: { revalidate: 1800 },
-              headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
-            });
-          }
 
           if (!resp.ok) return;
 
-          const xml = await resp.text();
-          const entries = xml.split("<entry>").slice(1);
+          const data = await resp.json();
+          const channelTitle =
+            data?.metadata?.channelMetadataRenderer?.title ||
+            data?.header?.pageHeaderRenderer?.pageTitle ||
+            "Канал";
+          const tabs = data?.contents?.twoColumnBrowseResultsRenderer?.tabs;
+          const videoTab = tabs?.find((t: any) => t.tabRenderer?.selected);
+          const richItems = videoTab?.tabRenderer?.content?.richGridRenderer?.contents || [];
 
-          for (const entry of entries) {
-            const idMatch = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
-            const titleMatch = entry.match(/<title>([^<]+)<\/title>/);
-            const authorMatch = entry.match(/<author>\s*<name>([^<]+)<\/name>/);
-            const publishedMatch = entry.match(/<published>([^<]+)<\/published>/);
-            const descMatch = entry.match(/<media:description>([\s\S]*?)<\/media:description>/);
+          for (const item of richItems) {
+            const lockup = item?.richItemRenderer?.content?.lockupViewModel;
+            const vr = item?.richItemRenderer?.content?.videoRenderer;
 
-            const id = idMatch ? idMatch[1].trim() : "";
-            const rawTitle = titleMatch ? titleMatch[1].trim() : "";
+            const id = lockup?.contentId || vr?.videoId;
+            if (!id || !YOUTUBE_ID_REGEX.test(id)) continue;
+
+            const rawTitle =
+              lockup?.metadata?.lockupMetadataViewModel?.title?.content ||
+              vr?.title?.runs?.[0]?.text ||
+              "";
+
             const cleanTitle = rawTitle
               .replace(/&amp;/g, "&")
               .replace(/&quot;/g, '"')
               .replace(/&#39;/g, "'")
               .replace(/&lt;/g, "<")
               .replace(/&gt;/g, ">");
-            const channel = authorMatch ? authorMatch[1].trim() : "Канал";
-            const published = publishedMatch ? publishedMatch[1].trim() : "";
-            const desc = descMatch ? descMatch[1].trim() : "";
 
-            const widthMatch = entry.match(/width="(\d+)"/);
-            const heightMatch = entry.match(/height="(\d+)"/);
-            const thumbWidth = widthMatch ? parseInt(widthMatch[1], 10) : 0;
-            const thumbHeight = heightMatch ? parseInt(heightMatch[1], 10) : 0;
-            const isVertical = thumbWidth > 0 && thumbHeight > 0 && thumbHeight >= thumbWidth;
+            let durationText = "";
+            const overlays = lockup?.contentImage?.thumbnailViewModel?.overlays || [];
+            for (const ov of overlays) {
+              const badges = ov?.thumbnailBottomOverlayViewModel?.badges;
+              if (Array.isArray(badges) && badges[0]?.thumbnailBadgeViewModel?.text) {
+                durationText = badges[0].thumbnailBadgeViewModel.text.trim();
+                break;
+              }
+            }
+            if (!durationText && vr?.lengthText?.simpleText) {
+              durationText = vr.lengthText.simpleText.trim();
+            }
 
-            if (!id || id.length !== 11 || isVertical) continue;
+            // Строго от 10 минут (>= 600 секунд)
+            if (!isValidDuration(durationText)) continue;
 
-            const text = (cleanTitle + " " + desc).toLowerCase();
+            const text = `${id} ${cleanTitle}`.toLowerCase();
             if (
-              /\b(shorts?|tiktok|reels?)\b/i.test(text) ||
-              /#(shorts?|tiktok|reels?)/i.test(text)
+              lockup?.contentType === "LOCKUP_CONTENT_TYPE_SHORTS" ||
+              lockup?.contentType === "LOCKUP_CONTENT_TYPE_LIVE" ||
+              /\b(shorts?|short|vertical|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(text) ||
+              /#(shorts?|short|vertical|tiktok|reels?)/i.test(text) ||
+              text.includes("🔴")
             ) {
               continue;
             }
@@ -92,26 +138,18 @@ export async function GET(request: NextRequest) {
             allVideos.push({
               id,
               title: cleanTitle,
-              channel,
+              channel: channelTitle,
               channelId,
-              published,
               level: "B1",
               thumbnailUrl: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
-              description: desc ? desc.slice(0, 160) : `${channel} • Последние выпуски`,
+              description: `${channelTitle} • Последние выпуски`,
+              durationText,
             });
           }
         } catch {}
       })
     );
 
-    // Sort by publication date (newest first)
-    allVideos.sort((a, b) => {
-      const timeA = a.published ? new Date(a.published).getTime() : 0;
-      const timeB = b.published ? new Date(b.published).getTime() : 0;
-      return timeB - timeA;
-    });
-
-    // Deduplicate
     const seen = new Set<string>();
     const deduplicated: YouTubeRecommendedVideo[] = [];
     for (const v of allVideos) {
@@ -121,22 +159,38 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const availableVideos = deduplicated.filter((v) => !excludeSet.has(v.id));
+    const availableVideos = shuffleArray(deduplicated.filter((v) => !excludeSet.has(v.id)));
     const offset = (page - 1) * limit;
     const pageVideos = availableVideos.slice(offset, offset + limit);
 
-    return NextResponse.json({
-      page,
-      limit,
-      videos: pageVideos,
-      hasMore: offset + limit < availableVideos.length,
-      totalAvailable: availableVideos.length,
-    });
+    return NextResponse.json(
+      {
+        page,
+        limit,
+        videos: pageVideos,
+        hasMore: offset + limit < availableVideos.length,
+        totalAvailable: availableVideos.length,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
+    );
   } catch (error: any) {
     console.error("API [subscriptions] error:", error?.message);
     return NextResponse.json(
       { error: "Ошибка при получении видео подписок", details: error?.message },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
     );
   }
 }

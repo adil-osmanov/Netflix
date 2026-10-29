@@ -33,27 +33,32 @@ const DEFAULT_SUBSCRIPTIONS: SubscribedChannel[] = [
 ];
 
 /**
- * Helper to parse duration to total seconds (e.g. "12:34", "14 мин")
+ * Strict duration validator: strictly >= 10 minutes (>= 600 seconds)
  */
-function parseDurationToSeconds(durationStr?: string): number | null {
-  if (!durationStr) return null;
+function isValidDuration(durationStr?: string, seconds?: number): boolean {
+  if (typeof seconds === "number" && seconds < 600) return false;
+  if (!durationStr) return false;
+
   const minMatch = durationStr.match(/(\d+)\s*(?:мин|min)/i);
   if (minMatch) {
-    return parseInt(minMatch[1], 10) * 60;
+    return parseInt(minMatch[1], 10) >= 10;
   }
+
   const parts = durationStr.split(":").map(Number);
-  if (parts.some(isNaN)) return null;
+  if (parts.some(isNaN)) return false;
   if (parts.length === 2) {
-    return parts[0] * 60 + parts[1];
+    // MM:SS -> отсекаем всё, где минут меньше 10
+    return parts[0] >= 10;
   }
   if (parts.length === 3) {
-    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    // HH:MM:SS -> видео идет больше часа, подходит на 100%
+    return true;
   }
-  return null;
+  return false;
 }
 
 /**
- * Filter out YouTube Shorts, live streams, broken videos, and videos under 4 minutes:
+ * Filter out YouTube Shorts, live streams, broken videos, and videos under 10 minutes:
  */
 const BLOCKED_PATTERNS = [
   /winnetou/i,
@@ -86,27 +91,24 @@ function isYouTubeShort(video: {
     return true;
   }
 
-  // 3. Keywords and hashtag patterns
+  // 3. Keywords and hashtag patterns (#shorts, #short, Shorts, vertical, etc.)
   if (
-    /\b(shorts?|short|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(title) ||
-    /#(shorts?|short|tiktok|reels?)/i.test(title) ||
-    /\b(shorts?|short|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(desc) ||
-    /#(shorts?|short|tiktok|reels?)/i.test(desc) ||
+    /\b(shorts?|short|vertical|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(title) ||
+    /#(shorts?|short|vertical|tiktok|reels?)/i.test(title) ||
+    /\b(shorts?|short|vertical|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(desc) ||
+    /#(shorts?|short|vertical|tiktok|reels?)/i.test(desc) ||
     title.includes("🔴")
   ) {
     return true;
   }
 
-  // 4. Strict duration filter: exclude videos under 4 minutes (240 seconds)
-  if (video.duration && video.duration < 240) {
+  // 4. Strict duration filter: exclude videos under 10 minutes (600 seconds)
+  if (video.duration && video.duration < 600) {
     return true;
   }
 
-  if (video.durationText) {
-    const sec = parseDurationToSeconds(video.durationText);
-    if (sec !== null && sec < 240) {
-      return true;
-    }
+  if (video.durationText && !isValidDuration(video.durationText, video.duration)) {
+    return true;
   }
 
   return false;
@@ -175,7 +177,7 @@ export default function YouTubeCatalogPage() {
     } catch {}
   };
 
-  // Fetch subscriptions videos
+  // Fetch subscriptions videos (with cache-busting for iPad / Safari WebKit)
   const fetchSubscriptionVideos = useCallback(
     async (pageToLoad: number, append: boolean = false) => {
       if (subscriptions.length === 0) {
@@ -193,7 +195,8 @@ export default function YouTubeCatalogPage() {
       try {
         const channelIds = subscriptions.map((s) => s.id).join(",");
         const res = await fetch(
-          `/api/youtube/subscriptions?channels=${encodeURIComponent(channelIds)}&page=${pageToLoad}&limit=16&seed=${seed}`
+          `/api/youtube/subscriptions?channels=${encodeURIComponent(channelIds)}&page=${pageToLoad}&limit=16&seed=${seed}&t=${Date.now()}&rnd=${Math.random()}`,
+          { cache: "no-store" }
         );
         if (res.ok) {
           const data = await res.json();
@@ -212,7 +215,7 @@ export default function YouTubeCatalogPage() {
     [subscriptions, seed]
   );
 
-  // Fetch recommendations
+  // Fetch recommendations (with POST + cache-busting for iPad / Safari WebKit)
   const fetchRecommendations = useCallback(
     async (pageToLoad: number, append: boolean = false) => {
       if (append) {
@@ -222,7 +225,16 @@ export default function YouTubeCatalogPage() {
       }
 
       try {
-        const res = await fetch(`/api/youtube/recommendations?page=${pageToLoad}&limit=16`);
+        const res = await fetch(`/api/youtube/recommendations?t=${Date.now()}&rnd=${Math.random()}`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            page: pageToLoad,
+            limit: 16,
+            timestamp: Date.now(),
+          }),
+        });
         if (res.ok) {
           const data = await res.json();
           const newVideos = data.videos || [];
