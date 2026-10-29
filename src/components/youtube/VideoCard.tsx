@@ -153,7 +153,7 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
           handleOpenVideo(videoId);
         }
       }}
-      className="group relative flex flex-col cursor-pointer text-left select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent]"
+      className="group relative flex flex-col cursor-pointer text-left select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
     >
       {/* 1. Preview 16:9 */}
       <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-all duration-300">
@@ -184,7 +184,7 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
         <button
           type="button"
           onClick={handleFavoriteClick}
-          className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/90 backdrop-blur-md text-zinc-300 hover:text-white transition z-20 cursor-pointer"
+          className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/90 backdrop-blur-md text-zinc-300 hover:text-white transition z-20 cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
           title={isFav ? "Удалить из избранного" : "Сохранить в избранное"}
         >
           <Bookmark

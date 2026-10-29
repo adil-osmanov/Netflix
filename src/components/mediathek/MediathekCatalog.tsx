@@ -32,16 +32,16 @@ export interface MediathekMediaItem {
 export type CategoryType = "all" | "films" | "docs" | "series" | "knowledge";
 export type LevelType = "ALL" | "A1" | "A2" | "B1" | "B2" | "C1";
 
-const CATEGORIES: { id: CategoryType; label: string; icon?: React.ComponentType<{ className?: string }> }[] = [
+const CATEGORIES: { id: CategoryType; label: string }[] = [
   { id: "all", label: "Рекомендации" },
-  { id: "films", label: "Фильмы", icon: Film },
-  { id: "docs", label: "Документальные фильмы", icon: Compass },
-  { id: "series", label: "Сериалы", icon: Tv },
-  { id: "knowledge", label: "Познавательное & Шоу", icon: Lightbulb },
+  { id: "films", label: "Фильмы" },
+  { id: "docs", label: "Документальное" },
+  { id: "series", label: "Сериалы" },
+  { id: "knowledge", label: "Познавательное" },
 ];
 
 const LEVELS: { id: LevelType; label: string }[] = [
-  { id: "ALL", label: "Все уровни" },
+  { id: "ALL", label: "Все" },
   { id: "A1", label: "A1" },
   { id: "A2", label: "A2" },
   { id: "B1", label: "B1" },
@@ -287,14 +287,14 @@ export default function MediathekCatalog() {
       <div className="max-w-3xl mx-auto mb-6">
         <form
           onSubmit={handleSearchSubmit}
-          className="relative bg-zinc-900/90 border border-zinc-800 rounded-full px-4 py-2.5 flex items-center gap-2.5 focus-within:border-zinc-500 transition-all shadow-xl select-none outline-none focus:outline-none focus:ring-0 [-webkit-tap-highlight-color:transparent]"
+          className="relative bg-zinc-900/90 border border-zinc-800 rounded-full px-4 py-2.5 flex items-center gap-2.5 focus-within:border-zinc-500 transition-all shadow-xl select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
         >
           <Search className="w-4 h-4 text-zinc-400 flex-shrink-0" />
           <input
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Поиск по архивам ARD, ZDF, 3sat, Arte (например: Terra X, Natur, Berlin)..."
+            placeholder="Поиск..."
             className="bg-transparent text-xs sm:text-sm text-white placeholder:text-zinc-500 outline-none w-full"
           />
           {searchInput && (
@@ -308,79 +308,72 @@ export default function MediathekCatalog() {
           )}
           <button
             type="submit"
-            className="hidden sm:inline-block px-4 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-xs font-bold text-white transition-colors cursor-pointer shadow select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent]"
+            className="hidden sm:inline-block bg-red-600 hover:bg-red-700 text-white font-medium text-xs px-5 py-2.5 rounded-full transition-colors cursor-pointer shadow select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
           >
-            Найти
+            Поиск
           </button>
         </form>
       </div>
 
-      {/* Панель фильтров: Категории слева, Уровни + ↻ справа (в точности как в YouTube) */}
-      <div className="max-w-7xl mx-auto mb-8">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
-          {/* Список категорий слева: [ Рекомендации ] [ Фильмы ] [ Документальные фильмы ] [ Сериалы ] [ Познавательное & Шоу ] */}
-          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
-            {CATEGORIES.map((cat) => {
-              const Icon = cat.icon;
-              const isActive = category === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => handleCategoryChange(cat.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-all cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] ${
-                    isActive
-                      ? "bg-red-600 text-white font-semibold shadow-lg shadow-red-950/40"
-                      : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700"
-                  }`}
-                >
-                  {Icon && <Icon className="w-3.5 h-3.5" />}
-                  <span>{cat.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Правый блок: уровни + кнопка обновления ↻ */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Группа переключателей уровней A1–C1 */}
-            <div className="flex items-center p-1 bg-zinc-900/90 rounded-full border border-zinc-800 flex-wrap">
-              {LEVELS.map((lvl) => {
-                const isActive = level === lvl.id;
-                let activeStyle = "bg-white text-black font-semibold";
-                if (lvl.id === "A1" || lvl.id === "A2") {
-                  activeStyle = "bg-emerald-600 text-white font-semibold shadow-md";
-                } else if (lvl.id === "B1" || lvl.id === "B2") {
-                  activeStyle = "bg-sky-600 text-white font-semibold shadow-md";
-                } else if (lvl.id === "C1") {
-                  activeStyle = "bg-red-600 text-white font-semibold shadow-md";
-                }
-
-                return (
-                  <button
-                    key={lvl.id}
-                    onClick={() => handleLevelChange(lvl.id)}
-                    className={`px-3 py-1 text-xs rounded-full transition-all cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] ${
-                      isActive
-                        ? activeStyle
-                        : "text-zinc-400 hover:text-white"
-                    }`}
-                  >
-                    {lvl.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Кнопка ↻ на том же месте, что и в YouTube */}
+      {/* Панель управления в одну строку (One-Row Layout) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        {/* Категории слева */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          {[
+            { id: "all", label: "Рекомендации" },
+            { id: "films", label: "Фильмы" },
+            { id: "docs", label: "Документальное" },
+            { id: "series", label: "Сериалы" },
+            { id: "knowledge", label: "Познавательное" },
+          ].map((cat) => (
             <button
-              onClick={handleRefresh}
-              disabled={isLoading}
-              className="p-2 rounded-full bg-zinc-900/90 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent] disabled:opacity-40 cursor-pointer shadow"
-              title="Обновить рекомендации"
+              key={cat.id}
+              onClick={() => handleCategoryChange(cat.id as CategoryType)}
+              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+                category === cat.id
+                  ? "bg-red-600 text-white shadow-md"
+                  : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+              }`}
             >
-              <RotateCw className={`w-4 h-4 text-red-500 ${isLoading ? "animate-spin" : ""}`} />
+              {cat.label}
             </button>
+          ))}
+        </div>
+
+        {/* Уровни + кнопка ↻ справа */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center p-1 bg-zinc-900 rounded-full border border-zinc-800">
+            {[
+              { id: "ALL", label: "Все" },
+              { id: "A1", label: "A1" },
+              { id: "A2", label: "A2" },
+              { id: "B1", label: "B1" },
+              { id: "B2", label: "B2" },
+              { id: "C1", label: "C1" },
+            ].map((lvl) => (
+              <button
+                key={lvl.id}
+                onClick={() => handleLevelChange(lvl.id as LevelType)}
+                className={`px-3 py-1 text-xs rounded-full transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+                  level === lvl.id
+                    ? "bg-white text-black font-semibold"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                {lvl.label}
+              </button>
+            ))}
           </div>
+
+          {/* Кнопка обновления */}
+          <button
+            onClick={handleRefresh}
+            disabled={isLoading}
+            className="p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] disabled:opacity-40"
+            title="Обновить"
+          >
+            <RotateCw className={`w-4 h-4 text-red-500 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
         </div>
       </div>
 
@@ -391,7 +384,7 @@ export default function MediathekCatalog() {
           <p className="text-sm text-zinc-300">{error}</p>
           <button
             onClick={() => fetchMediaItems({ newOffset: 0, append: false })}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-600 hover:bg-red-700 text-xs font-bold text-white transition-colors cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:bg-opacity-90 [-webkit-tap-highlight-color:transparent]"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-600 hover:bg-red-700 text-xs font-bold text-white transition-colors cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
           >
             <RotateCw className="w-3.5 h-3.5" />
             <span>Повторить</span>
@@ -450,7 +443,7 @@ export default function MediathekCatalog() {
                     handleCardClick(item.url_website);
                   }
                 }}
-                className="group relative flex flex-col cursor-pointer text-left select-none outline-none [-webkit-tap-highlight-color:transparent]"
+                className="group relative flex flex-col cursor-pointer text-left select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
               >
                 {/* 1. Превью 16:9 с наложением */}
                 <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800">
@@ -483,7 +476,7 @@ export default function MediathekCatalog() {
                   <button
                     type="button"
                     onClick={(e) => handleToggleFavorite(e, item)}
-                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/90 text-white transition z-10 cursor-pointer backdrop-blur-md select-none outline-none focus:outline-none focus:ring-0 [-webkit-tap-highlight-color:transparent]"
+                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/90 text-white transition z-10 cursor-pointer backdrop-blur-md select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
                     title={isFav ? "Удалить из избранного" : "Сохранить в избранное"}
                   >
                     <Bookmark

@@ -174,7 +174,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
           <button
             type="button"
             onClick={() => setSelectedLevel("B1")}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
               selectedLevel === "B1"
                 ? "bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-950/50"
                 : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
@@ -187,7 +187,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
           <button
             type="button"
             onClick={() => setSelectedLevel("B2")}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
               selectedLevel === "B2"
                 ? "bg-sky-600 text-white font-bold shadow-lg shadow-sky-950/50"
                 : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
@@ -200,7 +200,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
           <button
             type="button"
             onClick={() => setSelectedLevel("C1")}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
               selectedLevel === "C1"
                 ? "bg-red-600 text-white font-bold border border-red-600 shadow-md"
                 : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
@@ -210,35 +210,27 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
           </button>
         </div>
 
-        {/* Центр: Счетчик прогресса в стиле Netflix */}
-        <div className="flex flex-col gap-1.5 min-w-[220px] sm:min-w-[260px]">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-xs font-medium text-zinc-400">
-              <span className="text-white font-semibold">{watchedCount} из {totalCount}</span> • {progressPercent}%
-            </span>
-          </div>
-          <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-500 rounded-full ${
-                selectedLevel === "C1"
-                  ? "bg-gradient-to-r from-red-600 to-amber-500"
-                  : selectedLevel === "B2"
-                  ? "bg-gradient-to-r from-sky-600 to-emerald-400"
-                  : "bg-gradient-to-r from-emerald-600 to-teal-400"
-              }`}
+        {/* Центр: Счетчик прогресса в стиле Netflix (строго по центру) */}
+        <div className="flex-1 max-w-xs mx-auto flex flex-col items-center">
+          <span className="text-[11px] text-zinc-400 font-medium mb-1">
+            {watchedCount} из {totalCount} • {progressPercent}%
+          </span>
+          <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-emerald-500 transition-all duration-300" 
               style={{ width: `${progressPercent}%` }}
             />
           </div>
         </div>
 
-        {/* Правая часть: Кнопка «+ Добавить видео» */}
+        {/* Правая часть: Кнопка «+ Видео» */}
         <button
           type="button"
           onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-lg shadow-emerald-950/40 cursor-pointer flex-shrink-0 active:scale-95"
+          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition shadow-lg shadow-emerald-950/40 cursor-pointer flex-shrink-0 select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
         >
-          <Plus className="w-4 h-4" />
-          <span>Добавить видео</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>Видео</span>
         </button>
       </div>
 
@@ -268,7 +260,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
                     setActiveVideo(video);
                   }
                 }}
-                className={`group relative flex flex-col cursor-pointer text-left select-none transition rounded-2xl p-1 ${
+                className={`group relative flex flex-col cursor-pointer text-left select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] transition rounded-2xl p-1 ${
                   isWatched
                     ? "border-2 border-emerald-500 shadow-lg shadow-emerald-950/30"
                     : "border border-transparent hover:border-zinc-800"
@@ -306,7 +298,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
                           handleDeleteVideo(video.id);
                         }
                       }}
-                      className="p-1.5 rounded-lg bg-black/70 hover:bg-red-600/80 text-zinc-400 hover:text-white transition opacity-0 group-hover:opacity-100 cursor-pointer"
+                      className="p-1.5 rounded-lg bg-black/70 hover:bg-red-600/80 text-zinc-400 hover:text-white transition opacity-0 group-hover:opacity-100 cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
                       title="Удалить видео"
                     >
                       <Trash2 size={14} />
@@ -317,7 +309,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
                       type="button"
                       onClick={(e) => handleToggleWatched(video.youtube_id, e)}
                       title={isWatched ? "Отметить как непросмотренное" : "Отметить как просмотренное"}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center transition cursor-pointer backdrop-blur-md ${
+                      className={`w-7 h-7 rounded-full flex items-center justify-center transition cursor-pointer backdrop-blur-md select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
                         isWatched
                           ? "bg-emerald-500 text-black shadow-md font-bold"
                           : "bg-black/60 text-zinc-400 hover:text-white"

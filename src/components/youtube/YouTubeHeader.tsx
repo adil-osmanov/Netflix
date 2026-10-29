@@ -10,23 +10,21 @@ export default function YouTubeHeader() {
       {/* Слева */}
       <div className="flex items-center">
         <Link
-          className="flex items-center gap-2 text-zinc-400 hover:text-white text-xs font-medium transition-colors"
+          className="flex items-center gap-2 text-zinc-400 hover:text-white text-xs font-medium transition-colors select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
           href="/"
         >
-          <ArrowLeft size={14} />
-          <span>В каталог фильмов</span>
+          <ArrowLeft size={16} />
+          <span>Назад</span>
         </Link>
       </div>
 
       {/* По центру */}
       <div className="flex items-center gap-2 select-none">
-        <span className="font-black tracking-tighter text-red-600 text-lg">NETFLIX</span>
-        <span className="text-zinc-600 text-xs">/</span>
-        <span className="text-xs uppercase tracking-widest font-semibold text-zinc-300">YouTube DE</span>
+        <span className="text-red-600 font-black tracking-widest text-lg sm:text-xl">NETFLIX</span>
       </div>
 
       {/* Справа (сбалансированный пустой блок) */}
-      <div className="w-28 hidden sm:block" />
+      <div className="w-20 hidden sm:block" />
     </header>
   );
 }
