@@ -100,13 +100,13 @@ export default function AddEasyGermanModal({
           <div className="flex items-center gap-2.5">
             <Video className="w-5 h-5 text-emerald-500" />
             <h2 className="text-base font-bold text-white">
-              Добавить видео в Easy German ({level})
+              Добавить видео
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition cursor-pointer"
+            className="p-1.5 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent]"
           >
             <X className="w-4 h-4" />
           </button>
@@ -124,14 +124,14 @@ export default function AddEasyGermanModal({
           {/* Единственное поле ввода: Ссылка или ID YouTube */}
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-zinc-300">
-              Ссылка на YouTube или ID ролика
+              Ссылка на YouTube
             </label>
             <input
               type="text"
               value={urlOrId}
               disabled={isLoading}
               onChange={(e) => setUrlOrId(e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=... или 11 символов ID"
+              placeholder="https://youtube.com/watch?v=..."
               className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-emerald-500 text-sm text-white placeholder:text-zinc-500 outline-none transition disabled:opacity-50"
               autoFocus
             />
@@ -159,7 +159,7 @@ export default function AddEasyGermanModal({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/50 cursor-pointer active:scale-[0.99]"
+            className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-semibold flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/50 cursor-pointer active:scale-[0.99] outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent]"
           >
             {isLoading ? (
               <>
@@ -167,10 +167,7 @@ export default function AddEasyGermanModal({
                 <span>Получение данных...</span>
               </>
             ) : (
-              <>
-                <Plus className="w-4 h-4" />
-                <span>+ Добавить в {level}</span>
-              </>
+              <span>+ Видео</span>
             )}
           </button>
         </form>

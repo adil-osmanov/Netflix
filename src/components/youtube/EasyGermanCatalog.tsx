@@ -213,12 +213,12 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
 
         {/* Центр: Счетчик прогресса в стиле Netflix (строго по центру с микро-эффектом свечения) */}
         <div className="flex-1 max-w-xs mx-auto flex flex-col items-center">
-          <span className="text-[11px] text-zinc-400 font-medium mb-1">
-            {watchedCount} из {totalCount} • {progressPercent}%
+          <span className="text-xs font-semibold text-zinc-400 mb-1">
+            {watchedCount} / {totalCount}
           </span>
           <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-300" 
+              className="h-full bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.35)] transition-all duration-300" 
               style={{ width: `${progressPercent}%` }}
             />
           </div>

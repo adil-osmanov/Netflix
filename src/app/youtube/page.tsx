@@ -459,6 +459,9 @@ export default function YouTubeCatalogPage() {
     }
 
     if (activeTab === "subscriptions") {
+      if (selectedLevel !== "ALL" && video.level && video.level !== selectedLevel) {
+        return false;
+      }
       if (selectedSubscribedChannel === "ALL") return true;
       const chClean = (video.channel || "").toLowerCase().trim();
       const selClean = selectedSubscribedChannel.toLowerCase().trim();
@@ -492,12 +495,12 @@ export default function YouTubeCatalogPage() {
 
   return (
     <div className="relative min-h-screen bg-black text-white pb-24 px-4 md:px-12 pt-4 transition-colors duration-500 overflow-x-hidden">
-      {/* Верхний рассеянный свет (Ambient Ceiling Light) */}
+      {/* Премиальный потолочный свет (Cinema Vignette) */}
       <div 
-        className={`fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[460px] pointer-events-none transition-all duration-700 ease-out z-0 blur-3xl ${
+        className={`fixed -top-32 left-1/2 -translate-x-1/2 w-[900px] h-[360px] pointer-events-none transition-opacity duration-700 ease-out z-0 blur-[120px] ${
           activeCategory === "youtube" && activeTab === "easy_german"
-            ? "opacity-100 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.10),transparent_70%)]"
-            : "opacity-100 bg-[radial-gradient(ellipse_at_top,rgba(220,38,38,0.06),transparent_70%)]"
+            ? "opacity-20 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.5),transparent_75%)]"
+            : "opacity-10 bg-[radial-gradient(ellipse_at_top,rgba(220,38,38,0.4),transparent_75%)]"
         }`}
       />
 
@@ -591,11 +594,7 @@ export default function YouTubeCatalogPage() {
           <div className="max-w-3xl mx-auto mb-6 pt-2">
             <form
               onSubmit={handleSearchOrWatch}
-              className={`relative bg-zinc-900/90 border rounded-full px-4 py-2 flex items-center gap-2 transition-all duration-500 select-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] ${
-                activeTab === "easy_german"
-                  ? "border-zinc-800/80 focus-within:border-emerald-500/50"
-                  : "border-zinc-800 focus-within:border-zinc-500"
-              }`}
+              className="relative bg-zinc-900/80 border border-zinc-800/80 focus-within:border-zinc-700 rounded-full px-4 py-2 flex items-center gap-2 transition-all duration-300 select-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent]"
             >
               <Search size={17} className="text-zinc-500 ml-3 flex-shrink-0" />
               <input
@@ -690,27 +689,25 @@ export default function YouTubeCatalogPage() {
               {/* Controls right side (only for Recommendations & Subscriptions) */}
               {activeTab !== "easy_german" && (
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                  {/* Группа переключателей уровней A1–C1 для рекомендаций */}
-                  {activeTab === "recommendations" && (
-                    <div className="flex items-center p-1 bg-zinc-900 rounded-full border border-zinc-800 flex-wrap">
-                      {LEVELS.map((lvl) => {
-                        const isActive = selectedLevel === lvl.id;
-                        return (
-                          <button
-                            key={lvl.id}
-                            onClick={() => handleLevelChange(lvl.id)}
-                            className={`px-3 py-1 text-xs rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
-                              isActive
-                                ? "bg-white text-black font-semibold"
-                                : "text-zinc-400 hover:text-white"
-                            }`}
-                          >
-                            {lvl.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                  {/* Группа переключателей уровней A1–C1 для рекомендаций и подписок */}
+                  <div className="flex items-center p-1 bg-zinc-900 rounded-full border border-zinc-800 flex-wrap">
+                    {LEVELS.map((lvl) => {
+                      const isActive = selectedLevel === lvl.id;
+                      return (
+                        <button
+                          key={lvl.id}
+                          onClick={() => handleLevelChange(lvl.id)}
+                          className={`px-3 py-1 text-xs rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
+                            isActive
+                              ? "bg-white text-black font-semibold"
+                              : "text-zinc-400 hover:text-white"
+                          }`}
+                        >
+                          {lvl.label}
+                        </button>
+                      );
+                    })}
+                  </div>
 
                   {/* Refresh Feed Button */}
                   <button

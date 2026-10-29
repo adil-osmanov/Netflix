@@ -14,6 +14,14 @@ export function parseDurationSeconds(durationText: string): number {
   return 0;
 }
 
+function detectLevelFromTitleOrDuration(title: string, durationSeconds: number): "A1" | "A2" | "B1" | "B2" | "C1" {
+  const match = title.match(/\b(A1|A2|B1|B2|C1)\b/i);
+  if (match) {
+    return match[1].toUpperCase() as any;
+  }
+  return durationSeconds >= 1200 ? "B2" : "B1";
+}
+
 export function extractVideosFromRichContents(
   contents: any[],
   fallbackChannelName: string,
@@ -48,7 +56,7 @@ export function extractVideosFromRichContents(
           title: rawTitle,
           channel: channelName,
           channelId,
-          level: durationSeconds >= 1200 ? "B2" : "B1",
+          level: detectLevelFromTitleOrDuration(rawTitle, durationSeconds),
           duration_str: durationText,
           durationText,
           duration_seconds: durationSeconds,
@@ -86,7 +94,7 @@ export function extractVideosFromRichContents(
           title: rawTitle,
           channel: fallbackChannelName,
           channelId,
-          level: durationSeconds >= 1200 ? "B2" : "B1",
+          level: detectLevelFromTitleOrDuration(rawTitle, durationSeconds),
           duration_str: durationText,
           durationText,
           duration_seconds: durationSeconds,
