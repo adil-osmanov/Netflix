@@ -499,3 +499,37 @@ export async function addEasyGermanVideoAction(
   return { success: true };
 }
 
+/**
+ * Easy German: удаление ролика из Supabase и global_settings
+ */
+export async function deleteEasyGermanVideoAction(
+  videoIdOrYoutubeId: string
+): Promise<{ success: boolean }> {
+  try {
+    await supabase
+      .from("easy_german_videos")
+      .delete()
+      .or(`id.eq.${videoIdOrYoutubeId},youtube_id.eq.${videoIdOrYoutubeId}`);
+  } catch {}
+
+  try {
+    const { data } = await supabase
+      .from("global_settings")
+      .select("value")
+      .eq("key", "easy_german_custom_videos")
+      .maybeSingle();
+    if (data?.value && Array.isArray(data.value)) {
+      const filtered = data.value.filter(
+        (v: EasyGermanVideo) =>
+          v.id !== videoIdOrYoutubeId && v.youtube_id !== videoIdOrYoutubeId
+      );
+      await supabase
+        .from("global_settings")
+        .upsert({ key: "easy_german_custom_videos", value: filtered });
+    }
+  } catch {}
+
+  return { success: true };
+}
+
+

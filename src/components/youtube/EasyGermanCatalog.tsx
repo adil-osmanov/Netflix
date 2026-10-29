@@ -1,24 +1,19 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Play, Check, Plus, Video } from "lucide-react";
+import { Play, Check, Plus, Video, Trash2 } from "lucide-react";
 import { EasyGermanVideo } from "@/types/youtube";
 import { INITIAL_EASY_GERMAN_VIDEOS } from "@/data/easyGermanVideos";
 import {
   getEasyGermanStateAction,
   toggleEasyGermanWatchedAction,
   addEasyGermanVideoAction,
+  deleteEasyGermanVideoAction,
 } from "@/app/youtube/actions";
 import EasyGermanPlayerModal from "./EasyGermanPlayerModal";
 import AddEasyGermanModal from "./AddEasyGermanModal";
 
-type LevelFilter = "ALL" | "B1" | "B2" | "C1";
-
-const LEVEL_BADGE_CLASSES: Record<"B1" | "B2" | "C1", string> = {
-  B1: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40",
-  B2: "bg-sky-500/20 text-sky-400 border border-sky-500/40",
-  C1: "bg-purple-500/20 text-purple-400 border border-purple-500/40",
-};
+type LevelFilter = "B1" | "B2" | "C1";
 
 interface EasyGermanCatalogProps {
   searchQuery?: string;
@@ -27,7 +22,7 @@ interface EasyGermanCatalogProps {
 export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalogProps) {
   const [customVideos, setCustomVideos] = useState<EasyGermanVideo[]>([]);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
-  const [selectedLevel, setSelectedLevel] = useState<LevelFilter>("ALL");
+  const [selectedLevel, setSelectedLevel] = useState<LevelFilter>("B1");
   const [activeVideo, setActiveVideo] = useState<EasyGermanVideo | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
 
@@ -85,11 +80,11 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
       .catch(() => {});
   }, []);
 
-  // Объединенный список видео (пользовательские сверху + курируемая база без дублей)
+  // Объединенный список видео (пользовательские + начальные без дублей)
   const allVideos = useMemo(() => {
     const map = new Map<string, EasyGermanVideo>();
     for (const v of [...customVideos, ...INITIAL_EASY_GERMAN_VIDEOS]) {
-      if (!map.has(v.youtube_id)) {
+      if (v && v.youtube_id && !map.has(v.youtube_id)) {
         map.set(v.youtube_id, {
           ...v,
           is_watched: watchedIds.has(v.youtube_id),
@@ -139,11 +134,24 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
     addEasyGermanVideoAction(newVideo).catch(() => {});
   };
 
-  // Фильтрация по уровню и поиску
+  // Удаление ролика
+  const handleDeleteVideo = (videoId: string) => {
+    setCustomVideos((prev) => {
+      const updated = prev.filter((v) => v.id !== videoId && v.youtube_id !== videoId);
+      try {
+        localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    deleteEasyGermanVideoAction(videoId).catch(() => {});
+  };
+
+  // Фильтрация строго по выбранному уровню (B1 / B2 / C1) и строке поиска
   const filteredVideos = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return allVideos.filter((v) => {
-      if (selectedLevel !== "ALL" && v.level !== selectedLevel) return false;
+      if (v.level !== selectedLevel) return false;
       if (q && !v.title.toLowerCase().includes(q) && !v.youtube_id.toLowerCase().includes(q)) {
         return false;
       }
@@ -151,57 +159,51 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
     });
   }, [allVideos, selectedLevel, searchQuery]);
 
-  // Статистика прогресса
-  const totalCount = allVideos.length;
-  const watchedCount = allVideos.filter((v) => v.is_watched).length;
+  // Статистика прогресса для текущего уровня
+  const totalCount = filteredVideos.length;
+  const watchedCount = filteredVideos.filter((v) => v.is_watched).length;
   const progressPercent = totalCount > 0 ? Math.round((watchedCount / totalCount) * 100) : 0;
 
   return (
     <div className="w-full">
       {/* Шапка вкладки Easy German */}
       <div className="mb-7 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-4">
-        {/* Левая часть: Фильтр по уровням сложности [ Все ] [ B1 ] [ B2 ] [ C1 ] */}
+        {/* Левая часть: Фильтр по уровням сложности [ B1 ] [ B2 ] [ C1 ] */}
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setSelectedLevel("ALL")}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-              selectedLevel === "ALL"
-                ? "bg-white text-black shadow font-bold"
-                : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
-            }`}
-          >
-            Все
-          </button>
+          {/* B1 - зеленый */}
           <button
             type="button"
             onClick={() => setSelectedLevel("B1")}
             className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
               selectedLevel === "B1"
-                ? "bg-emerald-500 text-black shadow font-bold"
+                ? "bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-950/50"
                 : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
             }`}
           >
             B1
           </button>
+
+          {/* B2 - синий */}
           <button
             type="button"
             onClick={() => setSelectedLevel("B2")}
             className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
               selectedLevel === "B2"
-                ? "bg-sky-500 text-black shadow font-bold"
+                ? "bg-sky-600 text-white font-bold shadow-lg shadow-sky-950/50"
                 : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
             }`}
           >
             B2
           </button>
+
+          {/* C1 - красный */}
           <button
             type="button"
             onClick={() => setSelectedLevel("C1")}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+            className={`px-4 py-1.5 rounded-full text-xs transition-all cursor-pointer ${
               selectedLevel === "C1"
-                ? "bg-purple-500 text-white shadow font-bold"
-                : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
+                ? "bg-red-600 text-white font-bold border border-red-500 shadow-lg shadow-red-950/50"
+                : "border border-red-500/30 text-red-400 hover:border-red-500/60 hover:text-red-300 bg-zinc-900/60"
             }`}
           >
             C1
@@ -212,13 +214,19 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
         <div className="flex flex-col gap-1.5 min-w-[220px] sm:min-w-[260px]">
           <div className="flex items-center justify-between text-xs">
             <span className="text-zinc-300 font-medium">
-              Просмотрено <strong className="text-white">{watchedCount}</strong> из{" "}
+              Уровень {selectedLevel}: просмотрено <strong className="text-white">{watchedCount}</strong> из{" "}
               <strong className="text-white">{totalCount}</strong> ({progressPercent}%)
             </span>
           </div>
           <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-[#E50914] to-emerald-500 transition-all duration-500 rounded-full"
+              className={`h-full transition-all duration-500 rounded-full ${
+                selectedLevel === "C1"
+                  ? "bg-gradient-to-r from-red-600 to-amber-500"
+                  : selectedLevel === "B2"
+                  ? "bg-gradient-to-r from-sky-600 to-emerald-400"
+                  : "bg-gradient-to-r from-emerald-600 to-teal-400"
+              }`}
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -228,7 +236,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
         <button
           type="button"
           onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-lg shadow-red-950/40 cursor-pointer flex-shrink-0"
+          className="flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-lg shadow-emerald-950/40 cursor-pointer flex-shrink-0 active:scale-95"
         >
           <Plus className="w-4 h-4" />
           <span>Добавить видео</span>
@@ -237,11 +245,11 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
 
       {/* Сетка карточек Easy German */}
       {filteredVideos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
+        <div className="flex flex-col items-center justify-center py-20 text-center space-y-3 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl p-8 max-w-lg mx-auto">
           <Video className="w-10 h-10 text-zinc-600" />
-          <h3 className="text-base font-bold text-white">Ролики не найдены</h3>
-          <p className="text-xs text-zinc-400">
-            Попробуйте переключить фильтр уровня или добавить новое видео.
+          <p className="text-sm text-zinc-300">
+            В уровне <span className="font-bold text-white">{selectedLevel}</span> пока нет роликов.
+            Добавьте первое видео через кнопку справа.
           </p>
         </div>
       ) : (
@@ -261,8 +269,10 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
                     setActiveVideo(video);
                   }
                 }}
-                className={`group relative flex flex-col cursor-pointer text-left select-none transition ${
-                  isWatched ? "opacity-65 hover:opacity-100" : ""
+                className={`group relative flex flex-col cursor-pointer text-left select-none transition rounded-2xl p-1 ${
+                  isWatched
+                    ? "border-2 border-emerald-500 shadow-lg shadow-emerald-950/30"
+                    : "border border-transparent hover:border-zinc-800"
                 }`}
               >
                 {/* Визуал превью */}
@@ -274,28 +284,49 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
                     loading="lazy"
                   />
 
-                  {/* В левом верхнем углу — бейдж уровня (B1 / B2 / C1) */}
-                  <span
-                    className={`absolute top-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold backdrop-blur-md z-10 ${
-                      LEVEL_BADGE_CLASSES[video.level]
-                    }`}
-                  >
-                    {video.level}
-                  </span>
+                  {/* Если просмотрено: легкий изумрудный оверлей + плашка завершения в левом верхнем углу */}
+                  {isWatched && (
+                    <>
+                      <div className="absolute inset-0 bg-emerald-950/20 pointer-events-none" />
+                      <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-emerald-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md z-10">
+                        <Check size={13} strokeWidth={3} />
+                        <span>Выполнено</span>
+                      </div>
+                    </>
+                  )}
 
-                  {/* В правом верхнем углу — кнопка-галочка «Просмотрено» */}
-                  <button
-                    type="button"
-                    onClick={(e) => handleToggleWatched(video.youtube_id, e)}
-                    title={isWatched ? "Отметить как непросмотренное" : "Отметить как просмотренное"}
-                    className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition z-10 cursor-pointer backdrop-blur-md ${
-                      isWatched
-                        ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/40"
-                        : "bg-black/60 text-zinc-400 hover:text-white"
-                    }`}
-                  >
-                    <Check className="w-4 h-4 stroke-[2.5]" />
-                  </button>
+                  {/* В правом верхнем углу: кнопка удаления и кнопка-галочка «Просмотрено» */}
+                  <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
+                    {/* Кнопка удаления ролика */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (confirm("Удалить это видео из списка?")) {
+                          handleDeleteVideo(video.id);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg bg-black/70 hover:bg-red-600/80 text-zinc-400 hover:text-white transition opacity-0 group-hover:opacity-100 cursor-pointer"
+                      title="Удалить видео"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+
+                    {/* Кнопка-галочка «Просмотрено» */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleWatched(video.youtube_id, e)}
+                      title={isWatched ? "Отметить как непросмотренное" : "Отметить как просмотренное"}
+                      className={`w-7 h-7 rounded-full flex items-center justify-center transition cursor-pointer backdrop-blur-md ${
+                        isWatched
+                          ? "bg-emerald-500 text-black shadow-md font-bold"
+                          : "bg-black/60 text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      <Check className="w-4 h-4 stroke-[2.5]" />
+                    </button>
+                  </div>
 
                   {/* Всплывающая красная кнопка Play по центру при наведении */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -304,7 +335,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
                     </div>
                   </div>
 
-                  {/* В правом нижнем углу — длительность ролика */}
+                  {/* В правом нижнем углу — длительность ролика (если есть) */}
                   {video.duration_str && (
                     <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] font-mono text-white">
                       {video.duration_str}
@@ -334,6 +365,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
       <AddEasyGermanModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
+        level={selectedLevel}
         onAddVideo={handleAddVideo}
       />
     </div>

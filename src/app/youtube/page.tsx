@@ -10,7 +10,8 @@ import {
   Video,
   Bookmark,
   Tv,
-  Plus
+  Plus,
+  Sparkles
 } from "lucide-react";
 import { 
   RECOMMENDED_YOUTUBE_VIDEOS, 
@@ -573,13 +574,18 @@ export default function YouTubeCatalogPage() {
                 {/* Таб 3: Easy German */}
                 <button
                   onClick={() => setActiveTab("easy_german")}
-                  className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm transition-all cursor-pointer ${
+                  className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                     activeTab === "easy_german"
-                      ? "bg-red-600 text-white font-semibold shadow-lg shadow-red-950/40"
-                      : "bg-zinc-900/80 text-zinc-400 hover:text-white border border-zinc-800"
+                      ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/30 scale-105"
+                      : "bg-emerald-950/40 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-900/40 hover:border-emerald-400"
                   }`}
                 >
-                  Easy German
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
+                  <Sparkles className="text-emerald-400 fill-emerald-400" size={14} />
+                  <span>Easy German</span>
                 </button>
               </div>
 

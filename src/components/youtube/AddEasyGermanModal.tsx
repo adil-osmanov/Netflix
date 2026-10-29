@@ -1,43 +1,25 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Plus, Video, Clock, AlertCircle } from "lucide-react";
+import { X, Plus, Video, AlertCircle } from "lucide-react";
 import { EasyGermanVideo } from "@/types/youtube";
 import { extractYouTubeId } from "@/data/youtubeVideos";
 
 interface AddEasyGermanModalProps {
   isOpen: boolean;
   onClose: () => void;
+  level: "B1" | "B2" | "C1";
   onAddVideo: (video: EasyGermanVideo) => void;
 }
-
-const LEVELS: Array<{ id: "B1" | "B2" | "C1"; label: string; activeClass: string }> = [
-  {
-    id: "B1",
-    label: "B1",
-    activeClass: "bg-emerald-500/20 text-emerald-400 border-emerald-500/60 shadow-lg shadow-emerald-950/40",
-  },
-  {
-    id: "B2",
-    label: "B2",
-    activeClass: "bg-sky-500/20 text-sky-400 border-sky-500/60 shadow-lg shadow-sky-950/40",
-  },
-  {
-    id: "C1",
-    label: "C1",
-    activeClass: "bg-purple-500/20 text-purple-400 border-purple-500/60 shadow-lg shadow-purple-950/40",
-  },
-];
 
 export default function AddEasyGermanModal({
   isOpen,
   onClose,
+  level,
   onAddVideo,
 }: AddEasyGermanModalProps) {
   const [urlOrId, setUrlOrId] = useState("");
   const [title, setTitle] = useState("");
-  const [level, setLevel] = useState<"B1" | "B2" | "C1">("B1");
-  const [durationStr, setDurationStr] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const extractedId = extractYouTubeId(urlOrId);
@@ -73,7 +55,6 @@ export default function AddEasyGermanModal({
       youtube_id: ytId,
       title: title.trim(),
       level,
-      duration_str: durationStr.trim() || undefined,
       is_watched: false,
       created_at: new Date().toISOString(),
     };
@@ -83,8 +64,6 @@ export default function AddEasyGermanModal({
     // Сброс формы и закрытие
     setUrlOrId("");
     setTitle("");
-    setLevel("B1");
-    setDurationStr("");
     onClose();
   };
 
@@ -100,8 +79,10 @@ export default function AddEasyGermanModal({
         {/* Шапка */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/80 bg-zinc-900/50">
           <div className="flex items-center gap-2.5">
-            <Video className="w-5 h-5 text-red-500" />
-            <h2 className="text-base font-bold text-white">Добавить видео в Easy German</h2>
+            <Video className="w-5 h-5 text-emerald-500" />
+            <h2 className="text-base font-bold text-white">
+              Добавить видео в Easy German ({level})
+            </h2>
           </div>
           <button
             type="button"
@@ -131,7 +112,7 @@ export default function AddEasyGermanModal({
               value={urlOrId}
               onChange={(e) => setUrlOrId(e.target.value)}
               placeholder="https://www.youtube.com/watch?v=... или 11 символов ID"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-zinc-600 text-sm text-white placeholder:text-zinc-500 outline-none transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-emerald-500 text-sm text-white placeholder:text-zinc-500 outline-none transition"
             />
             {extractedId && (
               <div className="mt-2 flex items-center gap-3 p-2 rounded-xl bg-zinc-900/80 border border-zinc-800">
@@ -160,61 +141,17 @@ export default function AddEasyGermanModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Например: Alltagsgespräche in Berlin"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-zinc-600 text-sm text-white placeholder:text-zinc-500 outline-none transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-emerald-500 text-sm text-white placeholder:text-zinc-500 outline-none transition"
             />
-          </div>
-
-          {/* 3. Уровень сложности и Длительность */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-zinc-300">
-                Уровень сложности
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {LEVELS.map((item) => {
-                  const isActive = level === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setLevel(item.id)}
-                      className={`py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                        isActive
-                          ? item.activeClass
-                          : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white hover:border-zinc-700"
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-zinc-300">
-                Длительность (опционально)
-              </label>
-              <div className="relative">
-                <Clock className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={durationStr}
-                  onChange={(e) => setDurationStr(e.target.value)}
-                  placeholder="14:20"
-                  className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-zinc-600 text-sm text-white placeholder:text-zinc-500 outline-none transition"
-                />
-              </div>
-            </div>
           </div>
 
           {/* Кнопка сохранения */}
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-red-950/50 cursor-pointer"
+            className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/50 cursor-pointer active:scale-[0.99]"
           >
             <Plus className="w-4 h-4" />
-            <span>Сохранить в Easy German</span>
+            <span>+ Добавить в {level}</span>
           </button>
         </form>
       </div>
