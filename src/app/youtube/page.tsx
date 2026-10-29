@@ -491,8 +491,18 @@ export default function YouTubeCatalogPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#141414] text-white pb-24 px-4 md:px-12 pt-4">
-      {/* 1. Верхняя навигация: вынос «Избранного» на первый уровень */}
+    <div className="relative min-h-screen bg-black text-white pb-24 px-4 md:px-12 pt-4 transition-colors duration-500 overflow-x-hidden">
+      {/* Верхний рассеянный свет (Ambient Glow) */}
+      <div 
+        className={`fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-[420px] pointer-events-none transition-all duration-700 ease-out z-0 blur-3xl ${
+          activeCategory === "youtube" && activeTab === "easy_german"
+            ? "opacity-100 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.14),transparent_70%)]"
+            : "opacity-100 bg-[radial-gradient(ellipse_at_top,rgba(220,38,38,0.06),transparent_70%)]"
+        }`}
+      />
+
+      <div className="relative z-10">
+        {/* 1. Верхняя навигация: вынос «Избранного» на первый уровень */}
       <div className="max-w-7xl mx-auto mb-6 pt-2 flex items-center justify-center">
         <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap justify-center">
           {/* YouTube */}
@@ -581,7 +591,11 @@ export default function YouTubeCatalogPage() {
           <div className="max-w-3xl mx-auto mb-6 pt-2">
             <form
               onSubmit={handleSearchOrWatch}
-              className="relative bg-zinc-900/90 border border-zinc-800 rounded-full px-4 py-2.5 flex items-center gap-2.5 focus-within:border-zinc-500 transition-all shadow-xl select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
+              className={`relative bg-zinc-900/90 border rounded-full px-4 py-2.5 flex items-center gap-2.5 transition-all duration-500 shadow-xl select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+                activeTab === "easy_german"
+                  ? "border-zinc-800/80 focus-within:border-emerald-500/50 shadow-emerald-950/20"
+                  : "border-zinc-800 focus-within:border-zinc-500 shadow-xl"
+              }`}
             >
               <Search className="w-4 h-4 text-zinc-400 flex-shrink-0" />
               <input
@@ -605,7 +619,11 @@ export default function YouTubeCatalogPage() {
               )}
               <button
                 type="submit"
-                className="hidden sm:inline-block bg-red-600 hover:bg-red-700 text-white font-medium text-xs px-5 py-2.5 rounded-full transition-colors cursor-pointer shadow select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
+                className={`hidden sm:inline-block px-5 py-2.5 rounded-full text-xs font-semibold text-white transition-all duration-500 select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
+                  activeTab === "easy_german"
+                    ? "bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-950/50"
+                    : "bg-red-600 hover:bg-red-700 shadow-lg shadow-red-950/40"
+                }`}
               >
                 Поиск
               </button>
@@ -626,7 +644,7 @@ export default function YouTubeCatalogPage() {
                 {/* Таб 1: Рекомендации */}
                 <button
                   onClick={() => setActiveTab("recommendations")}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-500 outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
                     activeTab === "recommendations"
                       ? "bg-red-600 text-white shadow-lg shadow-red-950/40"
                       : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
@@ -638,7 +656,7 @@ export default function YouTubeCatalogPage() {
                 {/* Таб 2: Подписки с бейджем количества каналов */}
                 <button
                   onClick={() => setActiveTab("subscriptions")}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold transition outline-none flex items-center gap-2 select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-500 outline-none flex items-center gap-2 select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
                     activeTab === "subscriptions"
                       ? "bg-red-600 text-white shadow-lg shadow-red-950/40"
                       : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
@@ -659,10 +677,10 @@ export default function YouTubeCatalogPage() {
                 {/* Таб 3: Easy German */}
                 <button
                   onClick={() => setActiveTab("easy_german")}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold transition outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
+                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-500 outline-none select-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
                     activeTab === "easy_german"
-                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/40"
-                      : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 hover:border-emerald-600/40"
+                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/60 ring-1 ring-emerald-400/40"
+                      : "bg-zinc-900/90 text-zinc-400 hover:text-white border border-zinc-800 hover:border-emerald-500/30"
                   }`}
                 >
                   Easy German
@@ -811,14 +829,15 @@ export default function YouTubeCatalogPage() {
         </>
       )}
 
-      {/* Manage Channels Modal */}
-      <ManageChannelsModal
-        isOpen={isManageModalOpen}
-        onClose={() => setIsManageModalOpen(false)}
-        channels={subscriptions}
-        onAddChannel={handleAddChannel}
-        onRemoveChannel={handleRemoveChannel}
-      />
+        {/* Manage Channels Modal */}
+        <ManageChannelsModal
+          isOpen={isManageModalOpen}
+          onClose={() => setIsManageModalOpen(false)}
+          channels={subscriptions}
+          onAddChannel={handleAddChannel}
+          onRemoveChannel={handleRemoveChannel}
+        />
+      </div>
     </div>
   );
 }

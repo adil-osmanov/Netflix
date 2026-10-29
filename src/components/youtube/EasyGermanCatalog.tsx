@@ -12,6 +12,7 @@ import {
 } from "@/app/youtube/actions";
 import EasyGermanPlayerModal from "./EasyGermanPlayerModal";
 import AddEasyGermanModal from "./AddEasyGermanModal";
+import EasyGermanCard from "./EasyGermanCard";
 
 type LevelFilter = "B1" | "B2" | "C1";
 
@@ -167,7 +168,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
   return (
     <div className="w-full">
       {/* Шапка вкладки Easy German */}
-      <div className="mb-7 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-4">
+      <div className="mb-7 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-zinc-800/80 bg-zinc-950/60 backdrop-blur-md transition-colors duration-500 rounded-2xl p-4">
         {/* Левая часть: Фильтр по уровням сложности [ B1 ] [ B2 ] [ C1 ] */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* B1 - зеленый */}
@@ -227,7 +228,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
         <button
           type="button"
           onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition shadow-lg shadow-emerald-950/40 cursor-pointer flex-shrink-0 select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
+          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition-all duration-300 shadow-md shadow-emerald-950/50 cursor-pointer flex-shrink-0 select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Видео</span>
@@ -245,102 +246,16 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-          {filteredVideos.map((video) => {
-            const isWatched = Boolean(video.is_watched);
-
-            return (
-              <div
-                key={video.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => setActiveVideo(video)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setActiveVideo(video);
-                  }
-                }}
-                className={`group relative flex flex-col cursor-pointer text-left select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] transition rounded-2xl p-1 ${
-                  isWatched
-                    ? "border-2 border-emerald-500 shadow-lg shadow-emerald-950/30"
-                    : "border border-transparent hover:border-zinc-800"
-                }`}
-              >
-                {/* Визуал превью */}
-                <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
-                  <img
-                    src={`https://i.ytimg.com/vi/${video.youtube_id}/hqdefault.jpg`}
-                    alt={video.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                    loading="lazy"
-                  />
-
-                  {/* Если просмотрено: легкий изумрудный оверлей + плашка завершения в левом верхнем углу */}
-                  {isWatched && (
-                    <>
-                      <div className="absolute inset-0 bg-emerald-950/20 pointer-events-none" />
-                      <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-emerald-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md z-10">
-                        <Check size={13} strokeWidth={3} />
-                        <span>Выполнено</span>
-                      </div>
-                    </>
-                  )}
-
-                  {/* В правом верхнем углу: кнопка удаления и кнопка-галочка «Просмотрено» */}
-                  <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
-                    {/* Кнопка удаления ролика */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (confirm("Удалить это видео из списка?")) {
-                          handleDeleteVideo(video.id);
-                        }
-                      }}
-                      className="p-1.5 rounded-lg bg-black/70 hover:bg-red-600/80 text-zinc-400 hover:text-white transition opacity-0 group-hover:opacity-100 cursor-pointer select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
-                      title="Удалить видео"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-
-                    {/* Кнопка-галочка «Просмотрено» */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleToggleWatched(video.youtube_id, e)}
-                      title={isWatched ? "Отметить как непросмотренное" : "Отметить как просмотренное"}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center transition cursor-pointer backdrop-blur-md select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent] ${
-                        isWatched
-                          ? "bg-emerald-500 text-black shadow-md font-bold"
-                          : "bg-black/60 text-zinc-400 hover:text-white"
-                      }`}
-                    >
-                      <Check className="w-4 h-4 stroke-[2.5]" />
-                    </button>
-                  </div>
-
-                  {/* Всплывающая красная кнопка Play по центру при наведении */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-12 h-12 bg-red-600/90 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-lg translate-y-2 group-hover:translate-y-0">
-                      <Play className="w-5 h-5 fill-current ml-0.5" />
-                    </div>
-                  </div>
-
-                  {/* В правом нижнем углу — длительность ролика (если есть) */}
-                  {video.duration_str && (
-                    <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] font-mono text-white">
-                      {video.duration_str}
-                    </span>
-                  )}
-                </div>
-
-                {/* Текст под превью: только заголовок */}
-                <h3 className="mt-2 text-sm font-medium text-zinc-100 line-clamp-2 group-hover:text-white transition-colors">
-                  {video.title}
-                </h3>
-              </div>
-            );
-          })}
+          {filteredVideos.map((video) => (
+            <EasyGermanCard
+              key={video.id}
+              video={video}
+              isWatched={Boolean(video.is_watched)}
+              onOpen={setActiveVideo}
+              onToggleWatched={handleToggleWatched}
+              onDelete={handleDeleteVideo}
+            />
+          ))}
         </div>
       )}
 
