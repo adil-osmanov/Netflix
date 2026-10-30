@@ -544,60 +544,83 @@ const EN_LEVEL_SEARCH_CLUSTERS: Record<"A1" | "A2" | "B1" | "B2" | "C1", string[
     "VOA Learning English Let's Learn English Level 1",
     "Learn American English Beginner Conversation A1",
     "Easy English Street Interviews Beginners",
+    "EnglishClass101 American English for Beginners A1",
   ],
   A2: [
     "Ariannita la Gringa Slow American English",
     "Speak English With Vanessa Everyday American",
-    "VOA Learning English Level 2",
+    "VOA Learning English Level 2 American Stories",
+    "English with Bob the Canadian conversation A2",
   ],
   B1: [
-    "TED-Ed Animated Lessons",
+    "TED-Ed Animated Lessons English",
     "Rachel's English Real American Conversation",
     "VOA Learning English American Stories",
+    "Clear English Corner American pronunciation B1",
+    "BBC The English We Speak learning",
   ],
   B2: [
-    "Jubilee Middle Ground",
-    "Vox Borders Documentary",
+    "Jubilee Middle Ground debate",
+    "Vox Borders Documentary American",
     "Cut Lineup American Culture",
     "Veritasium Science Documentary",
+    "Kurzgesagt in a nutshell English",
+    "School of Greatness Lewis Howes interview",
   ],
   C1: [
     "Huberman Lab Podcast Full Episode",
-    "Lex Fridman Podcast AI Science",
-    "The Diary Of A CEO Full Interview",
-    "Conan O'Brien Needs A Friend Podcast",
+    "Lex Fridman Podcast AI Science Interview",
+    "The Diary Of A CEO Steven Bartlett Full Interview",
+    "Conan O'Brien Needs A Friend Full Episode",
+    "The Joe Rogan Experience full clip discussion",
+    "Flagrant podcast full episode",
   ],
 };
 
 const EN_PODCAST_LEVEL_CLUSTERS: Record<"A1" | "A2" | "B1" | "B2" | "C1", string[]> = {
   A1: [
-    "Spotlight English beginner podcast",
+    "Spotlight English Chats beginner podcast",
     "6 Minute English BBC basics learning",
     "Slow English Podcast A1 listening practice",
+    "Real English Conversations slow podcast beginners",
+    "Easy English podcast interview beginner",
   ],
   A2: [
     "Culips English Podcast simplified speech",
     "Slow English conversation stories beginner A2",
     "VOA Learning English American stories podcast",
+    "Bob the Canadian slow english conversation",
+    "English Cozy Chat podcast A2",
   ],
   B1: [
-    "All Ears English podcast American",
-    "Rachel's English conversation podcast practice",
+    "All Ears English podcast American English",
+    "NPR Life Kit everyday podcast",
+    "TED Talks Daily podcast inspiration",
+    "The English We Speak BBC learning",
+    "Rachel's English conversation real American",
     "Luke's English Podcast American accent",
   ],
   B2: [
-    "NPR Life Kit podcast episode",
-    "Modern Wisdom Chris Williamson podcast",
-    "The Daily New York Times podcast",
+    "Modern Wisdom Chris Williamson full podcast",
+    "The Daily New York Times podcast full",
+    "Jay Shetty On Purpose podcast interview",
+    "The Mel Robbins Podcast full episode",
+    "The School of Greatness Lewis Howes podcast",
+    "Jubilee Middle Ground full conversation",
   ],
   C1: [
     "Huberman Lab Podcast Full Episode",
-    "Lex Fridman Podcast AI Science",
-    "The Diary Of A CEO Podcast",
-    "Conan O'Brien Needs A Friend Podcast",
-    "Joe Rogan Experience full clip podcast",
+    "Lex Fridman Podcast AI Science Interview",
+    "The Diary Of A CEO Podcast Steven Bartlett",
+    "Conan O'Brien Needs A Friend Podcast Full",
+    "The Joe Rogan Experience full clip podcast",
+    "Flagrant podcast full episode",
   ],
 };
+
+// In-memory cache for dynamic English feeds
+let cachedEnglishFeedVideos: YouTubeRecommendedVideo[] = [];
+let cachedPodcastFeedVideos: YouTubeRecommendedVideo[] = [];
 
 async function fetchEnglishClusterVideos(
   clusterQuery: string,
@@ -655,7 +678,7 @@ async function fetchEnglishClusterVideos(
         if (!durationText) continue;
         const parts = durationText.split(":").map(Number);
         if (parts.some(isNaN)) continue;
-        if (parts.length === 2 && parts[0] < 4) continue;
+        if (parts.length === 2 && parts[0] < 3) continue;
 
         const combinedText = `${id} ${cleanTitle} ${channelName} ${clusterQuery}`.toLowerCase();
         if (
@@ -708,10 +731,10 @@ async function handleEnglishRecommendationsRequest(
   levelFilter: string = "ALL",
   categoryFilter?: string
 ) {
-  const curatedSource =
-    categoryFilter === "podcasts"
-      ? (englishPodcastsJson as any[])
-      : (englishVideosJson as any[]);
+  const isPodcasts = categoryFilter === "podcasts";
+  const curatedSource = isPodcasts
+    ? (englishPodcastsJson as any[])
+    : (englishVideosJson as any[]);
 
   const curatedPool: YouTubeRecommendedVideo[] = curatedSource.map((item) => ({
     id: item.youtube_id,
@@ -724,78 +747,108 @@ async function handleEnglishRecommendationsRequest(
     category: item.category,
   }));
 
-  const isLevelActive = levelFilter && levelFilter !== "ALL" && levelFilter !== "Все" && levelFilter !== "all";
+  const isLevelActive =
+    levelFilter &&
+    levelFilter !== "ALL" &&
+    levelFilter !== "Все" &&
+    levelFilter !== "all";
 
-  let available = curatedPool.filter((v) => {
+  // 1. Фильтруем из кэшированного пула и кураторского списка
+  const currentPool = isPodcasts ? cachedPodcastFeedVideos : cachedEnglishFeedVideos;
+  const poolCombined = [...curatedPool, ...currentPool];
+
+  const seenIds = new Set<string>();
+  let available = poolCombined.filter((v) => {
+    if (seenIds.has(v.id)) return false;
+    seenIds.add(v.id);
+
     if (excludeSet.has(v.id)) return false;
-    if (categoryFilter === "podcasts" && v.category !== "podcasts") return false;
+    if (isPodcasts && v.category !== "podcasts") return false;
     if (isLevelActive) {
       if (!v.level) return false;
-      if (String(v.level).trim().toUpperCase() !== String(levelFilter).trim().toUpperCase()) return false;
+      if (String(v.level).trim().toUpperCase() !== String(levelFilter).trim().toUpperCase()) {
+        return false;
+      }
     }
     return true;
   });
 
-  if (page > 1 || available.length < limit) {
-    let clusters: { q: string; lvl?: "A1" | "A2" | "B1" | "B2" | "C1" }[] = [];
-    if (categoryFilter === "podcasts") {
-      if (
-        isLevelActive &&
-        EN_PODCAST_LEVEL_CLUSTERS[levelFilter.toUpperCase() as keyof typeof EN_PODCAST_LEVEL_CLUSTERS]
-      ) {
-        const lvl = levelFilter.toUpperCase() as "A1" | "A2" | "B1" | "B2" | "C1";
-        clusters = EN_PODCAST_LEVEL_CLUSTERS[lvl].map((q) => ({ q, lvl }));
-      } else {
-        clusters = [
-          { q: EN_PODCAST_LEVEL_CLUSTERS.A1[0], lvl: "A1" },
-          { q: EN_PODCAST_LEVEL_CLUSTERS.A2[0], lvl: "A2" },
-          { q: EN_PODCAST_LEVEL_CLUSTERS.B1[0], lvl: "B1" },
-          { q: EN_PODCAST_LEVEL_CLUSTERS.B2[0], lvl: "B2" },
-          { q: EN_PODCAST_LEVEL_CLUSTERS.C1[0], lvl: "C1" },
-        ];
-      }
-    } else if (
-      isLevelActive &&
-      EN_LEVEL_SEARCH_CLUSTERS[levelFilter.toUpperCase() as keyof typeof EN_LEVEL_SEARCH_CLUSTERS]
-    ) {
-      const lvl = levelFilter.toUpperCase() as "A1" | "A2" | "B1" | "B2" | "C1";
-      clusters = EN_LEVEL_SEARCH_CLUSTERS[lvl].map((q) => ({ q, lvl }));
-    } else {
-      clusters = [
-        { q: EN_LEVEL_SEARCH_CLUSTERS.A1[0], lvl: "A1" },
-        { q: EN_LEVEL_SEARCH_CLUSTERS.A2[0], lvl: "A2" },
-        { q: EN_LEVEL_SEARCH_CLUSTERS.B1[0], lvl: "B1" },
-        { q: EN_LEVEL_SEARCH_CLUSTERS.B2[0], lvl: "B2" },
-        { q: EN_LEVEL_SEARCH_CLUSTERS.C1[0], lvl: "C1" },
-      ];
-    }
+  // 2. Всегда подгружаем внешние YouTube кластеры для постоянного обновления и разнообразия
+  const clusterSource = isPodcasts ? EN_PODCAST_LEVEL_CLUSTERS : EN_LEVEL_SEARCH_CLUSTERS;
+  let targetClusters: { q: string; lvl?: "A1" | "A2" | "B1" | "B2" | "C1" }[] = [];
 
-    const startIdx = ((page - 1) * 2) % clusters.length;
-    const selected = [
-      clusters[startIdx % clusters.length],
-      clusters[(startIdx + 1) % clusters.length],
-      clusters[(startIdx + 2) % clusters.length],
+  if (isLevelActive && clusterSource[levelFilter.toUpperCase() as keyof typeof clusterSource]) {
+    const lvl = levelFilter.toUpperCase() as "A1" | "A2" | "B1" | "B2" | "C1";
+    targetClusters = clusterSource[lvl].map((q) => ({ q, lvl }));
+  } else {
+    targetClusters = [
+      { q: clusterSource.A1[0], lvl: "A1" },
+      { q: clusterSource.A2[0], lvl: "A2" },
+      { q: clusterSource.B1[0], lvl: "B1" },
+      { q: clusterSource.B2[0], lvl: "B2" },
+      { q: clusterSource.C1[0], lvl: "C1" },
+      { q: clusterSource.B2[1] || clusterSource.B2[0], lvl: "B2" },
+      { q: clusterSource.C1[1] || clusterSource.C1[0], lvl: "C1" },
     ];
+  }
 
+  // Рандомизируем выборку кластеров со смещением страницы
+  const randomShift = Math.floor(Math.random() * targetClusters.length);
+  const startIdx = ((page - 1) * 2 + randomShift) % targetClusters.length;
+  const selected = [
+    targetClusters[startIdx % targetClusters.length],
+    targetClusters[(startIdx + 1) % targetClusters.length],
+    targetClusters[(startIdx + 2) % targetClusters.length],
+  ];
+
+  try {
     const fetchedLists = await Promise.all(
       selected.map((item) => fetchEnglishClusterVideos(item.q, item.lvl))
     );
 
-    const seenIds = new Set(available.map((v) => v.id));
     for (const list of fetchedLists) {
       for (const v of list) {
+        if (isPodcasts) {
+          v.category = "podcasts";
+          if (!cachedPodcastFeedVideos.some((c) => c.id === v.id)) {
+            cachedPodcastFeedVideos.push(v);
+          }
+        } else {
+          if (!cachedEnglishFeedVideos.some((c) => c.id === v.id)) {
+            cachedEnglishFeedVideos.push(v);
+          }
+        }
+
         if (seenIds.has(v.id) || excludeSet.has(v.id)) continue;
-        if (levelFilter !== "ALL" && v.level !== levelFilter) continue;
+        if (isLevelActive && v.level !== levelFilter.toUpperCase()) continue;
         seenIds.add(v.id);
         available.push(v);
       }
     }
+  } catch (err) {
+    console.error("Failed fetching English clusters:", err);
   }
 
-  const finalVideos = available.slice(0, limit).map((v) => ({
+  // 3. Перемешиваем (Seed-based shuffle) для разнообразия при каждом запросе
+  const shuffled = shuffleArray(available);
+  let finalVideos = shuffled.slice(0, limit).map((v) => ({
     ...v,
     youtube_id: v.id,
   }));
+
+  // Если из-за строгой фильтрации ничего не найдено в available, берем из curatedPool
+  if (finalVideos.length === 0) {
+    const fallback = curatedPool.filter((v) => {
+      if (isLevelActive) {
+        return String(v.level).trim().toUpperCase() === String(levelFilter).trim().toUpperCase();
+      }
+      return true;
+    });
+    finalVideos = shuffleArray(fallback).slice(0, limit).map((v) => ({
+      ...v,
+      youtube_id: (v as any).youtube_id || v.id,
+    }));
+  }
 
   return NextResponse.json(
     {

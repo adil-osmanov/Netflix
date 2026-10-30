@@ -25,6 +25,7 @@ import EasyGermanCatalog from "@/components/youtube/EasyGermanCatalog";
 import MediathekCatalog from "@/components/mediathek/MediathekCatalog";
 import englishVideosJson from "@/data/english_videos.json";
 import englishPodcastsJson from "@/data/english_podcasts.json";
+import { shuffleArray } from "@/lib/youtube";
 
 export type TopCategory = "youtube" | "mediathek" | "podcasts" | "favorites";
 export type MainTab = "recommendations" | "subscriptions" | "easy_german";
@@ -192,20 +193,26 @@ export default function YouTubeCatalogPage() {
 
   // Podcasts state (for EN mode)
   const [podcasts, setPodcasts] = useState<YouTubeRecommendedVideo[]>(() =>
-    (englishPodcastsJson as any[]).map((item) => ({
-      id: item.youtube_id,
-      youtube_id: item.youtube_id,
-      title: item.title,
-      channel: item.channel,
-      level: item.level as "A1" | "A2" | "B1" | "B2" | "C1",
-      thumbnailUrl: `https://i.ytimg.com/vi/${item.youtube_id}/hqdefault.jpg`,
-      durationText: item.duration,
-      category: item.category,
-    }))
+    shuffleArray(
+      (englishPodcastsJson as any[]).map((item) => ({
+        id: item.youtube_id,
+        youtube_id: item.youtube_id,
+        title: item.title,
+        channel: item.channel,
+        level: item.level as "A1" | "A2" | "B1" | "B2" | "C1",
+        thumbnailUrl: `https://i.ytimg.com/vi/${item.youtube_id}/hqdefault.jpg`,
+        durationText: item.duration,
+        category: item.category,
+      }))
+    )
   );
-  const [podcastVisibleCount, setPodcastVisibleCount] = useState<number>(12);
+  const [podcastPage, setPodcastPage] = useState<number>(1);
+  const [hasMorePodcasts, setHasMorePodcasts] = useState<boolean>(true);
   const [isLoadingPodcasts, setIsLoadingPodcasts] = useState<boolean>(false);
   const [isFetchingMorePodcasts, setIsFetchingMorePodcasts] = useState<boolean>(false);
+
+  const podcastsRef = useRef<YouTubeRecommendedVideo[]>([]);
+  podcastsRef.current = podcasts;
 
   // Load isolated subscriptions when language changes
   useEffect(() => {
@@ -343,9 +350,10 @@ export default function YouTubeCatalogPage() {
       pageToLoad: number,
       append: boolean = false,
       levelOverride?: LevelType,
-      langOverride?: Language
+      langOverride?: Language,
+      reset: boolean = false
     ) => {
-      if (append) {
+      if (append && !reset) {
         setIsFetchingMoreRec(true);
       } else {
         setIsLoadingRec(true);
@@ -353,9 +361,10 @@ export default function YouTubeCatalogPage() {
 
       const lvl = levelOverride !== undefined ? levelOverride : selectedLevel;
       const targetLang = langOverride !== undefined ? langOverride : currentLang;
-      const excludeIds = append
-        ? recommendationsRef.current.map((v) => (v as any).youtube_id || v.id)
-        : [];
+      const excludeIds =
+        append && !reset
+          ? recommendationsRef.current.map((v) => (v as any).youtube_id || v.id)
+          : [];
 
       try {
         const res = await fetch(
@@ -378,9 +387,9 @@ export default function YouTubeCatalogPage() {
           const data = await res.json();
           const newVideos: YouTubeRecommendedVideo[] = data.videos || data.items || [];
           setRecommendations((prev) =>
-            append ? appendUniqueVideos(prev, newVideos) : newVideos
+            append && !reset ? appendUniqueVideos(prev, newVideos) : newVideos
           );
-          setHasMoreRec(true);
+          setHasMoreRec(data.hasMore ?? true);
           setRecPage(pageToLoad);
         }
       } catch (err) {
@@ -393,43 +402,69 @@ export default function YouTubeCatalogPage() {
     [selectedLevel, currentLang]
   );
 
-  // Fetch podcasts when in EN mode and Podcasts category is active
-  const fetchPodcasts = useCallback(async (levelToLoad?: LevelType) => {
-    setIsLoadingPodcasts(true);
-    const lvl = levelToLoad !== undefined ? levelToLoad : selectedLevel;
-    try {
-      const res = await fetch(
-        `/api/youtube/recommendations?t=${Date.now()}&rnd=${Math.random()}`,
-        {
-          method: "POST",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            page: 1,
-            limit: 24,
-            level: lvl,
-            lang: "EN",
-            category: "podcasts",
-          }),
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const newVideos: YouTubeRecommendedVideo[] = data.videos || data.items || [];
-        if (newVideos.length > 0) {
-          setPodcasts((prev) => appendUniqueVideos(prev, newVideos));
-        }
+  // Динамическая загрузка подкастов (порциями по 12 штук)
+  const fetchPodcastsFeed = useCallback(
+    async (
+      pageToLoad: number,
+      append: boolean = false,
+      levelOverride?: LevelType,
+      reset: boolean = false
+    ) => {
+      if (append && !reset) {
+        setIsFetchingMorePodcasts(true);
+      } else {
+        setIsLoadingPodcasts(true);
       }
-    } catch {} finally {
-      setIsLoadingPodcasts(false);
-    }
-  }, [selectedLevel]);
 
+      const lvl = levelOverride !== undefined ? levelOverride : selectedLevel;
+      const excludeIds =
+        append && !reset
+          ? podcastsRef.current.map((v) => (v as any).youtube_id || v.id)
+          : [];
+
+      try {
+        const res = await fetch(
+          `/api/youtube/recommendations?t=${Date.now()}&rnd=${Math.random()}`,
+          {
+            method: "POST",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              page: pageToLoad,
+              limit: 12,
+              level: lvl,
+              lang: "EN",
+              category: "podcasts",
+              excludeIds,
+              timestamp: Date.now(),
+            }),
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const newVideos: YouTubeRecommendedVideo[] = data.videos || data.items || [];
+          setPodcasts((prev) =>
+            append && !reset ? appendUniqueVideos(prev, newVideos) : newVideos
+          );
+          setHasMorePodcasts(data.hasMore ?? true);
+          setPodcastPage(pageToLoad);
+        }
+      } catch (err) {
+        console.error("Failed to fetch podcasts:", err);
+      } finally {
+        setIsLoadingPodcasts(false);
+        setIsFetchingMorePodcasts(false);
+      }
+    },
+    [selectedLevel]
+  );
+
+  // Первоначальная загрузка подкастов при открытии вкладки
   useEffect(() => {
-    if (isEN && activeCategory === "podcasts") {
-      fetchPodcasts();
+    if (isEN && activeCategory === "podcasts" && podcasts.length === 0) {
+      fetchPodcastsFeed(1, false, selectedLevel);
     }
-  }, [isEN, activeCategory, fetchPodcasts]);
+  }, [isEN, activeCategory, fetchPodcastsFeed, selectedLevel, podcasts.length]);
 
   // Auto switch to B1 if user is on Easy German in DE mode and level is A1 or A2
   useEffect(() => {
@@ -457,10 +492,17 @@ export default function YouTubeCatalogPage() {
     if (newLang === currentLang) return;
     setLanguage(newLang);
 
-    if (newLang === "EN" && activeCategory === "mediathek") {
-      setActiveCategory("podcasts");
-    } else if (newLang === "DE" && activeCategory === "podcasts") {
-      setActiveCategory("mediathek");
+    if (newLang === "EN") {
+      if (activeCategory === "mediathek") {
+        setActiveCategory("podcasts");
+        setPodcasts([]);
+        setPodcastPage(1);
+        fetchPodcastsFeed(1, false, selectedLevel);
+      }
+    } else if (newLang === "DE") {
+      if (activeCategory === "podcasts") {
+        setActiveCategory("mediathek");
+      }
     }
   };
 
@@ -472,22 +514,25 @@ export default function YouTubeCatalogPage() {
     setActiveTab(tab);
   };
 
-  // Смена уровня сложности
+  // Смена уровня сложности со сбросом пагинации в начало
   const handleLevelChange = (lvl: LevelType) => {
     if (lvl === selectedLevel) return;
     setSelectedLevel(lvl);
-    setPodcastVisibleCount(12);
+
     if (activeCategory === "youtube") {
       setRecommendations([]);
       setRecPage(1);
       setHasMoreRec(true);
-      fetchRecommendations(1, false, lvl, currentLang);
+      fetchRecommendations(1, false, lvl, currentLang, true);
     } else if (activeCategory === "podcasts") {
-      fetchPodcasts(lvl);
+      setPodcasts([]);
+      setPodcastPage(1);
+      setHasMorePodcasts(true);
+      fetchPodcastsFeed(1, false, lvl, true);
     }
   };
 
-  // Load more handler for InfiniteVideoFeed
+  // Load more handler for InfiniteVideoFeed (YouTube Recommendations & Subscriptions)
   const handleLoadMoreYouTube = useCallback(() => {
     if (activeCategory !== "youtube") return;
 
@@ -516,18 +561,51 @@ export default function YouTubeCatalogPage() {
     fetchSubscriptionVideos,
   ]);
 
-  // Refresh feed
+  // Load more handler for Podcasts Infinite Feed
+  const handleLoadMorePodcasts = useCallback(() => {
+    if (
+      activeCategory === "podcasts" &&
+      hasMorePodcasts &&
+      !isLoadingPodcasts &&
+      !isFetchingMorePodcasts
+    ) {
+      fetchPodcastsFeed(podcastPage + 1, true);
+    }
+  }, [
+    activeCategory,
+    hasMorePodcasts,
+    isLoadingPodcasts,
+    isFetchingMorePodcasts,
+    podcastPage,
+    fetchPodcastsFeed,
+  ]);
+
+  // Refresh feed: рандомизация и перезагрузка свежей порции без дублей
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    if (activeCategory === "podcasts") {
-      setPodcastVisibleCount(12);
-      await fetchPodcasts();
-    } else if (activeTab === "recommendations") {
-      await fetchRecommendations(1, false);
-    } else if (activeTab === "subscriptions") {
-      await fetchSubscriptionVideos(1, false);
+    if (currentLang === "EN") {
+      if (activeCategory === "podcasts") {
+        setPodcastPage(1);
+        await fetchPodcastsFeed(1, false, selectedLevel, true);
+      } else if (activeTab === "recommendations") {
+        setRecPage(1);
+        await fetchRecommendations(1, false, selectedLevel, "EN", true);
+      } else if (activeTab === "subscriptions") {
+        setSubPage(1);
+        await fetchSubscriptionVideos(1, false);
+      }
+    } else {
+      if (activeTab === "recommendations") {
+        setRecPage(1);
+        await fetchRecommendations(1, false, selectedLevel, "DE", true);
+      } else if (activeTab === "subscriptions") {
+        setSubPage(1);
+        await fetchSubscriptionVideos(1, false);
+      }
     }
-    setIsRefreshing(false);
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 500);
   };
 
   // Channel management callbacks
@@ -597,7 +675,7 @@ export default function YouTubeCatalogPage() {
     return true;
   });
 
-  // Строгая фильтрация и пагинация подкастов (порциями по 12 штук)
+  // Строгая фильтрация подкастов по выбранному уровню и дедупликация по ID
   const filteredPodcasts = useMemo(() => {
     let list = podcasts;
     if (isFilterActive) {
@@ -606,24 +684,14 @@ export default function YouTubeCatalogPage() {
         return String(v.level).trim().toUpperCase() === String(selectedLevel).trim().toUpperCase();
       });
     }
-    return list;
+    const seenP = new Set<string>();
+    return list.filter((v) => {
+      const vid = (v as any).youtube_id || v.id;
+      if (!vid || seenP.has(vid)) return false;
+      seenP.add(vid);
+      return true;
+    });
   }, [podcasts, isFilterActive, selectedLevel]);
-
-  const visiblePodcasts = useMemo(() => {
-    return filteredPodcasts.slice(0, podcastVisibleCount);
-  }, [filteredPodcasts, podcastVisibleCount]);
-
-  const hasMorePodcasts = podcastVisibleCount < filteredPodcasts.length;
-
-  const handleLoadMorePodcasts = useCallback(() => {
-    if (podcastVisibleCount < filteredPodcasts.length) {
-      setIsFetchingMorePodcasts(true);
-      setTimeout(() => {
-        setPodcastVisibleCount((prev) => prev + 12);
-        setIsFetchingMorePodcasts(false);
-      }, 200);
-    }
-  }, [podcastVisibleCount, filteredPodcasts.length]);
 
   // Client-side deduplication of isolated favorites
   const uniqueFavorites = Array.from(
@@ -812,7 +880,9 @@ export default function YouTubeCatalogPage() {
                   title="Обновить"
                 >
                   <RotateCw
-                    className={`w-4 h-4 text-red-500 ${isRefreshing ? "animate-spin" : ""}`}
+                    className={`w-4 h-4 transition-transform duration-500 ${
+                      isRefreshing ? "rotate-180 animate-spin text-white" : "text-red-500 hover:scale-110"
+                    }`}
                   />
                 </button>
               </div>
@@ -835,7 +905,7 @@ export default function YouTubeCatalogPage() {
               </div>
             ) : (
               <InfiniteVideoFeed
-                items={visiblePodcasts}
+                items={filteredPodcasts}
                 hasMore={hasMorePodcasts}
                 isFetchingMore={isFetchingMorePodcasts}
                 onLoadMore={handleLoadMorePodcasts}
@@ -930,7 +1000,9 @@ export default function YouTubeCatalogPage() {
                       title="Обновить"
                     >
                       <RotateCw
-                        className={`w-4 h-4 text-red-500 ${isRefreshing ? "animate-spin" : ""}`}
+                        className={`w-4 h-4 transition-transform duration-500 ${
+                          isRefreshing ? "rotate-180 animate-spin text-white" : "text-red-500 hover:scale-110"
+                        }`}
                       />
                     </button>
                   </div>
