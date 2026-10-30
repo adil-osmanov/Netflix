@@ -464,11 +464,11 @@ export default function YouTubeCatalogPage() {
 
   return (
     <div className="relative min-h-screen bg-black text-white pb-24 px-4 md:px-12 pt-1 transition-colors duration-500 overflow-x-hidden">
-      {/* Потолочный изумрудный свет (Ambient Ceiling Glow) */}
+      {/* Глубокая изумрудная дымка Easy German */}
       <div 
-        className={`fixed top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[450px] pointer-events-none transition-opacity duration-700 ease-out z-0 blur-[140px] ${
+        className={`fixed -top-32 left-1/2 -translate-x-1/2 w-[1200px] h-[550px] pointer-events-none transition-opacity duration-1000 ease-out z-0 blur-[160px] ${
           activeCategory === "youtube" && activeTab === "easy_german"
-            ? "opacity-35 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.65),transparent_70%)]"
+            ? "opacity-40 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.7),rgba(6,78,59,0.25)_45%,transparent_75%)]"
             : "opacity-0"
         }`}
       />
@@ -566,7 +566,7 @@ export default function YouTubeCatalogPage() {
         <>
           {/* YouTube Подменю: [ Рекомендации ] [ Подписки ] [ Easy German ] */}
           <div className="max-w-7xl mx-auto mb-6">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                 {/* Таб 1: Рекомендации */}
                 <button

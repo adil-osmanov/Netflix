@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Play, Check, Plus, Video, Trash2 } from "lucide-react";
 import { EasyGermanVideo, QuizItem } from "@/types/youtube";
 import { INITIAL_EASY_GERMAN_VIDEOS } from "@/data/easyGermanVideos";
+import { fetchYouTubeTitle, isPlaceholderTitle } from "@/lib/youtube";
 import {
   getEasyGermanStateAction,
   toggleEasyGermanWatchedAction,
@@ -161,6 +162,60 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
       })
       .catch(() => {});
   }, []);
+
+  // Фоновое обновление реальных названий для роликов с техническими заглушками (Easy German B1 (...))
+  const checkedTitleIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (customVideos.length === 0) return;
+
+    const needsTitle = customVideos.filter(
+      (v) =>
+        v.youtube_id &&
+        isPlaceholderTitle(v.title) &&
+        !checkedTitleIdsRef.current.has(v.youtube_id)
+    );
+
+    if (needsTitle.length === 0) return;
+
+    needsTitle.forEach((v) => checkedTitleIdsRef.current.add(v.youtube_id));
+
+    let isCancelled = false;
+
+    Promise.all(
+      needsTitle.map(async (v) => {
+        try {
+          const title = await fetchYouTubeTitle(v.youtube_id);
+          if (title && !isCancelled) {
+            return { youtube_id: v.youtube_id, title };
+          }
+        } catch {}
+        return null;
+      })
+    ).then((results) => {
+      if (isCancelled) return;
+      const valid = results.filter(Boolean) as { youtube_id: string; title: string }[];
+      if (valid.length > 0) {
+        setCustomVideos((prev) => {
+          const titleMap = new Map(valid.map((r) => [r.youtube_id, r.title]));
+          const updated = prev.map((item) =>
+            titleMap.has(item.youtube_id)
+              ? { ...item, title: titleMap.get(item.youtube_id)! }
+              : item
+          );
+          try {
+            localStorage.setItem("easy_german_videos", JSON.stringify(updated));
+            localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [customVideos]);
 
   // Объединенный список видео (пользовательские + начальные без дублей) с подгрузкой квизов
   const allVideos = useMemo(() => {
@@ -358,10 +413,10 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
   return (
     <div className="w-full">
       {/* Премиальный статус-блок Easy German */}
-      <div className="relative z-10 mb-6 p-4 rounded-2xl bg-gradient-to-b from-zinc-900/60 to-zinc-950/80 border border-emerald-500/20 backdrop-blur-xl shadow-2xl shadow-emerald-950/20">
+      <div className="relative z-10 mb-6 p-4 rounded-2xl bg-zinc-950/60 border border-zinc-800/60 backdrop-blur-xl shadow-2xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Левая часть: Уровни B1, B2, C1 в капсуле (все изумрудные при выборе) */}
-          <div className="flex items-center gap-1.5 p-1 bg-black/50 rounded-xl border border-emerald-950/60">
+          <div className="flex items-center gap-1.5 p-1 bg-black/50 rounded-xl border border-zinc-800/80">
             {EASY_GERMAN_LEVELS.map((lvl) => (
               <button
                 key={lvl}

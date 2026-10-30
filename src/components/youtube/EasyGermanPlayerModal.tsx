@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Check, X, Sparkles, AlertCircle } from "lucide-react";
+import { Check, Sparkles, AlertCircle } from "lucide-react";
 import { EasyGermanVideo, QuizItem } from "@/types/youtube";
 import VideoQuiz from "./VideoQuiz";
 
@@ -69,9 +69,36 @@ export default function EasyGermanPlayerModal({
   const [isImporting, setIsImporting] = useState(false);
   const [jsonInput, setJsonInput] = useState("");
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const [isIdle, setIsIdle] = useState(false);
+
+  const playerContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleDoubleClick = () => {
+    if (!document.fullscreenElement) {
+      playerContainerRef.current?.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // Автоматическое скрытие курсора мыши при бездействии более 2.5 сек
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    const handleMouseMove = () => {
+      setIsIdle(false);
+      clearTimeout(timer);
+      timer = setTimeout(() => setIsIdle(true), 2500);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      clearTimeout(timer);
+    };
   }, []);
 
   // Блокировка фонового скролла сайта при открытом окне
@@ -117,43 +144,22 @@ export default function EasyGermanPlayerModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] overflow-y-auto bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 sm:p-6 md:p-10 animate-in fade-in duration-200"
+      className={`fixed inset-0 z-[100] overflow-y-auto bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 sm:p-6 md:p-10 animate-in fade-in duration-200 ${
+        isIdle ? "cursor-none" : "cursor-default"
+      }`}
       onClick={onClose}
     >
-      {/* Единая карточка модалки (все идет единым потоком сверху вниз, без вложенных скроллов) */}
+      {/* Единая карточка модалки */}
       <div
         className="relative w-full max-w-4xl bg-zinc-950 border border-zinc-800/90 rounded-2xl overflow-hidden shadow-2xl my-auto animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 1. Верхняя панель модалки над видео (как на референсе) */}
-        <div className="px-5 py-3.5 bg-zinc-900/70 border-b border-zinc-800/80 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0 pr-2">
-            <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 shrink-0 font-mono">
-              {video.level || "B2"}
-            </span>
-            {video.duration_str && (
-              <span className="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-zinc-800/80 text-zinc-300 border border-zinc-700/60 shrink-0">
-                {video.duration_str}
-              </span>
-            )}
-            <h3 className="text-xs sm:text-sm font-semibold text-zinc-200 truncate">
-              {video.title}
-            </h3>
-          </div>
-
-          {/* Кнопка закрытия ✕ */}
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-full bg-zinc-800/60 hover:bg-zinc-800 text-zinc-400 hover:text-white transition outline-none focus:outline-none focus:ring-0 active:outline-none shrink-0 cursor-pointer [-webkit-tap-highlight-color:transparent]"
-            title="Закрыть (Esc)"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* 2. Плеер 16:9 строго под шапкой */}
-        <div className="relative aspect-video w-full bg-black">
+        {/* Плеер 16:9 со скругленными верхними углами и жестом двойного клика для Fullscreen */}
+        <div
+          ref={playerContainerRef}
+          onDoubleClick={handleDoubleClick}
+          className="relative aspect-video w-full bg-black rounded-t-2xl overflow-hidden"
+        >
           <iframe
             src={`https://www.youtube.com/embed/${video.youtube_id}?autoplay=1&rel=0`}
             className="w-full h-full border-0"
@@ -162,7 +168,7 @@ export default function EasyGermanPlayerModal({
           />
         </div>
 
-        {/* 3. Блок под видео: кнопка выполнения и интерактив */}
+        {/* Блок под видео: кнопка выполнения и интерактив */}
         <div className="p-4 sm:p-5 bg-zinc-950 space-y-4">
           <div className="flex items-center justify-between border-b border-zinc-900/80 pb-4">
             <button
