@@ -1,0 +1,162 @@
+[
+  {
+    "id": "en-a1-01",
+    "youtube_id": "WR9_nsLyaEY",
+    "title": "Let's Learn English - Lesson 1: Welcome!",
+    "channel": "VOA Learning English",
+    "level": "A1",
+    "duration": "05:14",
+    "category": "american_english",
+    "order_index": 1
+  },
+  {
+    "id": "en-a1-02",
+    "youtube_id": "1-U7o9xjWQc",
+    "title": "Where Are You From? Basic American Greetings",
+    "channel": "VOA Learning English",
+    "level": "A1",
+    "duration": "06:20",
+    "category": "american_english",
+    "order_index": 2
+  },
+  {
+    "id": "en-a2-01",
+    "youtube_id": "6ZmsgYnvJQg",
+    "title": "Ordering Food at an American Diner",
+    "channel": "Ariannita la Gringa",
+    "level": "A2",
+    "duration": "12:45",
+    "category": "american_english",
+    "order_index": 1
+  },
+  {
+    "id": "en-a2-02",
+    "youtube_id": "l0RZ9OJBRnw",
+    "title": "Supermarket Shopping in the USA: Everyday Vocabulary",
+    "channel": "Ariannita la Gringa",
+    "level": "A2",
+    "duration": "14:10",
+    "category": "american_english",
+    "order_index": 2
+  },
+  {
+    "id": "en-b1-01",
+    "youtube_id": "2W85Dwxx218",
+    "title": "Why Do We Dream? - Amy Adkins",
+    "channel": "TED-Ed",
+    "level": "B1",
+    "duration": "05:10",
+    "category": "recommendations",
+    "order_index": 1
+  },
+  {
+    "id": "en-b1-02",
+    "youtube_id": "oMW8Z1TaSeQ",
+    "title": "American Stories: Classic Tales with Subtitles",
+    "channel": "VOA Learning English",
+    "level": "B1",
+    "duration": "15:00",
+    "category": "recommendations",
+    "order_index": 2
+  },
+  {
+    "id": "en-b1-03",
+    "youtube_id": "2JnnSu53QS0",
+    "title": "Real American English Conversation Practice",
+    "channel": "Rachel's English",
+    "level": "B1",
+    "duration": "14:25",
+    "category": "american_english",
+    "order_index": 3
+  },
+  {
+    "id": "en-b1-04",
+    "youtube_id": "BZObLA7OxX8",
+    "title": "Daily American English Conversation & Vocabulary",
+    "channel": "Speak English With Vanessa",
+    "level": "B1",
+    "duration": "19:40",
+    "category": "american_english",
+    "order_index": 4
+  },
+  {
+    "id": "en-b2-01",
+    "youtube_id": "vjFwzUs_H-I",
+    "title": "Middle Ground: Can Both Sides Agree?",
+    "channel": "Jubilee",
+    "level": "B2",
+    "duration": "16:45",
+    "category": "recommendations",
+    "order_index": 1
+  },
+  {
+    "id": "en-b2-02",
+    "youtube_id": "U9SUVTcSFQY",
+    "title": "What Americans Actually Eat in a Day",
+    "channel": "Cut",
+    "level": "B2",
+    "duration": "11:30",
+    "category": "recommendations",
+    "order_index": 2
+  },
+  {
+    "id": "en-b2-03",
+    "youtube_id": "QtYIp5KYk0M",
+    "title": "Mastering Natural American Pronunciation & Rhythm",
+    "channel": "Clear English Corner",
+    "level": "B2",
+    "duration": "15:20",
+    "category": "american_english",
+    "order_index": 3
+  },
+  {
+    "id": "en-b2-04",
+    "youtube_id": "r5Ps1TZXAN8",
+    "title": "How US Geography Shapes American Culture",
+    "channel": "Vox",
+    "level": "B2",
+    "duration": "13:15",
+    "category": "american_english",
+    "order_index": 4
+  },
+  {
+    "id": "en-c1-01",
+    "youtube_id": "lIo9FcrljDk",
+    "title": "Master Your Sleep & Energy",
+    "channel": "Huberman Lab",
+    "level": "C1",
+    "duration": "18:50",
+    "category": "podcasts",
+    "order_index": 1
+  },
+  {
+    "id": "en-c1-02",
+    "youtube_id": "EV7WhVT270Q",
+    "title": "AI & The Future of Technology",
+    "channel": "Lex Fridman",
+    "level": "C1",
+    "duration": "24:10",
+    "category": "podcasts",
+    "order_index": 2
+  },
+  {
+    "id": "en-c1-03",
+    "youtube_id": "AcK_zgJjnoo",
+    "title": "The Psychology of High Performance & Habits",
+    "channel": "The Diary Of A CEO",
+    "level": "C1",
+    "duration": "32:15",
+    "category": "podcasts",
+    "order_index": 3
+  },
+  {
+    "id": "en-c1-04",
+    "youtube_id": "YlC0oomxFms",
+    "title": "Late Night Comedy & Storytelling in America",
+    "channel": "Conan O'Brien Needs A Friend",
+    "level": "C1",
+    "duration": "21:40",
+    "category": "podcasts",
+    "order_index": 4
+  }
+]

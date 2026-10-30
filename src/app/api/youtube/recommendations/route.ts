@@ -536,12 +536,247 @@ async function handleRecommendationsRequest(
   );
 }
 
+import englishVideosJson from "@/data/english_videos.json";
+
+const EN_LEVEL_SEARCH_CLUSTERS: Record<"A1" | "A2" | "B1" | "B2" | "C1", string[]> = {
+  A1: [
+    "VOA Learning English Let's Learn English Level 1",
+    "Learn American English Beginner Conversation A1",
+    "Easy English Street Interviews Beginners",
+  ],
+  A2: [
+    "Ariannita la Gringa Slow American English",
+    "Speak English With Vanessa Everyday American",
+    "VOA Learning English Level 2",
+  ],
+  B1: [
+    "TED-Ed Animated Lessons",
+    "Rachel's English Real American Conversation",
+    "VOA Learning English American Stories",
+  ],
+  B2: [
+    "Jubilee Middle Ground",
+    "Vox Borders Documentary",
+    "Cut Lineup American Culture",
+    "Veritasium Science Documentary",
+  ],
+  C1: [
+    "Huberman Lab Podcast Full Episode",
+    "Lex Fridman Podcast AI Science",
+    "The Diary Of A CEO Full Interview",
+    "Conan O'Brien Needs A Friend Podcast",
+  ],
+};
+
+const EN_PODCAST_CLUSTERS = [
+  "Huberman Lab Podcast Episode",
+  "Lex Fridman Podcast Interview",
+  "The Diary Of A CEO Podcast",
+  "Conan O'Brien Needs A Friend Full Episode",
+  "Freakonomics Radio Podcast",
+];
+
+async function fetchEnglishClusterVideos(
+  clusterQuery: string,
+  targetLevel?: "A1" | "A2" | "B1" | "B2" | "C1"
+): Promise<YouTubeRecommendedVideo[]> {
+  const results: YouTubeRecommendedVideo[] = [];
+  try {
+    const resp = await fetch("https://www.youtube.com/youtubei/v1/search?prettyPrint=false", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+      },
+      body: JSON.stringify({
+        context: {
+          client: {
+            clientName: "WEB",
+            clientVersion: "2.20240101.01.00",
+            hl: "en",
+            gl: "US",
+          },
+        },
+        query: clusterQuery,
+      }),
+      cache: "no-store",
+    });
+
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    const sections =
+      data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer
+        ?.contents || [];
+
+    for (const sec of sections) {
+      const items = sec?.itemSectionRenderer?.contents || [];
+      for (const item of items) {
+        const vr = item?.videoRenderer;
+        if (!vr || !vr.videoId || !YOUTUBE_ID_REGEX.test(vr.videoId)) continue;
+
+        const id = vr.videoId;
+        const rawTitle = vr.title?.runs?.[0]?.text || vr.title?.simpleText || "";
+        const cleanTitle = rawTitle
+          .replace(/&amp;/g, "&")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'");
+        const channelName =
+          vr.ownerText?.runs?.[0]?.text ||
+          vr.longBylineText?.runs?.[0]?.text ||
+          "American English";
+        const channelId =
+          vr.ownerText?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId || "";
+        const durationText = vr.lengthText?.simpleText?.trim() || "";
+
+        if (!durationText) continue;
+        const parts = durationText.split(":").map(Number);
+        if (parts.some(isNaN)) continue;
+        if (parts.length === 2 && parts[0] < 4) continue;
+
+        const combinedText = `${id} ${cleanTitle} ${channelName} ${clusterQuery}`.toLowerCase();
+        if (
+          /\b(shorts?|short|vertical|tiktok|reels?|livestream|live-stream|24\/7)\b/i.test(
+            combinedText
+          ) ||
+          /#(shorts?|short|vertical|tiktok|reels?)/i.test(combinedText) ||
+          combinedText.includes("🔴")
+        ) {
+          continue;
+        }
+
+        let level: "A1" | "A2" | "B1" | "B2" | "C1" = targetLevel || "B1";
+        if (!targetLevel) {
+          if (/\b(a1|beginner|let's learn english|lesson 1|lesson 2)\b/i.test(combinedText)) {
+            level = "A1";
+          } else if (/\b(a2|ariannita|vanessa|slow english)\b/i.test(combinedText)) {
+            level = "A2";
+          } else if (/\b(c1|huberman|lex fridman|diary of a ceo|conan|freakonomics|podcast)\b/i.test(combinedText)) {
+            level = "C1";
+          } else if (/\b(b2|jubilee|middle ground|vox|veritasium|cut)\b/i.test(combinedText)) {
+            level = "B2";
+          } else {
+            level = "B1";
+          }
+        }
+
+        results.push({
+          id,
+          title: cleanTitle,
+          channel: channelName,
+          channelId,
+          level,
+          thumbnailUrl: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+          description: `${channelName} • ${clusterQuery}`,
+          durationText,
+        });
+      }
+    }
+  } catch {
+    return [];
+  }
+  return results;
+}
+
+async function handleEnglishRecommendationsRequest(
+  page: number,
+  limit: number,
+  excludeSet: Set<string>,
+  levelFilter: string = "ALL",
+  categoryFilter?: string
+) {
+  const curatedPool: YouTubeRecommendedVideo[] = (englishVideosJson as any[]).map((item) => ({
+    id: item.youtube_id,
+    youtube_id: item.youtube_id,
+    title: item.title,
+    channel: item.channel,
+    level: item.level as "A1" | "A2" | "B1" | "B2" | "C1",
+    thumbnailUrl: `https://i.ytimg.com/vi/${item.youtube_id}/hqdefault.jpg`,
+    durationText: item.duration,
+    category: item.category,
+  }));
+
+  let available = curatedPool.filter((v) => {
+    if (excludeSet.has(v.id)) return false;
+    if (categoryFilter === "podcasts" && v.category !== "podcasts") return false;
+    if (levelFilter !== "ALL" && v.level !== levelFilter) return false;
+    return true;
+  });
+
+  if (page > 1 || available.length < limit) {
+    let clusters: { q: string; lvl?: "A1" | "A2" | "B1" | "B2" | "C1" }[] = [];
+    if (categoryFilter === "podcasts") {
+      clusters = EN_PODCAST_CLUSTERS.map((q) => ({ q, lvl: "C1" }));
+    } else if (
+      levelFilter !== "ALL" &&
+      EN_LEVEL_SEARCH_CLUSTERS[levelFilter as keyof typeof EN_LEVEL_SEARCH_CLUSTERS]
+    ) {
+      const lvl = levelFilter as "A1" | "A2" | "B1" | "B2" | "C1";
+      clusters = EN_LEVEL_SEARCH_CLUSTERS[lvl].map((q) => ({ q, lvl }));
+    } else {
+      clusters = [
+        { q: EN_LEVEL_SEARCH_CLUSTERS.A1[0], lvl: "A1" },
+        { q: EN_LEVEL_SEARCH_CLUSTERS.A2[0], lvl: "A2" },
+        { q: EN_LEVEL_SEARCH_CLUSTERS.B1[0], lvl: "B1" },
+        { q: EN_LEVEL_SEARCH_CLUSTERS.B2[0], lvl: "B2" },
+        { q: EN_LEVEL_SEARCH_CLUSTERS.C1[0], lvl: "C1" },
+      ];
+    }
+
+    const startIdx = ((page - 1) * 2) % clusters.length;
+    const selected = [
+      clusters[startIdx % clusters.length],
+      clusters[(startIdx + 1) % clusters.length],
+      clusters[(startIdx + 2) % clusters.length],
+    ];
+
+    const fetchedLists = await Promise.all(
+      selected.map((item) => fetchEnglishClusterVideos(item.q, item.lvl))
+    );
+
+    const seenIds = new Set(available.map((v) => v.id));
+    for (const list of fetchedLists) {
+      for (const v of list) {
+        if (seenIds.has(v.id) || excludeSet.has(v.id)) continue;
+        if (levelFilter !== "ALL" && v.level !== levelFilter) continue;
+        seenIds.add(v.id);
+        available.push(v);
+      }
+    }
+  }
+
+  const finalVideos = available.slice(0, limit).map((v) => ({
+    ...v,
+    youtube_id: v.id,
+  }));
+
+  return NextResponse.json(
+    {
+      page,
+      limit,
+      videos: finalVideos,
+      items: finalVideos,
+      hasMore: true,
+      totalAvailable: finalVideos.length,
+    },
+    {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    }
+  );
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.max(1, Math.min(50, parseInt(searchParams.get("limit") || "16", 10)));
     const level = searchParams.get("level") || "ALL";
+    const lang = searchParams.get("lang") || "DE";
+    const category = searchParams.get("category") || undefined;
     const excludeParam = searchParams.get("excludeIds") || searchParams.get("exclude") || "";
     const excludeSet = new Set(
       excludeParam
@@ -549,6 +784,10 @@ export async function GET(request: NextRequest) {
         .map((s) => s.trim())
         .filter(Boolean)
     );
+
+    if (lang === "EN") {
+      return await handleEnglishRecommendationsRequest(page, limit, excludeSet, level, category);
+    }
 
     return await handleRecommendationsRequest(page, limit, excludeSet, level);
   } catch (error: any) {
@@ -566,6 +805,8 @@ export async function POST(request: NextRequest) {
     const page = Math.max(1, Number(body.page) || 1);
     const limit = Math.max(1, Math.min(50, Number(body.limit) || 16));
     const level = body.level || "ALL";
+    const lang = body.lang || "DE";
+    const category = body.category || undefined;
     const rawExclude = body.excludeIds || body.exclude || [];
     const excludeList: string[] = Array.isArray(rawExclude)
       ? rawExclude
@@ -573,6 +814,10 @@ export async function POST(request: NextRequest) {
       ? rawExclude.split(",").map((s: string) => s.trim()).filter(Boolean)
       : [];
     const excludeSet = new Set(excludeList);
+
+    if (lang === "EN") {
+      return await handleEnglishRecommendationsRequest(page, limit, excludeSet, level, category);
+    }
 
     return await handleRecommendationsRequest(page, limit, excludeSet, level);
   } catch (error: any) {

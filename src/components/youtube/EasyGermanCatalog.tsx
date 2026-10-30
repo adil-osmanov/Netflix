@@ -2,8 +2,16 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Play, Check, Plus, Video, Trash2 } from "lucide-react";
-import { EasyGermanVideo, QuizItem } from "@/types/youtube";
+import {
+  EasyGermanVideo,
+  QuizItem,
+  Language,
+  DE_LEVELS,
+  EN_LEVELS,
+  EnglishLevel,
+} from "@/types/youtube";
 import { INITIAL_EASY_GERMAN_VIDEOS } from "@/data/easyGermanVideos";
+import englishVideosJson from "@/data/english_videos.json";
 import { fetchYouTubeTitle, isPlaceholderTitle } from "@/lib/youtube";
 import {
   getEasyGermanStateAction,
@@ -17,101 +25,175 @@ import EasyGermanPlayerModal from "./EasyGermanPlayerModal";
 import AddEasyGermanModal from "./AddEasyGermanModal";
 import EasyGermanCard from "./EasyGermanCard";
 
-type LevelFilter = "B1" | "B2" | "C1";
-const EASY_GERMAN_LEVELS = ["B1", "B2", "C1"] as const;
+type LevelFilter = EnglishLevel;
+
+const INITIAL_ENGLISH_VIDEOS: EasyGermanVideo[] = (englishVideosJson as any[]).map((item) => ({
+  id: item.id,
+  youtube_id: item.youtube_id,
+  title: item.title,
+  channel: item.channel,
+  category: item.category,
+  level: item.level as LevelFilter,
+  duration: item.duration,
+  duration_str: item.duration,
+  order_index: item.order_index,
+  is_watched: false,
+  quiz: [],
+}));
 
 interface EasyGermanCatalogProps {
   searchQuery?: string;
+  lang?: Language;
 }
 
-export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalogProps) {
+export default function EasyGermanCatalog({
+  searchQuery = "",
+  lang = "DE",
+}: EasyGermanCatalogProps) {
+  const isEN = lang === "EN";
+  const availableLevels: LevelFilter[] = isEN ? EN_LEVELS : DE_LEVELS;
+
   const [customVideos, setCustomVideos] = useState<EasyGermanVideo[]>([]);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
-  const [selectedLevel, setSelectedLevel] = useState<LevelFilter>("B1");
+  const [selectedLevel, setSelectedLevel] = useState<LevelFilter>(isEN ? "A1" : "B1");
   const [activeVideo, setActiveVideo] = useState<EasyGermanVideo | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
 
-  // Считываем последний открытый уровень при монтировании (если A1/A2, сбрасываем на B1)
+  // Считываем последний открытый уровень при монтировании и смене языка
   useEffect(() => {
     try {
-      const savedLevel = localStorage.getItem("easy_german_last_level");
-      if (savedLevel && ["B1", "B2", "C1"].includes(savedLevel)) {
-        setSelectedLevel(savedLevel as LevelFilter);
+      if (isEN) {
+        const savedEn = localStorage.getItem("last_level_en");
+        if (savedEn && (EN_LEVELS as string[]).includes(savedEn)) {
+          setSelectedLevel(savedEn as LevelFilter);
+        } else {
+          setSelectedLevel("A1");
+        }
       } else {
-        setSelectedLevel("B1");
+        const savedDe =
+          localStorage.getItem("last_level_de") ||
+          localStorage.getItem("easy_german_last_level");
+        if (savedDe && (DE_LEVELS as string[]).includes(savedDe)) {
+          setSelectedLevel(savedDe as LevelFilter);
+        } else {
+          setSelectedLevel("B1");
+        }
       }
     } catch {
-      setSelectedLevel("B1");
+      setSelectedLevel(isEN ? "A1" : "B1");
     }
-  }, []);
+  }, [isEN]);
 
-  // Функция переключения уровня с сохранением в localStorage
+  // Функция переключения уровня с сохранением в изолированный ключ localStorage
   const handleSelectLevel = (lvl: LevelFilter) => {
     setSelectedLevel(lvl);
     try {
-      localStorage.setItem("easy_german_last_level", lvl);
+      if (isEN) {
+        localStorage.setItem("last_level_en", lvl);
+      } else {
+        localStorage.setItem("last_level_de", lvl);
+        localStorage.setItem("easy_german_last_level", lvl);
+      }
     } catch {}
   };
 
-  // Загрузка из localStorage + синхронизация с Supabase
+  // Загрузка из localStorage + синхронизация с Supabase (только для DE)
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (isEN) {
+      // Изолированный режим EN (American English)
+      let localWatchedEn: string[] = [];
+      let localCustomEn: EasyGermanVideo[] = [];
+
+      try {
+        const rawWatched = localStorage.getItem("watched_en");
+        if (rawWatched) {
+          const parsed = JSON.parse(rawWatched);
+          if (Array.isArray(parsed)) localWatchedEn = parsed;
+        }
+      } catch {}
+
+      try {
+        const rawCustom = localStorage.getItem("custom_videos_en");
+        if (rawCustom) {
+          const parsed = JSON.parse(rawCustom);
+          if (Array.isArray(parsed)) localCustomEn = parsed;
+        }
+      } catch {}
+
+      setWatchedIds(new Set(localWatchedEn));
+      setCustomVideos(localCustomEn);
+      return;
+    }
+
+    // Режим DE (Easy German)
     let localWatched: string[] = [];
     let localCustom: EasyGermanVideo[] = [];
 
-    if (typeof window !== "undefined") {
-      try {
-        const rawWatched = localStorage.getItem("easy_german_watched_ids");
-        if (rawWatched) {
-          const parsed = JSON.parse(rawWatched);
-          if (Array.isArray(parsed)) localWatched = parsed;
-        }
-      } catch {}
+    try {
+      const rawWatched =
+        localStorage.getItem("watched_de") ||
+        localStorage.getItem("easy_german_watched_ids");
+      if (rawWatched) {
+        const parsed = JSON.parse(rawWatched);
+        if (Array.isArray(parsed)) localWatched = parsed;
+      }
+    } catch {}
 
-      try {
-        const rawVideos = localStorage.getItem("easy_german_videos");
-        const rawCustom = localStorage.getItem("easy_german_custom_videos");
-        const parsedVideos = rawVideos ? JSON.parse(rawVideos) : null;
-        const parsedCustom = rawCustom ? JSON.parse(rawCustom) : null;
-        const mergedLocal = [
-          ...(Array.isArray(parsedCustom) ? parsedCustom : []),
-          ...(Array.isArray(parsedVideos) ? parsedVideos : []),
-        ];
-        if (mergedLocal.length > 0) {
-          const localMap = new Map<string, EasyGermanVideo>();
-          for (const v of mergedLocal) {
-            if (v && v.youtube_id) localMap.set(v.youtube_id, v);
-          }
-          localCustom = Array.from(localMap.values());
+    try {
+      const rawCustomDe = localStorage.getItem("custom_videos_de");
+      const rawVideos = localStorage.getItem("easy_german_videos");
+      const rawCustom = localStorage.getItem("easy_german_custom_videos");
+      const parsedCustomDe = rawCustomDe ? JSON.parse(rawCustomDe) : null;
+      const parsedVideos = rawVideos ? JSON.parse(rawVideos) : null;
+      const parsedCustom = rawCustom ? JSON.parse(rawCustom) : null;
+      const mergedLocal = [
+        ...(Array.isArray(parsedCustomDe) ? parsedCustomDe : []),
+        ...(Array.isArray(parsedCustom) ? parsedCustom : []),
+        ...(Array.isArray(parsedVideos) ? parsedVideos : []),
+      ];
+      if (mergedLocal.length > 0) {
+        const localMap = new Map<string, EasyGermanVideo>();
+        for (const v of mergedLocal) {
+          if (v && v.youtube_id) localMap.set(v.youtube_id, v);
         }
-      } catch {}
-    }
+        localCustom = Array.from(localMap.values());
+      }
+    } catch {}
 
     setWatchedIds(new Set(localWatched));
-    if (localCustom.length > 0) {
-      setCustomVideos(localCustom);
-    }
+    setCustomVideos(localCustom);
 
-    // Асинхронная синхронизация с Supabase
+    // Асинхронная синхронизация с Supabase для DE
     getEasyGermanStateAction()
       .then((res) => {
         if (res.watchedIds.length > 0 || localWatched.length > 0) {
           const mergedWatched = Array.from(new Set([...localWatched, ...res.watchedIds]));
           setWatchedIds(new Set(mergedWatched));
           try {
+            localStorage.setItem("watched_de", JSON.stringify(mergedWatched));
             localStorage.setItem("easy_german_watched_ids", JSON.stringify(mergedWatched));
           } catch {}
         }
 
         if (res.customVideos.length > 0 || localCustom.length > 0) {
           const map = new Map<string, EasyGermanVideo>();
-          // Сначала Supabase, затем localCustom поверх, сохраняя длительности и валидные названия
           for (const v of [...res.customVideos, ...localCustom]) {
             if (v && v.youtube_id) {
               const existing = map.get(v.youtube_id);
-              const durationStr = existing?.duration_str || v.duration_str || existing?.duration || v.duration || "";
-              const bestTitle = (existing?.title && !isPlaceholderTitle(existing.title))
-                ? existing.title
-                : ((v.title && !isPlaceholderTitle(v.title)) ? v.title : (existing?.title || v.title));
+              const durationStr =
+                existing?.duration_str ||
+                v.duration_str ||
+                existing?.duration ||
+                v.duration ||
+                "";
+              const bestTitle =
+                existing?.title && !isPlaceholderTitle(existing.title)
+                  ? existing.title
+                  : v.title && !isPlaceholderTitle(v.title)
+                  ? v.title
+                  : existing?.title || v.title;
               map.set(v.youtube_id, {
                 ...existing,
                 ...v,
@@ -125,6 +207,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
           const mergedCustom = Array.from(map.values());
           setCustomVideos(mergedCustom);
           try {
+            localStorage.setItem("custom_videos_de", JSON.stringify(mergedCustom));
             localStorage.setItem("easy_german_videos", JSON.stringify(mergedCustom));
             localStorage.setItem("easy_german_custom_videos", JSON.stringify(mergedCustom));
           } catch {}
@@ -151,11 +234,13 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
                       ? {
                           ...item,
                           duration_str: durMap.get(item.youtube_id) || item.duration_str,
-                          duration: durMap.get(item.youtube_id) || item.duration || item.duration_str,
+                          duration:
+                            durMap.get(item.youtube_id) || item.duration || item.duration_str,
                         }
                       : item
                   );
                   try {
+                    localStorage.setItem("custom_videos_de", JSON.stringify(updated));
                     localStorage.setItem("easy_german_videos", JSON.stringify(updated));
                     localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
                   } catch {}
@@ -168,9 +253,9 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
         }
       })
       .catch(() => {});
-  }, []);
+  }, [isEN]);
 
-  // Фоновое обновление реальных названий для роликов с техническими заглушками (Easy German B1 (...))
+  // Фоновое обновление реальных названий для роликов с техническими заглушками
   const checkedTitleIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -211,8 +296,13 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
               : item
           );
           try {
-            localStorage.setItem("easy_german_videos", JSON.stringify(updated));
-            localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
+            if (isEN) {
+              localStorage.setItem("custom_videos_en", JSON.stringify(updated));
+            } else {
+              localStorage.setItem("custom_videos_de", JSON.stringify(updated));
+              localStorage.setItem("easy_german_videos", JSON.stringify(updated));
+              localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
+            }
           } catch {}
           return updated;
         });
@@ -222,9 +312,9 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
     return () => {
       isCancelled = true;
     };
-  }, [customVideos]);
+  }, [customVideos, isEN]);
 
-  // Объединенный список видео (пользовательские + начальные без дублей) с подгрузкой квизов
+  // Объединенный список видео (пользовательские + начальные без дублей)
   const allVideos = useMemo(() => {
     let quizMap: Record<string, QuizItem[]> = {};
     if (typeof window !== "undefined") {
@@ -234,8 +324,10 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
       } catch {}
     }
 
+    const baseInitial = isEN ? INITIAL_ENGLISH_VIDEOS : INITIAL_EASY_GERMAN_VIDEOS;
     const map = new Map<string, EasyGermanVideo>();
-    for (const v of [...customVideos, ...INITIAL_EASY_GERMAN_VIDEOS]) {
+
+    for (const v of [...customVideos, ...baseInitial]) {
       if (v && v.youtube_id && !map.has(v.youtube_id)) {
         const assignedQuiz = quizMap[v.youtube_id] || quizMap[v.id] || v.quiz;
         map.set(v.youtube_id, {
@@ -246,7 +338,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
       }
     }
     return Array.from(map.values());
-  }, [customVideos, watchedIds]);
+  }, [customVideos, watchedIds, isEN]);
 
   // Переключение статуса «Просмотрено»
   const handleToggleWatched = (youtubeId: string, e?: React.MouseEvent) => {
@@ -266,24 +358,29 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
 
       const arr = Array.from(next);
       try {
-        localStorage.setItem("easy_german_watched_ids", JSON.stringify(arr));
+        if (isEN) {
+          localStorage.setItem("watched_en", JSON.stringify(arr));
+        } else {
+          localStorage.setItem("watched_de", JSON.stringify(arr));
+          localStorage.setItem("easy_german_watched_ids", JSON.stringify(arr));
+        }
       } catch {}
 
-      toggleEasyGermanWatchedAction(youtubeId, willBeWatched).catch(() => {});
+      if (!isEN) {
+        toggleEasyGermanWatchedAction(youtubeId, willBeWatched).catch(() => {});
+      }
       return next;
     });
   };
 
   // Обновление/сохранение квиза для видео
   const handleUpdateQuiz = (videoIdOrYoutubeId: string, quiz: QuizItem[]) => {
-    // 1. Сохранение в dedicated localStorage map
     try {
       const stored = JSON.parse(localStorage.getItem("easy_german_quizzes") || "{}");
       stored[videoIdOrYoutubeId] = quiz;
       localStorage.setItem("easy_german_quizzes", JSON.stringify(stored));
     } catch {}
 
-    // 2. Обновление customVideos если это кастомное видео
     setCustomVideos((prev) => {
       const updated = prev.map((v) => {
         if (v.id === videoIdOrYoutubeId || v.youtube_id === videoIdOrYoutubeId) {
@@ -292,27 +389,35 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
         return v;
       });
       try {
-        localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
+        if (isEN) {
+          localStorage.setItem("custom_videos_en", JSON.stringify(updated));
+        } else {
+          localStorage.setItem("custom_videos_de", JSON.stringify(updated));
+          localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
+        }
       } catch {}
       return updated;
     });
 
-    // 3. Немедленное обновление активного видео в плеере
     setActiveVideo((prev) => (prev ? { ...prev, quiz } : null));
   };
 
-  // Добавление нового видео вручную (строго в конец списка)
+  // Добавление нового видео вручную (строго в конец списка, изолированно по языку)
   const handleAddVideo = (newVideo: EasyGermanVideo) => {
-    setCustomVideos((prev) => {
-      const currentLevelVideos = prev.filter((v) => v.level === newVideo.level);
-      const nextOrder = currentLevelVideos.length > 0
-        ? Math.max(...currentLevelVideos.map((v) => v.order_index || 0)) + 1
-        : 1;
+    const baseInitial = isEN ? INITIAL_ENGLISH_VIDEOS : INITIAL_EASY_GERMAN_VIDEOS;
 
+    setCustomVideos((prev) => {
+      const allForLevel = [...prev, ...baseInitial].filter((v) => v.level === newVideo.level);
+      const nextOrder =
+        allForLevel.length > 0
+          ? Math.max(...allForLevel.map((v) => v.order_index || 0)) + 1
+          : 1;
+
+      const label = isEN ? "American English" : "Easy German";
       const videoWithOrder: EasyGermanVideo = {
         ...newVideo,
         order_index: newVideo.order_index || nextOrder,
-        title: newVideo.title || `Easy German ${newVideo.level} #${nextOrder}`,
+        title: newVideo.title || `${label} ${newVideo.level} #${nextOrder}`,
         duration: newVideo.duration || newVideo.duration_str || "",
         duration_str: newVideo.duration_str || newVideo.duration || "",
         quiz: newVideo.quiz || [],
@@ -321,13 +426,20 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
       const filtered = prev.filter((v) => v.youtube_id !== videoWithOrder.youtube_id);
       const updated = [...filtered, videoWithOrder];
       try {
-        localStorage.setItem("easy_german_videos", JSON.stringify(updated));
-        localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
+        if (isEN) {
+          localStorage.setItem("custom_videos_en", JSON.stringify(updated));
+        } else {
+          localStorage.setItem("custom_videos_de", JSON.stringify(updated));
+          localStorage.setItem("easy_german_videos", JSON.stringify(updated));
+          localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
+        }
       } catch {}
       return updated;
     });
 
-    addEasyGermanVideoAction(newVideo).catch(() => {});
+    if (!isEN) {
+      addEasyGermanVideoAction(newVideo).catch(() => {});
+    }
   };
 
   // Удаление ролика
@@ -335,20 +447,29 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
     setCustomVideos((prev) => {
       const updated = prev.filter((v) => v.id !== videoId && v.youtube_id !== videoId);
       try {
-        localStorage.setItem("easy_german_videos", JSON.stringify(updated));
-        localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
+        if (isEN) {
+          localStorage.setItem("custom_videos_en", JSON.stringify(updated));
+        } else {
+          localStorage.setItem("custom_videos_de", JSON.stringify(updated));
+          localStorage.setItem("easy_german_videos", JSON.stringify(updated));
+          localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
+        }
       } catch {}
       return updated;
     });
 
-    deleteEasyGermanVideoAction(videoId).catch(() => {});
+    if (!isEN) {
+      deleteEasyGermanVideoAction(videoId).catch(() => {});
+    }
   };
 
   // Изменение номера урока с авто-сортировкой
   const handleUpdateOrder = (videoIdOrYoutubeId: string, newOrder: number) => {
+    const baseInitial = isEN ? INITIAL_ENGLISH_VIDEOS : INITIAL_EASY_GERMAN_VIDEOS;
+
     setCustomVideos((prev) => {
       const map = new Map<string, EasyGermanVideo>();
-      for (const v of [...prev, ...INITIAL_EASY_GERMAN_VIDEOS]) {
+      for (const v of [...prev, ...baseInitial]) {
         if (v && v.youtube_id && !map.has(v.youtube_id)) {
           map.set(v.youtube_id, { ...v });
         }
@@ -387,15 +508,20 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
       });
 
       try {
-        localStorage.setItem("easy_german_videos", JSON.stringify(updatedAll));
-        localStorage.setItem("easy_german_custom_videos", JSON.stringify(updatedAll));
+        if (isEN) {
+          localStorage.setItem("custom_videos_en", JSON.stringify(updatedAll));
+        } else {
+          localStorage.setItem("custom_videos_de", JSON.stringify(updatedAll));
+          localStorage.setItem("easy_german_videos", JSON.stringify(updatedAll));
+          localStorage.setItem("easy_german_custom_videos", JSON.stringify(updatedAll));
+        }
       } catch {}
 
       return updatedAll;
     });
   };
 
-  // Фильтрация строго по выбранному уровню (B1 / B2 / C1) и строке поиска с авто-сортировкой
+  // Фильтрация строго по выбранному уровню и строке поиска с авто-сортировкой
   const filteredVideos = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const list = allVideos.filter((v) => {
@@ -415,53 +541,62 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
   // Статистика прогресса для текущего уровня
   const totalCount = filteredVideos.length;
   const watchedCount = filteredVideos.filter((v) => v.is_watched).length;
-  const progressPercent = totalCount > 0 ? Math.round((watchedCount / totalCount) * 100) : 0;
 
   return (
     <div className="w-full">
-      {/* Бесшовный чистый блок уровней Easy German */}
+      {/* Бесшовный чистый блок уровней */}
       <div className="relative z-10 mb-6 py-2 bg-transparent flex flex-wrap items-center justify-between gap-4">
-          {/* Левая часть: Уровни B1, B2, C1 в капсуле (все изумрудные при выборе) */}
-          <div className="flex items-center gap-1.5 p-1 bg-black/50 rounded-xl border border-zinc-800/80">
-            {EASY_GERMAN_LEVELS.map((lvl) => (
-              <button
-                key={lvl}
-                onClick={() => handleSelectLevel(lvl)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
-                  selectedLevel === lvl
-                    ? "bg-emerald-500 text-black shadow-md shadow-emerald-950/50"
-                    : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                {lvl}
-              </button>
-            ))}
-          </div>
-
-          {/* Центральная часть: Статус усвоения и неоновый прогресс */}
-          <div className="flex-1 max-w-xs mx-auto flex flex-col items-center">
-            <span className="text-xs font-mono font-bold text-zinc-300 mb-1.5">
-              {watchedCount} / {totalCount}
-            </span>
-            <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden p-[1px] border border-zinc-800">
-              <div
-                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(16,185,129,0.7)]"
-                style={{ width: `${totalCount > 0 ? (watchedCount / totalCount) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Правая часть: Кнопка «+ Видео» (без дублирования знака +) */}
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shadow-lg shadow-emerald-950/50 flex items-center gap-1.5 border border-emerald-400/20 active:scale-95 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] cursor-pointer"
-          >
-            <Plus size={14} strokeWidth={2.5} />
-            <span>Видео</span>
-          </button>
+        {/* Левая часть: Уровни (B1-C1 для DE, A1-C1 для EN) */}
+        <div className="flex items-center gap-1.5 p-1 bg-black/50 rounded-xl border border-zinc-800/80">
+          {availableLevels.map((lvl) => (
+            <button
+              key={lvl}
+              onClick={() => handleSelectLevel(lvl)}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
+                selectedLevel === lvl
+                  ? isEN
+                    ? "bg-[#E50914] text-white shadow-md shadow-red-950/50"
+                    : "bg-emerald-500 text-black shadow-md shadow-emerald-950/50"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              {lvl}
+            </button>
+          ))}
         </div>
 
-      {/* Сетка карточек Easy German с порядковой нумерацией (#01, #02...) */}
+        {/* Центральная часть: Статус усвоения и прогресс */}
+        <div className="flex-1 max-w-xs mx-auto flex flex-col items-center">
+          <span className="text-xs font-mono font-bold text-zinc-300 mb-1.5">
+            {watchedCount} / {totalCount}
+          </span>
+          <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden p-[1px] border border-zinc-800">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                isEN
+                  ? "bg-gradient-to-r from-[#E50914] to-red-500 shadow-[0_0_10px_rgba(229,9,20,0.7)]"
+                  : "bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_10px_rgba(16,185,129,0.7)]"
+              }`}
+              style={{ width: `${totalCount > 0 ? (watchedCount / totalCount) * 100 : 0}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Правая часть: Кнопка «+ Видео» */}
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className={`px-4 py-2 rounded-xl font-semibold text-xs text-white transition-all shadow-lg flex items-center gap-1.5 active:scale-95 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] cursor-pointer ${
+            isEN
+              ? "bg-[#E50914] hover:bg-red-700 shadow-red-950/50 border border-red-400/20"
+              : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50 border border-emerald-400/20"
+          }`}
+        >
+          <Plus size={14} strokeWidth={2.5} />
+          <span>Видео</span>
+        </button>
+      </div>
+
+      {/* Сетка карточек с порядковой нумерацией (#01, #02...) */}
       {filteredVideos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-3 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl p-8 max-w-lg mx-auto">
           <Video className="w-10 h-10 text-zinc-600" />
@@ -476,7 +611,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
             <EasyGermanCard
               key={video.id || video.youtube_id}
               video={video}
-              index={video.order_index ?? (index + 1)}
+              index={video.order_index ?? index + 1}
               isWatched={Boolean(video.is_watched)}
               onOpen={setActiveVideo}
               onToggleWatched={handleToggleWatched}
@@ -501,6 +636,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         level={selectedLevel}
+        lang={lang}
         onAddVideo={handleAddVideo}
       />
     </div>

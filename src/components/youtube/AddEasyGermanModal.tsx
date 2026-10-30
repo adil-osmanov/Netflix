@@ -8,7 +8,8 @@ import { fetchYouTubeVideoMetadataAction } from "@/app/youtube/actions";
 interface AddEasyGermanModalProps {
   isOpen: boolean;
   onClose: () => void;
-  level: "B1" | "B2" | "C1";
+  level: "A1" | "A2" | "B1" | "B2" | "C1";
+  lang?: "DE" | "EN";
   onAddVideo: (video: EasyGermanVideo) => void;
 }
 
@@ -25,6 +26,7 @@ export default function AddEasyGermanModal({
   isOpen,
   onClose,
   level,
+  lang = "DE",
   onAddVideo,
 }: AddEasyGermanModalProps) {
   const [urlOrId, setUrlOrId] = useState("");
@@ -32,6 +34,7 @@ export default function AddEasyGermanModal({
   const [error, setError] = useState<string | null>(null);
 
   const extractedId = extractYouTubeId(urlOrId);
+  const isEN = lang === "EN";
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,13 +84,17 @@ export default function AddEasyGermanModal({
         }
       } catch {}
 
+      const prefix = isEN ? "en" : "eg";
+      const label = isEN ? "American English" : "Easy German";
+
       const newVideo: EasyGermanVideo = {
-        id: `eg-${level.toLowerCase()}-${Date.now()}`,
+        id: `${prefix}-${level.toLowerCase()}-${Date.now()}`,
         youtube_id: ytId,
-        title: resolvedTitle || `Easy German ${level} (${ytId})`,
+        title: resolvedTitle || `${label} ${level} (${ytId})`,
         duration_str: resolvedDuration,
         duration: resolvedDuration,
         level,
+        category: isEN ? "american_english" : undefined,
         is_watched: false,
         created_at: new Date().toISOString(),
         quiz: [],
@@ -117,8 +124,8 @@ export default function AddEasyGermanModal({
         {/* Шапка */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/80 bg-zinc-900/50">
           <div className="flex items-center gap-2.5">
-            <Video className="w-5 h-5 text-emerald-500" />
-            <h2 className="text-base font-bold text-white">Добавить видео</h2>
+            <Video className={`w-5 h-5 ${isEN ? "text-[#E50914]" : "text-emerald-500"}`} />
+            <h2 className="text-base font-bold text-white">Добавить видео ({level})</h2>
           </div>
           <button
             type="button"
@@ -149,7 +156,9 @@ export default function AddEasyGermanModal({
               disabled={isLoading}
               onChange={(e) => setUrlOrId(e.target.value)}
               placeholder="https://youtube.com/watch?v=..."
-              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-emerald-500 text-sm text-white placeholder:text-zinc-500 outline-none transition disabled:opacity-50"
+              className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 ${
+                isEN ? "focus:border-[#E50914]" : "focus:border-emerald-500"
+              } text-sm text-white placeholder:text-zinc-500 outline-none transition disabled:opacity-50`}
               autoFocus
             />
             {extractedId && (
@@ -162,7 +171,13 @@ export default function AddEasyGermanModal({
                 <div className="text-xs text-zinc-400">
                   <div>
                     ID:{" "}
-                    <span className="font-mono text-emerald-400 font-semibold">{extractedId}</span>
+                    <span
+                      className={`font-mono font-semibold ${
+                        isEN ? "text-red-400" : "text-emerald-400"
+                      }`}
+                    >
+                      {extractedId}
+                    </span>
                   </div>
                   <div className="text-[11px] text-zinc-500 mt-0.5">
                     Название и хронометраж будут получены автоматически
@@ -176,7 +191,11 @@ export default function AddEasyGermanModal({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-semibold flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/50 cursor-pointer active:scale-[0.99] outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
+            className={`w-full py-2.5 rounded-xl ${
+              isEN
+                ? "bg-[#E50914] hover:bg-red-700 shadow-red-950/50"
+                : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50"
+            } disabled:opacity-50 text-white text-sm font-semibold flex items-center justify-center gap-2 transition shadow-lg cursor-pointer active:scale-[0.99] outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]`}
           >
             {isLoading ? (
               <>

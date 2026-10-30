@@ -5,20 +5,23 @@ import { Play, Bookmark } from "lucide-react";
 import { YouTubeRecommendedVideo } from "@/types/youtube";
 import { useYouTube } from "@/context/YouTubeContext";
 
+import { LevelBadge, getLevelBadgeStyle } from "./LevelBadge";
+export { LevelBadge };
+
 export function isValidDuration(durationStr?: string, seconds?: number): boolean {
-  if (typeof seconds === "number" && seconds < 600) return false;
+  if (typeof seconds === "number" && seconds < 180) return false;
   if (!durationStr) return false;
 
   const minMatch = durationStr.match(/(\d+)\s*(?:мин|min)/i);
   if (minMatch) {
-    return parseInt(minMatch[1], 10) >= 10;
+    return parseInt(minMatch[1], 10) >= 3;
   }
 
   const parts = durationStr.split(":").map(Number);
   if (parts.some(isNaN)) return false;
   if (parts.length === 2) {
-    // MM:SS -> отсекаем всё, где минут меньше 10
-    return parts[0] >= 10;
+    // MM:SS -> отсекаем Shorts (< 3 минут)
+    return parts[0] >= 3;
   }
   if (parts.length === 3) {
     // HH:MM:SS -> видео идет больше часа, подходит на 100%
@@ -28,7 +31,7 @@ export function isValidDuration(durationStr?: string, seconds?: number): boolean
 }
 
 function getFallbackPoster(channel: string, topic: string): string {
-  const ch = channel || "ARD / ZDF";
+  const ch = channel || "YouTube";
   const bg = ch.toUpperCase().includes("ZDF")
     ? "#e05a10"
     : ch.toUpperCase().includes("ARTE")
@@ -36,7 +39,7 @@ function getFallbackPoster(channel: string, topic: string): string {
     : "#003366";
 
   const safeChannel = ch.replace(/[<>&"']/g, "");
-  const safeTopic = (topic || "Mediathek").slice(0, 35).replace(/[<>&"']/g, "");
+  const safeTopic = (topic || "Video").slice(0, 35).replace(/[<>&"']/g, "");
 
   return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" fill="%2318181b"/><rect width="640" height="360" fill="${encodeURIComponent(bg)}" opacity="0.35"/><text x="40" y="80" fill="%23ffffff" font-family="sans-serif" font-weight="900" font-size="28">${encodeURIComponent(safeChannel)}</text><text x="40" y="140" fill="%23e4e4e7" font-family="sans-serif" font-weight="bold" font-size="22">${encodeURIComponent(safeTopic)}</text></svg>`;
 }
@@ -64,7 +67,6 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
 
   const durationDisplay = video.durationText || video.duration_str;
 
-  const [isDead, setIsDead] = useState(false);
   const [thumbUrl, setThumbUrl] = useState(() => {
     if (video.thumbnailUrl && !video.thumbnailUrl.includes("maxresdefault")) {
       return video.thumbnailUrl;
@@ -75,7 +77,7 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
     return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
   });
 
-  // Строгая клиентская проверка для YouTube: бан Shorts и видео короче 10 минут
+  // Строгая клиентская проверка для YouTube: бан Shorts
   if (!isExternalUrl) {
     const combinedText = `${videoId} ${video.title || ""} ${video.description || ""}`.toLowerCase();
     if (
@@ -98,7 +100,7 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
     if (thumbUrl.includes("maxresdefault")) {
       setThumbUrl(`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`);
     } else {
-      setIsDead(true);
+      setThumbUrl(getFallbackPoster(video.channel || "YouTube", video.title || ""));
     }
   };
 
@@ -127,7 +129,6 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
   };
 
   const level = (video.level || "B1").toUpperCase();
-  if (isDead) return null;
 
   return (
     <div
@@ -145,7 +146,7 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
       {/* 1. Preview 16:9 */}
       <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-all duration-300">
         <img
-          src={thumbUrl || getFallbackPoster(video.channel || "ARD / ZDF", video.title || "")}
+          src={thumbUrl || getFallbackPoster(video.channel || "YouTube", video.title || "")}
           alt={video.title}
           onError={handleImageError}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -154,26 +155,22 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
 
         {/* Top-Left: Channel Badge (if Mediathek) and Opaque Level Badge */}
-        <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5">
-          {video.channel && isExternalUrl && (
-            <span className="bg-zinc-900 border border-zinc-700 text-zinc-100 text-[11px] font-extrabold uppercase shadow-md px-2 py-0.5 rounded select-none">
+        {video.channel && isExternalUrl ? (
+          <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5 select-none pointer-events-none">
+            <span className="bg-zinc-900 border border-zinc-700 text-zinc-100 text-[10px] font-black tracking-wider uppercase shadow-md px-2 py-0.5 rounded">
               {video.channel}
             </span>
-          )}
-          <span
-            className={`px-2 py-0.5 rounded text-[11px] font-extrabold uppercase shadow-md select-none ${
-              level === "C1"
-                ? "bg-red-600 text-white"
-                : level === "B2"
-                ? "bg-emerald-600 text-white"
-                : level === "B1"
-                ? "bg-cyan-600 text-white"
-                : "bg-zinc-800 text-zinc-100"
-            }`}
-          >
-            {level}
-          </span>
-        </div>
+            <span
+              className={`px-2 py-0.5 rounded text-[10px] font-black tracking-wider uppercase shadow-md ${getLevelBadgeStyle(
+                level
+              )}`}
+            >
+              {level}
+            </span>
+          </div>
+        ) : (
+          <LevelBadge level={level} />
+        )}
 
         {/* Top-Right: Bookmark Favorite Button */}
         <button

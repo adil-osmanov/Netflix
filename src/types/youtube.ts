@@ -1,3 +1,10 @@
+export type Language = 'DE' | 'EN';
+export type GermanLevel = 'B1' | 'B2' | 'C1';
+export type EnglishLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1';
+
+export const DE_LEVELS: GermanLevel[] = ['B1', 'B2', 'C1'];
+export const EN_LEVELS: EnglishLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1'];
+
 export interface TranscriptItem {
   text: string;
   start: number;     // in seconds
@@ -14,6 +21,7 @@ export interface YouTubeRecommendedVideo {
   description?: string;
   durationText?: string;
   published?: string;
+  category?: string;
 }
 
 export interface QuizItem {
@@ -28,7 +36,9 @@ export interface EasyGermanVideo {
   id: string;              // уникальный ID записи
   youtube_id: string;      // 11 символов ID YouTube
   title: string;           // название
-  level: 'B1' | 'B2' | 'C1';
+  channel?: string;        // канал
+  category?: string;       // категория ('american_english' | 'recommendations' | 'podcasts')
+  level: 'A1' | 'A2' | 'B1' | 'B2' | 'C1';
   duration_str?: string;   // например, "14:20"
   duration?: string;       // синоним duration_str
   order_index?: number;    // порядковый номер серии/шага

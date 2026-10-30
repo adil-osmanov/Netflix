@@ -33,6 +33,8 @@ const DEFAULT_SETTINGS: SubtitleSettings = {
 };
 
 interface YouTubeContextType {
+  currentLang: "DE" | "EN";
+  setLanguage: (lang: "DE" | "EN") => void;
   isDictionaryOpen: boolean;
   openDictionary: () => void;
   closeDictionary: () => void;
@@ -44,8 +46,10 @@ interface YouTubeContextType {
   clearChannelDeck: (channel: string) => Promise<void>;
   subtitleSettings: SubtitleSettings;
   updateSubtitleSettings: (newSettings: Partial<SubtitleSettings>) => void;
-  // Favorites system
+  // Favorites system (isolated per language)
   favorites: YouTubeRecommendedVideo[];
+  favoritesDE: YouTubeRecommendedVideo[];
+  favoritesEN: YouTubeRecommendedVideo[];
   isFavorite: (videoId: string) => boolean;
   toggleFavorite: (video: YouTubeRecommendedVideo) => Promise<void>;
   removeFavorite: (videoId: string) => Promise<void>;
@@ -55,15 +59,24 @@ interface YouTubeContextType {
 const YouTubeContext = createContext<YouTubeContextType | undefined>(undefined);
 
 export function YouTubeProvider({ children }: { children: React.ReactNode }) {
+  const [currentLang, setCurrentLang] = useState<"DE" | "EN">("DE");
   const [isDictionaryOpen, setIsDictionaryOpen] = useState(false);
   const [savedWords, setSavedWords] = useState<UserWord[]>([]);
   const [isLoadingWords, setIsLoadingWords] = useState(false);
   const [subtitleSettings, setSubtitleSettings] = useState<SubtitleSettings>(DEFAULT_SETTINGS);
-  const [favorites, setFavorites] = useState<YouTubeRecommendedVideo[]>([]);
+  const [favoritesDE, setFavoritesDE] = useState<YouTubeRecommendedVideo[]>([]);
+  const [favoritesEN, setFavoritesEN] = useState<YouTubeRecommendedVideo[]>([]);
 
-  // Load subtitle settings & favorites from localStorage on mount
+  // Load app_lang, subtitle settings & isolated favorites from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
+    try {
+      const savedLang = localStorage.getItem("app_lang");
+      if (savedLang === "DE" || savedLang === "EN") {
+        setCurrentLang(savedLang);
+      }
+    } catch {}
+
     try {
       const stored = localStorage.getItem("yt_de_subtitle_settings");
       if (stored) {
@@ -72,17 +85,35 @@ export function YouTubeProvider({ children }: { children: React.ReactNode }) {
     } catch {}
 
     try {
-      const storedFavs = localStorage.getItem("netflix_favorites");
-      if (storedFavs) {
-        const parsed = JSON.parse(storedFavs);
+      const storedDe = localStorage.getItem("favorites_de") || localStorage.getItem("netflix_favorites");
+      if (storedDe) {
+        const parsed = JSON.parse(storedDe);
         if (Array.isArray(parsed)) {
-          setFavorites(parsed);
+          setFavoritesDE(parsed);
+          localStorage.setItem("favorites_de", JSON.stringify(parsed));
         }
       }
     } catch {}
 
-    // Also fetch server favorites and merge
+    try {
+      const storedEn = localStorage.getItem("favorites_en");
+      if (storedEn) {
+        const parsed = JSON.parse(storedEn);
+        if (Array.isArray(parsed)) {
+          setFavoritesEN(parsed);
+        }
+      }
+    } catch {}
+
+    // Fetch server favorites for DE and merge
     refreshFavorites();
+  }, []);
+
+  const setLanguage = useCallback((lang: "DE" | "EN") => {
+    setCurrentLang(lang);
+    try {
+      localStorage.setItem("app_lang", lang);
+    } catch {}
   }, []);
 
   const updateSubtitleSettings = (newSettings: Partial<SubtitleSettings>) => {
@@ -137,18 +168,20 @@ export function YouTubeProvider({ children }: { children: React.ReactNode }) {
     setIsDictionaryOpen(false);
   };
 
-  // Favorites logic
+  // Favorites logic (isolated by language)
+  const favorites = currentLang === "EN" ? favoritesEN : favoritesDE;
+
   const refreshFavorites = useCallback(async () => {
     try {
       const res = await getFavoritesAction();
       if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-        setFavorites((prev) => {
-          // Merge local and server favorites
+        setFavoritesDE((prev) => {
           const map = new Map<string, YouTubeRecommendedVideo>();
           for (const v of prev) map.set(v.id, v);
           for (const v of res.data) map.set(v.id, v);
           const merged = Array.from(map.values());
           try {
+            localStorage.setItem("favorites_de", JSON.stringify(merged));
             localStorage.setItem("netflix_favorites", JSON.stringify(merged));
           } catch {}
           return merged;
@@ -165,28 +198,47 @@ export function YouTubeProvider({ children }: { children: React.ReactNode }) {
   );
 
   const toggleFavorite = async (video: YouTubeRecommendedVideo) => {
-    const exists = favorites.some((v) => v.id === video.id);
-    let updated: YouTubeRecommendedVideo[];
-    if (exists) {
-      updated = favorites.filter((v) => v.id !== video.id);
-    } else {
-      updated = [video, ...favorites.filter((v) => v.id !== video.id)];
+    if (currentLang === "EN") {
+      const exists = favoritesEN.some((v) => v.id === video.id);
+      const updated = exists
+        ? favoritesEN.filter((v) => v.id !== video.id)
+        : [video, ...favoritesEN.filter((v) => v.id !== video.id)];
+      setFavoritesEN(updated);
+      try {
+        localStorage.setItem("favorites_en", JSON.stringify(updated));
+      } catch {}
+      return;
     }
-    setFavorites(updated);
+
+    const exists = favoritesDE.some((v) => v.id === video.id);
+    const updated = exists
+      ? favoritesDE.filter((v) => v.id !== video.id)
+      : [video, ...favoritesDE.filter((v) => v.id !== video.id)];
+    setFavoritesDE(updated);
     try {
+      localStorage.setItem("favorites_de", JSON.stringify(updated));
       localStorage.setItem("netflix_favorites", JSON.stringify(updated));
     } catch {}
 
-    // Call server action in background
     try {
       await toggleFavoriteAction(video);
     } catch {}
   };
 
   const removeFavorite = async (videoId: string) => {
-    const updated = favorites.filter((v) => v.id !== videoId);
-    setFavorites(updated);
+    if (currentLang === "EN") {
+      const updated = favoritesEN.filter((v) => v.id !== videoId);
+      setFavoritesEN(updated);
+      try {
+        localStorage.setItem("favorites_en", JSON.stringify(updated));
+      } catch {}
+      return;
+    }
+
+    const updated = favoritesDE.filter((v) => v.id !== videoId);
+    setFavoritesDE(updated);
     try {
+      localStorage.setItem("favorites_de", JSON.stringify(updated));
       localStorage.setItem("netflix_favorites", JSON.stringify(updated));
     } catch {}
     try {
@@ -197,6 +249,8 @@ export function YouTubeProvider({ children }: { children: React.ReactNode }) {
   return (
     <YouTubeContext.Provider
       value={{
+        currentLang,
+        setLanguage,
         isDictionaryOpen,
         openDictionary,
         closeDictionary,
@@ -209,6 +263,8 @@ export function YouTubeProvider({ children }: { children: React.ReactNode }) {
         subtitleSettings,
         updateSubtitleSettings,
         favorites,
+        favoritesDE,
+        favoritesEN,
         isFavorite,
         toggleFavorite,
         removeFavorite,
