@@ -34,7 +34,7 @@ export default async function SearchPage({
   }));
 
   return (
-    <main className="min-h-screen bg-[#141414] pt-28 md:pt-32 pb-12 w-full">
+    <main className="min-h-screen bg-black pt-28 md:pt-32 pb-12 w-full">
       <Navbar />
       
       <div className="w-full">

@@ -3,8 +3,8 @@
 import { Play, X, ChevronDown, CheckCircle2 } from "lucide-react";
 import Image from "next/image";
 import { useWatched } from "@/context/WatchedContext";
-import { getTelegramDeepLink } from "@/utils/telegram";
-import { useState, useEffect } from "react";
+import { openTelegramLink } from "@/lib/telegram";
+import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { getEpisodesAction, setLastWatchedAction } from "@/app/actions";
 import { Movie } from "./MovieCard";
@@ -68,11 +68,19 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
         document.body.style.overflow = '';
       };
     }
-  }, [isOpen, movie.id]);
+  }, [isOpen, movie.id, movie.collection_type]);
+
+  const displayedEpisodes = useMemo(() => {
+    return isSeries 
+      ? episodes.filter(e => e.season === activeSeason) 
+      : episodes;
+  }, [isSeries, episodes, activeSeason]);
+
+  const seasonWatchedCount = useMemo(() => {
+    return displayedEpisodes.filter(ep => isWatched(movie.id, ep.id)).length;
+  }, [displayedEpisodes, isWatched, movie.id]);
 
   if (!isOpen || !mounted) return null;
-
-
 
   const getDisplayName = (title: string, idx: number) => {
     const s = `Серия ${idx + 1}`;
@@ -81,30 +89,21 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
     if (title === p) return "Часть";
     return title;
   };
-  const getEpisodeLink = (ep: any) => {
-    return getTelegramDeepLink(ep.telegram_link || movie.telegram_url);
-  };
+
   const playEpisode = (ep: any) => {
-    const link = getTelegramDeepLink(ep.telegram_link || movie.telegram_url);
-    if (link && link !== '#') window.open(link, '_blank');
+    const raw = ep.telegram_link || movie.telegram_url;
+    if (raw) openTelegramLink(raw);
   };
-
-  const displayedEpisodes = isSeries 
-    ? episodes.filter(e => e.season === activeSeason) 
-    : episodes;
-
-  const seasonWatchedCount = displayedEpisodes.filter(ep => isWatched(movie.id, ep.id)).length;
-  const seasonProgress = displayedEpisodes.length > 0 ? (seasonWatchedCount / displayedEpisodes.length) * 100 : 0;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto no-scrollbar animate-in fade-in duration-300" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto no-scrollbar animate-in fade-in duration-300" onClick={onClose}>
       <div 
         onClick={(e) => e.stopPropagation()} 
-        className="w-full max-w-[950px] bg-[#181818] rounded-xl shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden relative h-fit max-h-[90vh] flex flex-col my-auto animate-in fade-in zoom-in-[0.98] duration-300 ease-out"
+        className="w-full max-w-[950px] bg-zinc-950 border border-zinc-800 rounded-xl shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden relative h-fit max-h-[90vh] flex flex-col my-auto animate-in fade-in zoom-in-[0.98] duration-300 ease-out"
       >
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 z-50 bg-[#181818] rounded-full w-9 h-9 flex items-center justify-center text-white hover:bg-zinc-800 transition-colors cursor-pointer shadow-xl border border-zinc-700"
+          className="absolute top-4 right-4 z-50 bg-zinc-900 rounded-full w-9 h-9 flex items-center justify-center text-white hover:bg-zinc-800 transition-colors cursor-pointer shadow-xl border border-zinc-700"
         >
           <X className="w-5 h-5" />
         </button>
@@ -113,8 +112,8 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
           {/* Top Banner (16:9) */}
           <div className="w-full aspect-video relative flex-shrink-0">
             <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 1024px) 100vw, 950px" className="object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#181818] via-[#181818]/40 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/40 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/30 to-transparent" />
             
             <div className="absolute bottom-0 left-0 p-4 md:p-12 w-full max-w-3xl">
               <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-white mb-4 drop-shadow-2xl tracking-tight leading-tight">
@@ -124,7 +123,7 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
           </div>
 
           {/* Content Section */}
-          <div className="w-full px-4 md:px-12 pb-8 md:pb-12 flex flex-col relative z-10 bg-[#181818]">
+          <div className="w-full px-4 md:px-12 pb-8 md:pb-12 flex flex-col relative z-10 bg-zinc-950">
             {loading ? (
               <div className="flex-1 flex items-center justify-center text-zinc-500 font-medium py-12">Загрузка...</div>
             ) : episodes.length === 0 ? (
@@ -138,7 +137,7 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
                     <div className="relative">
                       <button 
                         onClick={() => setIsSeasonDropdownOpen(!isSeasonDropdownOpen)}
-                        className="flex items-center gap-3 bg-[#242424] hover:bg-[#2f2f2f] border border-zinc-700 hover:border-zinc-500 text-white text-lg font-semibold px-5 py-2.5 rounded-md transition-all"
+                        className="flex items-center gap-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-zinc-500 text-white text-lg font-semibold px-5 py-2.5 rounded-md transition-all cursor-pointer"
                       >
                         <span>Сезон {activeSeason}</span>
                         <ChevronDown className={`w-5 h-5 text-zinc-400 transition-transform duration-300 ${isSeasonDropdownOpen ? 'rotate-180' : ''}`} />
@@ -147,12 +146,12 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
                       {isSeasonDropdownOpen && (
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setIsSeasonDropdownOpen(false)}></div>
-                          <div className="absolute right-0 top-full mt-2 w-48 bg-[#181818] border border-zinc-700 rounded-md shadow-2xl z-50 overflow-hidden py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                          <div className="absolute right-0 top-full mt-2 w-48 bg-zinc-900 border border-zinc-700 rounded-md shadow-2xl z-50 overflow-hidden py-2 animate-in fade-in slide-in-from-top-2 duration-200">
                             {seasons.map(s => (
                               <button
                                 key={s}
                                 onClick={() => { setActiveSeason(s); setIsSeasonDropdownOpen(false); }}
-                                className={`w-full text-left px-5 py-3 hover:bg-[#2f2f2f] transition-colors text-lg font-medium ${activeSeason === s ? 'text-white bg-[#2f2f2f] border-l-2 border-[#E50914]' : 'text-zinc-400 border-l-2 border-transparent'}`}
+                                className={`w-full text-left px-5 py-3 hover:bg-zinc-800 transition-colors text-lg font-medium cursor-pointer ${activeSeason === s ? 'text-white bg-zinc-800 border-l-2 border-[#E50914]' : 'text-zinc-400 border-l-2 border-transparent'}`}
                               >
                                 Сезон {s}
                               </button>
@@ -171,17 +170,26 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
 
                 <div className="space-y-4">
                   {displayedEpisodes.map((ep, idx) => (
-                    <a 
+                    <div 
                       key={ep.id}
-                      href={getEpisodeLink(ep)}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => {
                         const urlParams = new URLSearchParams(window.location.search);
                         const categoryType = urlParams.get('category') || 'all';
                         setLastWatchedAction(categoryType, movie);
+                        playEpisode(ep);
                       }}
-                      className="flex items-center gap-6 p-4 border-b border-zinc-800 group hover:bg-[#2f2f2f] transition-colors cursor-pointer rounded-lg"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          const urlParams = new URLSearchParams(window.location.search);
+                          const categoryType = urlParams.get('category') || 'all';
+                          setLastWatchedAction(categoryType, movie);
+                          playEpisode(ep);
+                        }
+                      }}
+                      className="flex items-center gap-6 p-4 border-b border-zinc-800/80 group hover:bg-zinc-900/80 transition-colors cursor-pointer rounded-lg select-none outline-none"
                     >
                       <div className="text-2xl text-zinc-500 font-medium w-8 text-center group-hover:hidden">
                         {idx + 1}
@@ -195,12 +203,12 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
                       </div>
                       <button 
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWatched(movie.id, ep.id); }}
-                        className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
+                        className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors cursor-pointer select-none outline-none"
                         title={isWatched(movie.id, ep.id) ? "Отметить как непросмотренное" : "Отметить как просмотренное"}
                       >
                         <CheckCircle2 className={`w-6 h-6 ${isWatched(movie.id, ep.id) ? 'text-green-500' : 'text-zinc-600'}`} />
                       </button>
-                    </a>
+                    </div>
                   ))}
                 </div>
               </div>

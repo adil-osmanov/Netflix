@@ -369,14 +369,6 @@ export default function MediathekCatalog() {
             const isFav = isFavorite(item.url_website) || isFavorite(item.id);
             const fallbackSvg = getFallbackPoster(item.channel, item.topic);
 
-            // Цветовой бейдж уровня на карточке
-            let levelBadgeClass = "bg-sky-500/20 text-sky-400 border border-sky-500/30";
-            if (item.level === "A1" || item.level === "A2") {
-              levelBadgeClass = "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
-            } else if (item.level === "C1") {
-              levelBadgeClass = "bg-red-500/20 text-red-400 border border-red-500/30";
-            }
-
             return (
               <div
                 key={item.id}
@@ -406,17 +398,27 @@ export default function MediathekCatalog() {
                     loading="lazy"
                   />
 
-                  {/* Бейдж канала (ZDF / ARD / Arte) */}
-                  <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold bg-black/70 text-white backdrop-blur-md">
-                    {item.channel}
-                  </span>
-
-                  {/* Бейдж CEFR (A1 / A2 / B1 / B2 / C1) */}
-                  <span
-                    className={`absolute top-2 left-14 px-2 py-0.5 rounded text-[10px] font-bold backdrop-blur-md ${levelBadgeClass}`}
-                  >
-                    {item.level}
-                  </span>
+                  {/* Непрозрачные контрастные бейджи канала и уровня */}
+                  <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5">
+                    {item.channel && (
+                      <span className="bg-zinc-900 border border-zinc-700 text-zinc-100 text-[11px] font-extrabold uppercase shadow-md px-2 py-0.5 rounded select-none">
+                        {item.channel}
+                      </span>
+                    )}
+                    <span
+                      className={`px-2 py-0.5 rounded text-[11px] font-extrabold uppercase shadow-md select-none ${
+                        item.level === "C1"
+                          ? "bg-red-600 text-white"
+                          : item.level === "B2"
+                          ? "bg-emerald-600 text-white"
+                          : item.level === "B1"
+                          ? "bg-cyan-600 text-white"
+                          : "bg-zinc-800 text-zinc-100"
+                      }`}
+                    >
+                      {item.level}
+                    </span>
+                  </div>
 
                   {/* Кнопка «В избранное» */}
                   <button

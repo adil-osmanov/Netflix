@@ -25,3 +25,6 @@ export function getTelegramDeepLink(url: string | undefined | null): string {
   // If it's some other link, just return it
   return url;
 }
+
+export { openTelegramLink } from "@/lib/telegram";
+

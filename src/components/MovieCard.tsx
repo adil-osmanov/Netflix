@@ -4,6 +4,7 @@ import { Play, Pencil, Trash2, CheckCircle2 } from "lucide-react";
 import Image from "next/image";
 import { useWatched } from "@/context/WatchedContext";
 import { getTelegramDeepLink } from "@/utils/telegram";
+import { openTelegramLink } from "@/lib/telegram";
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import CollectionViewerModal from "./CollectionViewerModal";
@@ -93,6 +94,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
     return link === '#' ? undefined : link;
   };
   const handlePlay = (e?: React.MouseEvent) => {
+    e?.preventDefault();
     e?.stopPropagation();
     
     const urlParams = new URLSearchParams(window.location.search);
@@ -103,12 +105,7 @@ export default function MovieCard({ movie }: MovieCardProps) {
     if (movie.is_collection) {
       setModalOpen(true);
     } else if (movie.telegram_url) {
-      let url = movie.telegram_url;
-      if (url && !url.includes('http')) {
-        const channelId = process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_ID?.replace("-100", "") || "3905550666";
-        url = `https://t.me/c/${channelId}/${url}`;
-      }
-      window.open(url, '_blank');
+      openTelegramLink(movie.telegram_url);
     }
   };
 
@@ -189,30 +186,13 @@ export default function MovieCard({ movie }: MovieCardProps) {
         onMouseLeave={handleMouseLeave}
         className={`group relative w-full aspect-video flex-shrink-0 transition-z duration-0 ${isHovered ? 'z-[70]' : isAnimatingOut ? 'z-[60]' : 'z-10'}`}
       >
-        <div className={`absolute inset-0 transition-all duration-300 ease-out origin-center rounded-md [clip-path:inset(0_round_6px)] bg-[#141414] isolate transform-gpu will-change-transform ${isHovered ? 'md:scale-[1.25] md:shadow-[0_0_30px_rgba(0,0,0,0.9)]' : 'scale-100'}`}>
+        <div className={`absolute inset-0 transition-all duration-300 ease-out origin-center rounded-md [clip-path:inset(0_round_6px)] bg-black isolate transform-gpu will-change-transform ${isHovered ? 'md:scale-[1.25] md:shadow-[0_0_30px_rgba(0,0,0,0.9)]' : 'scale-100'}`}>
           
           {/* Background and Clickable Area */}
-          {movie.is_collection ? (
-            <div onClick={handlePlay} className="absolute inset-0 z-0 cursor-pointer">
-              <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw" className="object-cover transition-transform duration-300" />
-              <div className={`absolute -inset-1 transition-opacity duration-300 bg-gradient-to-t from-[#141414] from-15% via-[#141414]/80 via-45% to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
-            </div>
-          ) : (
-            <a 
-              href={getPlayLink()}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                const urlParams = new URLSearchParams(window.location.search);
-                const categoryType = urlParams.get('category') || 'all';
-                setLastWatchedAction(categoryType, movie);
-              }}
-              className="absolute inset-0 z-0 cursor-pointer block"
-            >
-              <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw" className="object-cover transition-transform duration-300" />
-              <div className={`absolute -inset-1 transition-opacity duration-300 bg-gradient-to-t from-[#141414] from-15% via-[#141414]/80 via-45% to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
-            </a>
-          )}
+          <div onClick={handlePlay} className="absolute inset-0 z-0 cursor-pointer">
+            <Image src={movie.cover_url} alt={movie.title} fill sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw" className="object-cover transition-transform duration-300" />
+            <div className={`absolute -inset-1 transition-opacity duration-300 bg-gradient-to-t from-black from-15% via-black/80 via-45% to-transparent ${isHovered ? 'opacity-100' : 'opacity-100 md:opacity-0'}`} />
+          </div>
 
           {/* Top Right: Edit & Delete (z-20) */}
           {!hideAdmin && (

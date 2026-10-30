@@ -4,6 +4,7 @@ import { Play, CheckCircle2 } from "lucide-react";
 import Image from "next/image";
 import { useWatched } from "@/context/WatchedContext";
 import { getTelegramDeepLink } from "@/utils/telegram";
+import { openTelegramLink } from "@/lib/telegram";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getCollectionPartsInfoAction, getLastWatchedAction, setLastWatchedAction } from "@/app/actions";
@@ -59,27 +60,21 @@ export default function Hero({ movie }: { movie?: any }) {
     if (displayMovie?.telegram_url && !displayMovie?.is_collection) {
       const category = searchParams.get('category') || 'all';
       setLastWatchedAction(category, displayMovie);
-      
-      let url = displayMovie.telegram_url;
-      if (url && !url.includes('http')) {
-        const channelId = process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_ID?.replace("-100", "") || "3905550666";
-        url = `https://t.me/c/${channelId}/${url}`;
-      }
-      window.open(url, '_blank');
+      openTelegramLink(displayMovie.telegram_url);
     } else if (displayMovie?.is_collection) {
       setModalOpen(true);
     }
   };
 
 
-  if (!mounted || !displayMovie) return <div className="min-h-[75vh] w-full bg-[#141414] animate-pulse"></div>;
+  if (!mounted || !displayMovie) return <div className="min-h-[75vh] w-full bg-black animate-pulse"></div>;
 
   let displayTitle = displayMovie.title;
   let year = displayMovie.release_year;
 
   return (
     <div 
-      className="relative w-full aspect-[16/9] md:aspect-auto md:h-[75vh] md:max-h-[850px] flex flex-col justify-end pb-4 md:pb-16 z-10 bg-[#141414]"
+      className="relative w-full aspect-[16/9] md:aspect-auto md:h-[75vh] md:max-h-[850px] flex flex-col justify-end pb-4 md:pb-16 z-10 bg-black"
     >
       <Image 
         src={displayMovie.cover_url} 
@@ -89,8 +84,8 @@ export default function Hero({ movie }: { movie?: any }) {
         className="object-cover object-top"
         sizes="100vw"
       />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#141414]/90 md:from-[#141414] md:via-[#141414]/50 to-transparent z-10" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#141414] from-10% via-[#141414]/80 md:via-[#141414]/40 via-60% to-transparent z-10" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/90 md:from-black md:via-black/50 to-transparent z-10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black from-10% via-black/80 md:via-black/40 via-60% to-transparent z-10" />
 
       <div className="relative z-20 px-4 md:px-12 lg:px-16 max-w-3xl">
         {displayMovie.is_collection && (

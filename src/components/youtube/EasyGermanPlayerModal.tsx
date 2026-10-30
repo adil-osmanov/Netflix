@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Check, Sparkles, AlertCircle } from "lucide-react";
+import { Check, Sparkles, AlertCircle, Maximize2, Minimize2 } from "lucide-react";
 import { EasyGermanVideo, QuizItem } from "@/types/youtube";
 import VideoQuiz from "./VideoQuiz";
 
@@ -71,13 +71,26 @@ export default function EasyGermanPlayerModal({
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [isIdle, setIsIdle] = useState(false);
 
-  const playerContainerRef = useRef<HTMLDivElement>(null);
+  const modalCardRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const handleDoubleClick = () => {
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      playerContainerRef.current?.requestFullscreen().catch(() => {});
+      // Разворачиваем карточку модалки на весь экран
+      if (modalCardRef.current?.requestFullscreen) {
+        modalCardRef.current.requestFullscreen().catch(() => {});
+      }
     } else {
-      document.exitFullscreen().catch(() => {});
+      // Корректно выходим из полноэкранного режима
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
     }
   };
 
@@ -149,15 +162,15 @@ export default function EasyGermanPlayerModal({
       }`}
       onClick={onClose}
     >
-      {/* Единая карточка модалки */}
+      {/* Единая карточка модалки с переключением Fullscreen по double click */}
       <div
+        ref={modalCardRef}
+        onDoubleClick={toggleFullscreen}
         className="relative w-full max-w-4xl bg-zinc-950 border border-zinc-800/90 rounded-2xl overflow-hidden shadow-2xl my-auto animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Плеер 16:9 со скругленными верхними углами и жестом двойного клика для Fullscreen */}
+        {/* Плеер 16:9 со скругленными верхними углами */}
         <div
-          ref={playerContainerRef}
-          onDoubleClick={handleDoubleClick}
           className="relative aspect-video w-full bg-black rounded-t-2xl overflow-hidden"
         >
           <iframe
@@ -168,8 +181,8 @@ export default function EasyGermanPlayerModal({
           />
         </div>
 
-        {/* Блок под видео: кнопка выполнения и интерактив */}
-        <div className="p-4 sm:p-5 bg-zinc-950 space-y-4">
+        {/* Блок под видео: кнопка выполнения, кнопка Fullscreen и интерактив */}
+        <div onDoubleClick={toggleFullscreen} className="p-4 sm:p-5 bg-zinc-950 space-y-4">
           <div className="flex items-center justify-between border-b border-zinc-900/80 pb-4">
             <button
               type="button"
@@ -182,6 +195,15 @@ export default function EasyGermanPlayerModal({
             >
               <Check size={14} strokeWidth={2.5} />
               <span>{watched ? "Выполнено" : "Отметить как выполненное"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition outline-none cursor-pointer select-none [-webkit-tap-highlight-color:transparent]"
+              title={isFullscreen ? "Выйти из полноэкранного режима" : "На весь экран"}
+            >
+              {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
             </button>
           </div>
 

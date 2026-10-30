@@ -127,19 +127,6 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
   };
 
   const level = (video.level || "B1").toUpperCase();
-  const getLevelBadgeClass = (lvl: string) => {
-    if (lvl.startsWith("A1") || lvl.startsWith("A2")) {
-      return "bg-emerald-500/20 border border-emerald-500/40 text-emerald-400";
-    }
-    if (lvl.startsWith("B1") || lvl.startsWith("B2")) {
-      return "bg-sky-500/20 border border-sky-500/40 text-sky-400";
-    }
-    if (lvl.startsWith("C1") || lvl.startsWith("C2")) {
-      return "bg-red-500/20 border border-red-500/40 text-red-400";
-    }
-    return "bg-sky-500/20 border border-sky-500/40 text-sky-400";
-  };
-
   if (isDead) return null;
 
   return (
@@ -166,15 +153,23 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
 
-        {/* Top-Left: Channel Badge (if Mediathek) or Level Badge */}
-        <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5">
+        {/* Top-Left: Channel Badge (if Mediathek) and Opaque Level Badge */}
+        <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5">
           {video.channel && isExternalUrl && (
-            <span className="bg-zinc-800/80 border border-zinc-700 text-zinc-300 text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md">
+            <span className="bg-zinc-900 border border-zinc-700 text-zinc-100 text-[11px] font-extrabold uppercase shadow-md px-2 py-0.5 rounded select-none">
               {video.channel}
             </span>
           )}
           <span
-            className={`${getLevelBadgeClass(level)} text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md`}
+            className={`px-2 py-0.5 rounded text-[11px] font-extrabold uppercase shadow-md select-none ${
+              level === "C1"
+                ? "bg-red-600 text-white"
+                : level === "B2"
+                ? "bg-emerald-600 text-white"
+                : level === "B1"
+                ? "bg-cyan-600 text-white"
+                : "bg-zinc-800 text-zinc-100"
+            }`}
           >
             {level}
           </span>

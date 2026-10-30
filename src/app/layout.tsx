@@ -18,7 +18,6 @@ export const viewport: Viewport = {
 
 import { SearchProvider } from "@/components/SearchContext";
 import { WatchedProvider } from "@/context/WatchedContext";
-import AutoFullscreen from "@/components/layout/AutoFullscreen";
 
 export const metadata: Metadata = {
   title: "Netflix",
@@ -41,8 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#141414] text-white">
-        <AutoFullscreen />
+      <body className="min-h-full flex flex-col bg-black text-white">
         <WatchedProvider>
           <SearchProvider>{children}</SearchProvider>
         </WatchedProvider>

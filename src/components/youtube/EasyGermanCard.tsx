@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Play, Check, Trash2 } from "lucide-react";
+import { Play, Check } from "lucide-react";
 import { EasyGermanVideo } from "@/types/youtube";
 
 interface EasyGermanCardProps {
@@ -58,7 +58,7 @@ export default function EasyGermanCard({
           : "hover:border-zinc-700"
       }`}
     >
-      {/* Превью контейнер */}
+      {/* Превью контейнер aspect-video */}
       <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 transition-all duration-300 group-hover:border-zinc-700">
         <img
           src={`https://i.ytimg.com/vi/${video.youtube_id}/hqdefault.jpg`}
@@ -123,24 +123,8 @@ export default function EasyGermanCard({
           )}
         </div>
 
-        {/* В правом верхнем углу: изумрудная кнопка удаления (при наведении) и кнопка «Просмотрено» */}
-        <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1.5">
-          {onDelete && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (typeof window !== "undefined" && window.confirm("Удалить видео из курса?")) {
-                  onDelete(video.id || video.youtube_id);
-                }
-              }}
-              className="p-1.5 rounded-full bg-zinc-900/80 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/80 border border-zinc-800 hover:border-emerald-500/40 opacity-0 group-hover:opacity-100 transition-all duration-200 outline-none cursor-pointer"
-              title="Удалить видео"
-            >
-              <Trash2 size={13} strokeWidth={2.5} />
-            </button>
-          )}
+        {/* В правом верхнем углу: кнопка-галочка «Просмотрено» */}
+        <div className="absolute top-2.5 right-2.5 z-20">
           <button
             type="button"
             onClick={(e) => {
@@ -182,11 +166,6 @@ export default function EasyGermanCard({
           </div>
         )}
       </div>
-
-      {/* Текст под превью: только заголовок */}
-      <h3 className="mt-2 text-sm font-medium text-zinc-100 line-clamp-2 group-hover:text-white transition-colors">
-        {video.title}
-      </h3>
     </div>
   );
 }

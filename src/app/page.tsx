@@ -62,9 +62,9 @@ export default async function Home() {
   });
 
   return (
-    <main className="min-h-screen bg-[#141414] overflow-x-hidden w-full relative">
+    <main className="min-h-screen bg-black overflow-x-hidden w-full relative">
       <Navbar />
-      <Suspense fallback={<div className="min-h-screen w-full bg-[#141414]" />}>
+      <Suspense fallback={<div className="min-h-screen w-full bg-black" />}>
         <ClientCatalog 
           allGenres={genres || []} 
           allMovies={allMovies} 

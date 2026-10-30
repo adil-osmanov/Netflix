@@ -412,9 +412,8 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
 
   return (
     <div className="w-full">
-      {/* Премиальный статус-блок Easy German */}
-      <div className="relative z-10 mb-6 p-4 rounded-2xl bg-zinc-950/60 border border-zinc-800/60 backdrop-blur-xl shadow-2xl">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* Бесшовный чистый блок уровней Easy German */}
+      <div className="relative z-10 mb-6 py-2 bg-transparent flex flex-wrap items-center justify-between gap-4">
           {/* Левая часть: Уровни B1, B2, C1 в капсуле (все изумрудные при выборе) */}
           <div className="flex items-center gap-1.5 p-1 bg-black/50 rounded-xl border border-zinc-800/80">
             {EASY_GERMAN_LEVELS.map((lvl) => (
@@ -454,7 +453,6 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
             <span>Видео</span>
           </button>
         </div>
-      </div>
 
       {/* Сетка карточек Easy German с порядковой нумерацией (#01, #02...) */}
       {filteredVideos.length === 0 ? (
