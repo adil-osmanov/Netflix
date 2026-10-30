@@ -466,16 +466,16 @@ export default function YouTubeCatalogPage() {
     <div className="relative min-h-screen bg-black text-white pb-24 px-4 md:px-12 pt-1 transition-colors duration-500 overflow-x-hidden">
       {/* Потолочный изумрудный свет (Ambient Ceiling Glow) */}
       <div 
-        className={`fixed -top-40 left-1/2 -translate-x-1/2 w-[1000px] h-[380px] pointer-events-none transition-opacity duration-700 ease-out z-0 blur-[130px] ${
+        className={`fixed top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[450px] pointer-events-none transition-opacity duration-700 ease-out z-0 blur-[140px] ${
           activeCategory === "youtube" && activeTab === "easy_german"
-            ? "opacity-30 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.7),transparent_75%)]"
+            ? "opacity-35 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.65),transparent_70%)]"
             : "opacity-0"
         }`}
       />
 
       {/* Обычный потолочный свет (Cinema Vignette) */}
       <div 
-        className={`fixed -top-48 left-1/2 -translate-x-1/2 w-[900px] h-[320px] pointer-events-none transition-opacity duration-700 ease-out z-0 blur-[130px] ${
+        className={`fixed top-0 left-1/2 -translate-x-1/2 w-[900px] h-[320px] pointer-events-none transition-opacity duration-700 ease-out z-0 blur-[140px] ${
           activeCategory === "youtube" && activeTab === "easy_german"
             ? "opacity-0"
             : "opacity-10 bg-[radial-gradient(ellipse_at_top,rgba(220,38,38,0.4),transparent_75%)]"
@@ -483,8 +483,11 @@ export default function YouTubeCatalogPage() {
       />
 
       <div className="relative z-10">
-        {/* 1. Верхняя навигация: вынос «Избранного» на первый уровень */}
-        <div className="max-w-7xl mx-auto mb-6 pt-1 flex items-center justify-center">
+        {/* Шапка: логотип Netflix + кнопки выбора источников */}
+        <header className="relative w-full pt-6 pb-4 flex flex-col items-center">
+          <div className="mb-4">
+            <NetflixLogo className="h-7 sm:h-8" />
+          </div>
           <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap justify-center">
             {/* YouTube */}
             <button
@@ -530,7 +533,7 @@ export default function YouTubeCatalogPage() {
               <span>{favorites.length}</span>
             </button>
           </div>
-        </div>
+        </header>
 
       {/* RENDER ACTIVE TOP CATEGORY */}
       {activeCategory === "favorites" ? (

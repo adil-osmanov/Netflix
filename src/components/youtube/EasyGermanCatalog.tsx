@@ -282,15 +282,71 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
     deleteEasyGermanVideoAction(videoId).catch(() => {});
   };
 
-  // Фильтрация строго по выбранному уровню (B1 / B2 / C1) и строке поиска
+  // Изменение номера урока с авто-сортировкой
+  const handleUpdateOrder = (videoIdOrYoutubeId: string, newOrder: number) => {
+    setCustomVideos((prev) => {
+      const map = new Map<string, EasyGermanVideo>();
+      for (const v of [...prev, ...INITIAL_EASY_GERMAN_VIDEOS]) {
+        if (v && v.youtube_id && !map.has(v.youtube_id)) {
+          map.set(v.youtube_id, { ...v });
+        }
+      }
+      const all = Array.from(map.values());
+
+      const target = all.find(
+        (v) => v.id === videoIdOrYoutubeId || v.youtube_id === videoIdOrYoutubeId
+      );
+      if (!target) return prev;
+
+      const targetLevel = target.level;
+      const levelVideos = all
+        .filter((v) => v.level === targetLevel)
+        .sort((a, b) => (a.order_index ?? 9999) - (b.order_index ?? 9999));
+
+      const remaining = levelVideos.filter(
+        (v) => v.id !== target.id && v.youtube_id !== target.youtube_id
+      );
+
+      const insertIdx = Math.max(0, Math.min(newOrder - 1, remaining.length));
+      remaining.splice(insertIdx, 0, { ...target, order_index: newOrder });
+
+      const reindexedLevelVideos = remaining.map((v, idx) => ({
+        ...v,
+        order_index: idx + 1,
+      }));
+
+      const levelMap = new Map(reindexedLevelVideos.map((v) => [v.youtube_id, v]));
+
+      const updatedAll = all.map((v) => {
+        if (levelMap.has(v.youtube_id)) {
+          return levelMap.get(v.youtube_id)!;
+        }
+        return v;
+      });
+
+      try {
+        localStorage.setItem("easy_german_videos", JSON.stringify(updatedAll));
+        localStorage.setItem("easy_german_custom_videos", JSON.stringify(updatedAll));
+      } catch {}
+
+      return updatedAll;
+    });
+  };
+
+  // Фильтрация строго по выбранному уровню (B1 / B2 / C1) и строке поиска с авто-сортировкой
   const filteredVideos = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return allVideos.filter((v) => {
+    const list = allVideos.filter((v) => {
       if (v.level !== selectedLevel) return false;
       if (q && !v.title.toLowerCase().includes(q) && !v.youtube_id.toLowerCase().includes(q)) {
         return false;
       }
       return true;
+    });
+    return list.sort((a, b) => {
+      const orderA = a.order_index ?? 9999;
+      const orderB = b.order_index ?? 9999;
+      return orderA - orderB;
     });
   }, [allVideos, selectedLevel, searchQuery]);
 
@@ -358,13 +414,14 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {filteredVideos.map((video, index) => (
             <EasyGermanCard
-              key={video.id}
+              key={video.id || video.youtube_id}
               video={video}
-              index={index + 1}
+              index={video.order_index ?? (index + 1)}
               isWatched={Boolean(video.is_watched)}
               onOpen={setActiveVideo}
               onToggleWatched={handleToggleWatched}
               onDelete={handleDeleteVideo}
+              onUpdateOrder={handleUpdateOrder}
             />
           ))}
         </div>

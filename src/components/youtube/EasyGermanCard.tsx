@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { Play, Check } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Play, Check, Trash2 } from "lucide-react";
 import { EasyGermanVideo } from "@/types/youtube";
 
 interface EasyGermanCardProps {
@@ -11,6 +11,7 @@ interface EasyGermanCardProps {
   onOpen: (video: EasyGermanVideo) => void;
   onToggleWatched: (youtubeId: string, e?: React.MouseEvent) => void;
   onDelete?: (videoId: string) => void;
+  onUpdateOrder?: (videoId: string, newOrder: number) => void;
 }
 
 export default function EasyGermanCard({
@@ -20,7 +21,26 @@ export default function EasyGermanCard({
   onOpen,
   onToggleWatched,
   onDelete,
+  onUpdateOrder,
 }: EasyGermanCardProps) {
+  const currentOrder = video.order_index ?? index;
+  const [isEditingOrder, setIsEditingOrder] = useState(false);
+  const [orderVal, setOrderVal] = useState(String(currentOrder));
+
+  useEffect(() => {
+    setOrderVal(String(currentOrder));
+  }, [currentOrder]);
+
+  const handleOrderSubmit = () => {
+    setIsEditingOrder(false);
+    const parsed = parseInt(orderVal, 10);
+    if (!isNaN(parsed) && parsed > 0 && parsed !== currentOrder) {
+      onUpdateOrder?.(video.id || video.youtube_id, parsed);
+    } else {
+      setOrderVal(String(currentOrder));
+    }
+  };
+
   return (
     <div
       role="button"
@@ -47,20 +67,81 @@ export default function EasyGermanCard({
           loading="lazy"
         />
 
-        {/* Левый верхний угол: лаконичный бейдж эпизода Netflix */}
-        <div
-          className={`absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md backdrop-blur-md text-[11px] font-mono font-bold flex items-center gap-1.5 z-10 transition-colors ${
-            isWatched
-              ? "bg-black/75 text-emerald-400 border border-emerald-500/30"
-              : "bg-black/80 text-zinc-300 border border-white/10"
-          }`}
-        >
-          <span>#{String(index).padStart(2, "0")}</span>
-          {isWatched && <Check className="text-emerald-400" size={11} strokeWidth={3} />}
+        {/* Левый верхний угол: лаконичный бейдж эпизода Netflix или инлайн редактирование */}
+        <div className="absolute top-2.5 left-2.5 z-20">
+          {isEditingOrder ? (
+            <input
+              type="number"
+              min={1}
+              value={orderVal}
+              autoFocus
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onChange={(e) => setOrderVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleOrderSubmit();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsEditingOrder(false);
+                  setOrderVal(String(currentOrder));
+                }
+              }}
+              onBlur={handleOrderSubmit}
+              className="w-11 bg-black/95 text-emerald-400 font-mono font-bold text-[11px] px-1 py-0.5 rounded border border-emerald-500 shadow-lg shadow-black/80 outline-none text-center"
+            />
+          ) : (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsEditingOrder(true);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsEditingOrder(true);
+                }
+              }}
+              className={`px-2 py-0.5 rounded-md backdrop-blur-md text-[11px] font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95 select-none outline-none focus:outline-none [-webkit-tap-highlight-color:transparent] ${
+                isWatched
+                  ? "bg-black/75 text-emerald-400 border border-emerald-500/30"
+                  : "bg-black/80 text-zinc-300 border border-white/10 hover:border-emerald-500/50 hover:text-emerald-400"
+              }`}
+              title="Нажмите, чтобы изменить номер урока"
+            >
+              <span>#{String(currentOrder).padStart(2, "0")}</span>
+              {isWatched && <Check className="text-emerald-400" size={11} strokeWidth={3} />}
+            </div>
+          )}
         </div>
 
-        {/* В правом верхнем углу: кнопка-галочка «Просмотрено» */}
-        <div className="absolute top-2.5 right-2.5 z-10">
+        {/* В правом верхнем углу: кнопка удаления (при наведении) и кнопка-галочка «Просмотрено» */}
+        <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1.5">
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof window !== "undefined" && window.confirm("Удалить это видео из каталога?")) {
+                  onDelete(video.id || video.youtube_id);
+                }
+              }}
+              className="p-1.5 rounded-full bg-black/70 hover:bg-red-950/80 text-red-500 hover:text-red-400 border border-red-900/40 hover:border-red-500/60 opacity-0 group-hover:opacity-100 transition-all duration-200 outline-none focus:outline-none cursor-pointer select-none [-webkit-tap-highlight-color:transparent]"
+              title="Удалить видео"
+            >
+              <Trash2 size={13} strokeWidth={2.5} />
+            </button>
+          )}
           <button
             type="button"
             onClick={(e) => {
