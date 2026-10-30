@@ -5,8 +5,12 @@ import { X, Tv, Trash2, Plus, AlertCircle, Loader2 } from "lucide-react";
 import { extractYouTubeChannelId } from "@/data/youtubeVideos";
 
 export interface SubscribedChannel {
-  id: string; // UC...
-  name: string;
+  id?: string; // UC...
+  name?: string;
+  channel_id?: string;
+  channel_title?: string;
+  channel_thumbnail?: string;
+  language?: "DE" | "EN";
 }
 
 interface ManageChannelsModalProps {
@@ -15,6 +19,7 @@ interface ManageChannelsModalProps {
   channels: SubscribedChannel[];
   onAddChannel: (channel: SubscribedChannel) => void;
   onRemoveChannel: (channelId: string) => void;
+  language?: "DE" | "EN";
 }
 
 export default function ManageChannelsModal({
@@ -23,6 +28,7 @@ export default function ManageChannelsModal({
   channels,
   onAddChannel,
   onRemoveChannel,
+  language = "DE",
 }: ManageChannelsModalProps) {
   const [channelInput, setChannelInput] = useState<string>("");
   const [channelName, setChannelName] = useState<string>("");
@@ -73,7 +79,7 @@ export default function ManageChannelsModal({
         return;
       }
 
-      if (channels.some((c) => c.id === resolvedChannelId)) {
+      if (channels.some((c) => (c.channel_id || c.id) === resolvedChannelId)) {
         setError("Этот канал уже добавлен в ваши подписки.");
         setIsAdding(false);
         return;
@@ -86,7 +92,13 @@ export default function ManageChannelsModal({
       const name =
         channelName.trim() || resolvedTitle || handleFallback;
 
-      onAddChannel({ id: resolvedChannelId, name });
+      onAddChannel({
+        id: resolvedChannelId,
+        channel_id: resolvedChannelId,
+        name,
+        channel_title: name,
+        language,
+      });
 
       setChannelInput("");
       setChannelName("");
@@ -121,7 +133,7 @@ export default function ManageChannelsModal({
           {/* Add Channel Form */}
           <form onSubmit={handleAdd} className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800/80 flex flex-col gap-3">
             <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">
-              Добавить немецкий канал
+              Добавить {language === "EN" ? "английский" : "немецкий"} канал
             </span>
 
             <div>
@@ -183,37 +195,41 @@ export default function ManageChannelsModal({
 
             {channels.length === 0 ? (
               <p className="text-xs text-zinc-500 py-4 text-center">
-                Список подписок пуст. Добавьте свои любимые немецкие каналы выше.
+                Список подписок пуст. Добавьте свои любимые {language === "EN" ? "английские" : "немецкие"} каналы выше.
               </p>
             ) : (
-              channels.map((ch) => (
-                <div
-                  key={ch.id}
-                  className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/80 hover:border-zinc-700 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-xs text-red-500 flex-shrink-0">
-                      {ch.name.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white leading-none mb-1">
-                        {ch.name}
-                      </p>
-                      <p className="text-[10px] text-zinc-500 font-mono">
-                        {ch.id}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => onRemoveChannel(ch.id)}
-                    title="Удалить канал из подписок"
-                    className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+              channels.map((ch) => {
+                const chId = ch.channel_id || ch.id || "";
+                const chName = ch.channel_title || ch.name || "Канал";
+                return (
+                  <div
+                    key={chId}
+                    className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/80 hover:border-zinc-700 transition-colors"
                   >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-xs text-red-500 flex-shrink-0">
+                        {chName.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-white leading-none mb-1">
+                          {chName}
+                        </p>
+                        <p className="text-[10px] text-zinc-500 font-mono">
+                          {chId}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => onRemoveChannel(chId)}
+                      title="Удалить канал из подписок"
+                      className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

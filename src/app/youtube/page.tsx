@@ -27,6 +27,15 @@ import englishVideosJson from "@/data/english_videos.json";
 import englishPodcastsJson from "@/data/english_podcasts.json";
 import { shuffleArray } from "@/lib/youtube";
 
+import {
+  Subscription,
+  fetchSubscriptions,
+  addSubscriptionToDb,
+  removeSubscriptionFromDb,
+  DEFAULT_DE_SUBSCRIPTIONS,
+  DEFAULT_EN_SUBSCRIPTIONS,
+} from "@/lib/subscriptions";
+
 export type TopCategory = "youtube" | "mediathek" | "podcasts" | "favorites";
 export type MainTab = "recommendations" | "subscriptions" | "easy_german";
 export type LevelType = "ALL" | "A1" | "A2" | "B1" | "B2" | "C1";
@@ -34,20 +43,6 @@ export type LevelType = "ALL" | "A1" | "A2" | "B1" | "B2" | "C1";
 export const DE_STANDARD_LEVELS: LevelType[] = ["A1", "A2", "B1", "B2", "C1"];
 export const EN_STANDARD_LEVELS: LevelType[] = ["A1", "A2", "B1", "B2", "C1"];
 export const EASY_GERMAN_LEVELS: LevelType[] = ["B1", "B2", "C1"];
-
-const DEFAULT_DE_SUBSCRIPTIONS: SubscribedChannel[] = [
-  { id: "UCbxb2fqe9oNgglAoYqsYOtQ", name: "Easy German" },
-  { id: "UCZHpIFMfoJJ_1QxNGLJTzyA", name: "MrWissen2go" },
-  { id: "UC4-a6QWRyBlzTFGdS-T_wfw", name: "SWR Handwerkskunst" },
-  { id: "UCUuab1dctZzN5ZmRmQnTzkg", name: "WDR Doku" },
-];
-
-const DEFAULT_EN_SUBSCRIPTIONS: SubscribedChannel[] = [
-  { id: "UCKyTokYo0nK2OA-az-sDijA", name: "VOA Learning English" },
-  { id: "UCsooa4yRKGN_zEE8iknghZA", name: "TED-Ed" },
-  { id: "UCLXo7UDZvByw2ixzpQCufnA", name: "Vox" },
-  { id: "UCHnyfMqiRRG1u-2MsSQLbXA", name: "Veritasium" },
-];
 
 /**
  * Duration validator:
@@ -168,12 +163,12 @@ export default function YouTubeCatalogPage() {
   const [isManageModalOpen, setIsManageModalOpen] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
-  // Subscriptions state (isolated per language)
-  const [subscriptions, setSubscriptions] = useState<SubscribedChannel[]>(DEFAULT_DE_SUBSCRIPTIONS);
+  // Subscriptions state (isolated per language, backed by Supabase with optimistic updates)
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [subVideos, setSubVideos] = useState<YouTubeRecommendedVideo[]>([]);
   const [subPage, setSubPage] = useState<number>(1);
   const [hasMoreSub, setHasMoreSub] = useState<boolean>(true);
-  const [isLoadingSubs, setIsLoadingSubs] = useState<boolean>(false);
+  const [isLoadingSubs, setIsLoadingSubs] = useState<boolean>(true);
   const [isFetchingMoreSub, setIsFetchingMoreSub] = useState<boolean>(false);
 
   // Токены пагинации (continuationToken) по каналам
@@ -214,34 +209,68 @@ export default function YouTubeCatalogPage() {
   const podcastsRef = useRef<YouTubeRecommendedVideo[]>([]);
   podcastsRef.current = podcasts;
 
-  // Load isolated subscriptions when language changes
+  // Загрузка актуальных подписок при смене языка или открытии
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const storageKey = isEN ? "yt_en_subscriptions" : "yt_de_subscriptions";
-    const fallbackSubs = isEN ? DEFAULT_EN_SUBSCRIPTIONS : DEFAULT_DE_SUBSCRIPTIONS;
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setSubscriptions(parsed);
-          setSelectedSubscribedChannel("ALL");
-          return;
+    let isMounted = true;
+
+    async function syncAndLoad() {
+      setIsLoadingSubs(true);
+
+      // 1. Проверяем старый LocalStorage на наличие несинхронизированных подписок
+      const localKeys = [
+        currentLang === "EN" ? "subscriptions_en" : "subscriptions_de",
+        currentLang === "EN" ? "yt_en_subscriptions" : "yt_de_subscriptions",
+      ];
+
+      for (const localKey of localKeys) {
+        if (typeof window === "undefined") break;
+        const legacyLocal = localStorage.getItem(localKey);
+        if (legacyLocal) {
+          try {
+            const parsed: any[] = JSON.parse(legacyLocal);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              for (const item of parsed) {
+                const chId = item.channel_id || item.id;
+                const chTitle = item.channel_title || item.name || item.title || "Канал";
+                if (chId) {
+                  await addSubscriptionToDb({
+                    channel_id: chId,
+                    channel_title: chTitle,
+                    channel_thumbnail: item.channel_thumbnail || item.thumbnail || "",
+                    language: currentLang,
+                  });
+                }
+              }
+              // Очищаем старый ключ после успешного переноса в БД
+              localStorage.removeItem(localKey);
+            }
+          } catch (e) {
+            console.error("Ошибка миграции локальных подписок:", e);
+          }
         }
       }
-    } catch {}
-    setSubscriptions(fallbackSubs);
-    setSelectedSubscribedChannel("ALL");
-  }, [isEN]);
 
-  // Save subscriptions to isolated localStorage key
-  const saveSubscriptions = (subs: SubscribedChannel[]) => {
-    setSubscriptions(subs);
-    const storageKey = isEN ? "yt_en_subscriptions" : "yt_de_subscriptions";
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(subs));
-    } catch {}
-  };
+      // 2. Загружаем свежие данные из Supabase
+      const dbSubs = await fetchSubscriptions(currentLang);
+      if (isMounted) {
+        setSubscriptions(dbSubs);
+        setSelectedSubscribedChannel("ALL");
+        if (typeof window !== "undefined") {
+          localStorage.setItem(
+            `cached_subscriptions_${currentLang.toLowerCase()}`,
+            JSON.stringify(dbSubs)
+          );
+        }
+        setIsLoadingSubs(false);
+      }
+    }
+
+    syncAndLoad();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentLang]);
 
   // Загрузка видео подписок
   const fetchSubscriptionVideos = useCallback(
@@ -274,7 +303,7 @@ export default function YouTubeCatalogPage() {
           : [];
 
         if (activeChannel !== "ALL") {
-          const chObj = subscriptions.find((s) => s.id === activeChannel);
+          const chObj = subscriptions.find((s) => (s.channel_id || s.id) === activeChannel);
           const token = append ? channelTokensRef.current[activeChannel] || null : null;
 
           const res = await fetch(
@@ -285,7 +314,7 @@ export default function YouTubeCatalogPage() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 channelId: activeChannel,
-                channelName: chObj?.name || "Канал",
+                channelName: chObj?.channel_title || chObj?.name || "Канал",
                 continuationToken: token,
                 excludeIds,
               }),
@@ -304,7 +333,9 @@ export default function YouTubeCatalogPage() {
             setSubPage(pageToLoad);
           }
         } else {
-          const channelIds = subscriptions.map((s) => s.id);
+          const channelIds = subscriptions
+            .map((s) => s.channel_id || s.id)
+            .filter(Boolean) as string[];
           const res = await fetch(
             `/api/youtube/subscriptions?t=${Date.now()}&rnd=${Math.random()}`,
             {
@@ -608,19 +639,78 @@ export default function YouTubeCatalogPage() {
     }, 500);
   };
 
-  // Channel management callbacks
-  const handleAddChannel = (channel: SubscribedChannel) => {
-    const updated = [...subscriptions.filter((s) => s.id !== channel.id), channel];
-    saveSubscriptions(updated);
+  // Оптимистичные обработчики добавления и удаления подписок (без задержек UI)
+  const handleToggleSubscribe = async (channel: { id: string; title: string; thumbnail?: string }) => {
+    const channelId = channel.id;
+    const isSubbed = subscriptions.some((s) => (s.channel_id || s.id) === channelId);
+
+    if (isSubbed) {
+      await handleRemoveChannel(channelId);
+    } else {
+      await handleAddChannel({
+        id: channelId,
+        channel_id: channelId,
+        name: channel.title,
+        channel_title: channel.title,
+        channel_thumbnail: channel.thumbnail || "",
+        language: currentLang,
+      });
+    }
   };
 
-  const handleRemoveChannel = (channelId: string) => {
-    const updated = subscriptions.filter((s) => s.id !== channelId);
-    saveSubscriptions(updated);
+  const handleAddChannel = async (channel: SubscribedChannel) => {
+    const channelId = channel.channel_id || channel.id || "";
+    const channelTitle = channel.channel_title || channel.name || "Канал";
+    if (!channelId) return;
+
+    const newSub: Subscription = {
+      channel_id: channelId,
+      channel_title: channelTitle,
+      channel_thumbnail: channel.channel_thumbnail || "",
+      language: currentLang,
+      id: channelId,
+      name: channelTitle,
+    };
+
+    // Мгновенно добавляем в стейт
+    setSubscriptions((prev) => {
+      const filtered = prev.filter((s) => (s.channel_id || s.id) !== channelId);
+      const updated = [newSub, ...filtered];
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          `cached_subscriptions_${currentLang.toLowerCase()}`,
+          JSON.stringify(updated)
+        );
+      }
+      return updated;
+    });
+
+    await addSubscriptionToDb({
+      channel_id: newSub.channel_id,
+      channel_title: newSub.channel_title,
+      channel_thumbnail: newSub.channel_thumbnail,
+      language: currentLang,
+    });
+  };
+
+  const handleRemoveChannel = async (channelId: string) => {
+    // Мгновенно убираем из стейта
+    setSubscriptions((prev) => {
+      const updated = prev.filter((s) => (s.channel_id || s.id) !== channelId);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          `cached_subscriptions_${currentLang.toLowerCase()}`,
+          JSON.stringify(updated)
+        );
+      }
+      return updated;
+    });
     setSubVideos((prev) => prev.filter((v) => v.channelId !== channelId));
     if (selectedSubscribedChannel === channelId) {
       setSelectedSubscribedChannel("ALL");
     }
+
+    await removeSubscriptionFromDb(channelId, currentLang);
   };
 
   // Уровни в зависимости от выбранного языка (A1-C1 для обоих в каталоге)
@@ -1026,19 +1116,23 @@ export default function YouTubeCatalogPage() {
                     >
                       Все каналы
                     </button>
-                    {subscriptions.map((ch) => (
-                      <button
-                        key={ch.id}
-                        onClick={() => setSelectedSubscribedChannel(ch.id)}
-                        className={`px-3 py-1 rounded-full text-xs outline-none cursor-pointer whitespace-nowrap focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 ${
-                          selectedSubscribedChannel === ch.id
-                            ? "bg-white text-black font-semibold"
-                            : "bg-zinc-900 text-zinc-400 hover:text-white"
-                        }`}
-                      >
-                        {ch.name}
-                      </button>
-                    ))}
+                    {subscriptions.map((ch) => {
+                      const chId = ch.channel_id || ch.id || "";
+                      const chName = ch.channel_title || ch.name || "Канал";
+                      return (
+                        <button
+                          key={chId}
+                          onClick={() => setSelectedSubscribedChannel(chId)}
+                          className={`px-3 py-1 rounded-full text-xs outline-none cursor-pointer whitespace-nowrap focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 ${
+                            selectedSubscribedChannel === chId
+                              ? "bg-white text-black font-semibold"
+                              : "bg-zinc-900 text-zinc-400 hover:text-white"
+                          }`}
+                        >
+                          {chName}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -1122,6 +1216,7 @@ export default function YouTubeCatalogPage() {
           channels={subscriptions}
           onAddChannel={handleAddChannel}
           onRemoveChannel={handleRemoveChannel}
+          language={currentLang}
         />
       </div>
     </div>
