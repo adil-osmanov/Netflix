@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     const { videos, nextContinuation, channelTitle } = await fetchChannelVideosPage(
       channelId,
       continuationToken,
-      channelName || "Канал"
+      channelName || ""
     );
 
     const filteredVideos = videos.filter(

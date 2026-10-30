@@ -67,7 +67,7 @@ async function handleSubscriptionsFeed({
         const { videos, nextContinuation } = await fetchChannelVideosPage(
           channelId,
           token,
-          "Канал"
+          ""
         );
         nextContinuationTokens[channelId] = nextContinuation;
 

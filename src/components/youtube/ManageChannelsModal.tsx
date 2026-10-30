@@ -87,7 +87,7 @@ export default function ManageChannelsModal({
 
       const handleFallback = trimmedInput.match(/@([\w.-]+)/)?.[1]
         ? `@${trimmedInput.match(/@([\w.-]+)/)?.[1]}`
-        : `Канал (${resolvedChannelId.slice(0, 8)}...)`;
+        : `${resolvedChannelId.slice(0, 10)}...`;
 
       const name =
         channelName.trim() || resolvedTitle || handleFallback;
@@ -200,7 +200,8 @@ export default function ManageChannelsModal({
             ) : (
               channels.map((ch) => {
                 const chId = ch.channel_id || ch.id || "";
-                const chName = ch.channel_title || ch.name || "Канал";
+                const chName = ch.channel_title || ch.name || "";
+                const displayName = chName && chName.toLowerCase() !== "канал" ? chName : chId;
                 return (
                   <div
                     key={chId}
@@ -208,12 +209,14 @@ export default function ManageChannelsModal({
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-xs text-red-500 flex-shrink-0">
-                        {chName.slice(0, 2).toUpperCase()}
+                        {displayName.slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-white leading-none mb-1">
-                          {chName}
-                        </p>
+                        {displayName && (
+                          <p className="text-sm font-semibold text-white leading-none mb-1">
+                            {displayName}
+                          </p>
+                        )}
                         <p className="text-[10px] text-zinc-500 font-mono">
                           {chId}
                         </p>

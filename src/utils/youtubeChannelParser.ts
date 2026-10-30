@@ -64,7 +64,9 @@ export function extractVideosFromRichContents(
           thumbnail: `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
           thumbnailUrl: `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
           published: v.publishedTimeText?.simpleText || "",
-          description: `${channelName} • ${v.publishedTimeText?.simpleText || "Видео канала"}`,
+          description: channelName
+            ? `${channelName} • ${v.publishedTimeText?.simpleText || ""}`.trim()
+            : v.publishedTimeText?.simpleText || "",
         });
       }
     } else if (lockup && lockup.contentId && YOUTUBE_ID_REGEX.test(lockup.contentId)) {
@@ -92,7 +94,7 @@ export function extractVideosFromRichContents(
           id: videoId,
           youtube_id: videoId,
           title: rawTitle,
-          channel: fallbackChannelName,
+          channel: fallbackChannelName || "",
           channelId,
           level: detectLevelFromTitleOrDuration(rawTitle, durationSeconds),
           duration_str: durationText,
@@ -102,7 +104,7 @@ export function extractVideosFromRichContents(
           thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
           thumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
           published: "",
-          description: `${fallbackChannelName} • Видео канала`,
+          description: fallbackChannelName ? `${fallbackChannelName}` : "",
         });
       }
     }
@@ -174,7 +176,7 @@ export async function fetchContinuationPage(
 export async function fetchChannelVideosPage(
   channelId: string,
   continuationToken?: string | null,
-  fallbackChannelName: string = "Канал"
+  fallbackChannelName: string = ""
 ): Promise<{ videos: any[]; nextContinuation: string | null; channelTitle: string }> {
   if (continuationToken) {
     const pageData = await fetchContinuationPage(

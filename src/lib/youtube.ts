@@ -65,3 +65,92 @@ export function shuffleArray<T>(array: T[]): T[] {
   return arr;
 }
 
+const channelNameMemoryCache = new Map<string, string>();
+
+/**
+ * Надежное получение имени канала через YouTube oEmbed и парсинг заголовка
+ */
+export async function resolveChannelName(videoId: string, title?: string): Promise<string> {
+  if (!videoId) return "";
+  const cleanId = videoId.trim();
+  if (channelNameMemoryCache.has(cleanId)) {
+    return channelNameMemoryCache.get(cleanId)!;
+  }
+
+  // 1. Попытка вытащить имя канала из официального oEmbed YouTube
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${encodeURIComponent(cleanId)}&format=json`
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data.author_name && typeof data.author_name === "string") {
+        const author = data.author_name.trim();
+        if (
+          author &&
+          author.toLowerCase() !== "канал" &&
+          author.toLowerCase() !== "undefined"
+        ) {
+          channelNameMemoryCache.set(cleanId, author);
+          return author;
+        }
+      }
+    }
+  } catch {
+    // игнорируем ошибку сети и переходим к парсингу заголовка
+  }
+
+  // 2. Если oEmbed не ответил, извлекаем канал из заголовка (например, "Тема видео | Название Канала")
+  if (title && (title.includes("|") || title.includes(" - ") || title.includes(" – "))) {
+    const parts = title.split(/[|\-–]/);
+    const possibleChannel = parts[parts.length - 1].trim();
+    if (
+      possibleChannel.length > 1 &&
+      possibleChannel.length < 35 &&
+      possibleChannel.toLowerCase() !== "канал" &&
+      possibleChannel.toLowerCase() !== "undefined"
+    ) {
+      channelNameMemoryCache.set(cleanId, possibleChannel);
+      return possibleChannel;
+    }
+  }
+
+  return "";
+}
+
+/**
+ * Получение названия канала по его UC... ID через публичный RSS фид
+ */
+export async function resolveChannelTitleById(channelId: string): Promise<string> {
+  if (!channelId || !channelId.startsWith("UC")) return "";
+  const cleanId = channelId.trim();
+  if (channelNameMemoryCache.has(cleanId)) {
+    return channelNameMemoryCache.get(cleanId)!;
+  }
+
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(cleanId)}`
+    );
+    if (res.ok) {
+      const xml = await res.text();
+      const match =
+        xml.match(/<author>\s*<name>([^<]+)<\/name>/i) ||
+        xml.match(/<title>([^<]+)<\/title>/i);
+      if (match?.[1]) {
+        const title = match[1].trim();
+        if (
+          title &&
+          title.toLowerCase() !== "канал" &&
+          title.toLowerCase() !== "undefined"
+        ) {
+          channelNameMemoryCache.set(cleanId, title);
+          return title;
+        }
+      }
+    }
+  } catch {}
+
+  return "";
+}
+

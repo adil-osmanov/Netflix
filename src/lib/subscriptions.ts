@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { resolveChannelName, resolveChannelTitleById } from "@/lib/youtube";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey =
@@ -83,13 +84,36 @@ export async function fetchSubscriptions(language: "DE" | "EN"): Promise<Subscri
 
     if (error) throw error;
     if (data && data.length > 0) {
+      const sanitized = data.map((item) => {
+        const rawTitle = (item.channel_title || item.name || "").trim();
+        const isPlaceholder =
+          !rawTitle ||
+          rawTitle.toLowerCase() === "канал" ||
+          rawTitle.toLowerCase() === "undefined";
+        if (isPlaceholder) {
+          const matchedDefault = [...DEFAULT_DE_SUBSCRIPTIONS, ...DEFAULT_EN_SUBSCRIPTIONS].find(
+            (d) => d.channel_id === item.channel_id
+          );
+          const cleanTitle = matchedDefault ? matchedDefault.channel_title : "";
+          return {
+            ...item,
+            channel_title: cleanTitle,
+            name: cleanTitle,
+          };
+        }
+        return {
+          ...item,
+          name: item.channel_title,
+        };
+      });
+
       if (typeof window !== "undefined") {
         localStorage.setItem(
           `cached_subscriptions_${language.toLowerCase()}`,
-          JSON.stringify(data)
+          JSON.stringify(sanitized)
         );
       }
-      return data;
+      return sanitized;
     }
   } catch (err) {
     console.error("Ошибка загрузки подписок из БД:", err);
@@ -102,7 +126,24 @@ export async function fetchSubscriptions(language: "DE" | "EN"): Promise<Subscri
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return parsed.map((item) => {
+            const rawTitle = (item.channel_title || item.name || "").trim();
+            const isPlaceholder =
+              !rawTitle ||
+              rawTitle.toLowerCase() === "канал" ||
+              rawTitle.toLowerCase() === "undefined";
+            if (isPlaceholder) {
+              const matchedDefault = [...DEFAULT_DE_SUBSCRIPTIONS, ...DEFAULT_EN_SUBSCRIPTIONS].find(
+                (d) => d.channel_id === (item.channel_id || item.id)
+              );
+              return {
+                ...item,
+                channel_title: matchedDefault ? matchedDefault.channel_title : "",
+                name: matchedDefault ? matchedDefault.channel_title : "",
+              };
+            }
+            return item;
+          });
         }
       }
     } catch {}
@@ -111,14 +152,29 @@ export async function fetchSubscriptions(language: "DE" | "EN"): Promise<Subscri
   return language === "EN" ? DEFAULT_EN_SUBSCRIPTIONS : DEFAULT_DE_SUBSCRIPTIONS;
 }
 
-// Добавление новой подписки
+// Добавление новой подписки (с защитой от записи плейсхолдера "Канал")
 export async function addSubscriptionToDb(
   sub: Omit<Subscription, "id" | "created_at">
 ): Promise<Subscription | null> {
   try {
+    let cleanTitle = (sub.channel_title || sub.name || "").trim();
+    if (
+      !cleanTitle ||
+      cleanTitle.toLowerCase() === "канал" ||
+      cleanTitle.toLowerCase() === "undefined"
+    ) {
+      const matchedDefault = [...DEFAULT_DE_SUBSCRIPTIONS, ...DEFAULT_EN_SUBSCRIPTIONS].find(
+        (d) => d.channel_id === sub.channel_id
+      );
+      cleanTitle = matchedDefault ? matchedDefault.channel_title : "";
+      if (!cleanTitle && sub.channel_id && sub.channel_id.startsWith("UC")) {
+        cleanTitle = await resolveChannelTitleById(sub.channel_id);
+      }
+    }
+
     const payload = {
       channel_id: sub.channel_id,
-      channel_title: sub.channel_title,
+      channel_title: cleanTitle,
       channel_thumbnail: sub.channel_thumbnail || "",
       language: sub.language,
     };
@@ -154,5 +210,115 @@ export async function removeSubscriptionFromDb(
   } catch (err) {
     console.error("Ошибка удаления подписки из БД:", err);
     return false;
+  }
+}
+
+/**
+ * Очистка закэшированных данных в LocalStorage и Supabase от плейсхолдеров "Канал"
+ */
+export async function cleanSubscriptionsAndCache(): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  const storageKeys = [
+    "cached_subscriptions_de",
+    "cached_subscriptions_en",
+    "custom_videos_de",
+    "custom_videos_en",
+    "subscriptions_de",
+    "subscriptions_en",
+    "yt_de_subscriptions",
+    "yt_en_subscriptions",
+  ];
+
+  for (const key of storageKeys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) continue;
+
+      let hasChanges = false;
+      const updated = await Promise.all(
+        parsed.map(async (item: any) => {
+          if (!item || typeof item !== "object") return item;
+
+          const rawTitle = (item.channel_title || item.channel || item.name || "").trim();
+          const isPlaceholder =
+            !rawTitle ||
+            rawTitle.toLowerCase() === "канал" ||
+            rawTitle.toLowerCase() === "undefined";
+
+          if (isPlaceholder) {
+            hasChanges = true;
+            let resolved = "";
+            const channelId = item.channel_id || item.id;
+            const videoId = item.youtube_id || item.id;
+
+            // 1. Попытка восстановить из дефолтов
+            const matchedDefault = [...DEFAULT_DE_SUBSCRIPTIONS, ...DEFAULT_EN_SUBSCRIPTIONS].find(
+              (d) => d.channel_id === channelId
+            );
+            if (matchedDefault) {
+              resolved = matchedDefault.channel_title;
+            }
+
+            // 2. Попытка резолва по channelId
+            if (!resolved && channelId && String(channelId).startsWith("UC")) {
+              resolved = await resolveChannelTitleById(String(channelId));
+            }
+
+            // 3. Попытка резолва по videoId
+            if (!resolved && videoId && !String(videoId).startsWith("UC")) {
+              resolved = await resolveChannelName(String(videoId), item.title);
+            }
+
+            return {
+              ...item,
+              channel: resolved,
+              channel_title: resolved,
+              name: resolved,
+            };
+          }
+          return item;
+        })
+      );
+
+      if (hasChanges) {
+        localStorage.setItem(key, JSON.stringify(updated));
+      }
+    } catch (e) {
+      console.error(`Ошибка очистки ключа ${key}:`, e);
+    }
+  }
+
+  // Очистка записей в Supabase с channel_title = 'Канал' или 'undefined'
+  try {
+    const { data, error } = await supabase
+      .from("subscriptions")
+      .select("*")
+      .or("channel_title.eq.Канал,channel_title.eq.undefined,channel_title.eq.");
+
+    if (!error && data && data.length > 0) {
+      for (const row of data) {
+        let realTitle = "";
+        const matchedDefault = [...DEFAULT_DE_SUBSCRIPTIONS, ...DEFAULT_EN_SUBSCRIPTIONS].find(
+          (d) => d.channel_id === row.channel_id
+        );
+        if (matchedDefault) {
+          realTitle = matchedDefault.channel_title;
+        } else if (row.channel_id && row.channel_id.startsWith("UC")) {
+          realTitle = await resolveChannelTitleById(row.channel_id);
+        }
+
+        if (realTitle) {
+          await supabase
+            .from("subscriptions")
+            .update({ channel_title: realTitle })
+            .eq("id", row.id);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Ошибка обновления Supabase subscriptions:", err);
   }
 }

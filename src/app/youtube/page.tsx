@@ -32,6 +32,7 @@ import {
   fetchSubscriptions,
   addSubscriptionToDb,
   removeSubscriptionFromDb,
+  cleanSubscriptionsAndCache,
   DEFAULT_DE_SUBSCRIPTIONS,
   DEFAULT_EN_SUBSCRIPTIONS,
 } from "@/lib/subscriptions";
@@ -231,7 +232,7 @@ export default function YouTubeCatalogPage() {
             if (Array.isArray(parsed) && parsed.length > 0) {
               for (const item of parsed) {
                 const chId = item.channel_id || item.id;
-                const chTitle = item.channel_title || item.name || item.title || "Канал";
+                const chTitle = item.channel_title || item.name || item.title || "";
                 if (chId) {
                   await addSubscriptionToDb({
                     channel_id: chId,
@@ -263,6 +264,9 @@ export default function YouTubeCatalogPage() {
         }
         setIsLoadingSubs(false);
       }
+
+      // 3. Фоновая очистка старых кэшей и записей Supabase от плейсхолдеров "Канал"
+      cleanSubscriptionsAndCache().catch(console.error);
     }
 
     syncAndLoad();
@@ -314,7 +318,7 @@ export default function YouTubeCatalogPage() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 channelId: activeChannel,
-                channelName: chObj?.channel_title || chObj?.name || "Канал",
+                channelName: chObj?.channel_title || chObj?.name || "",
                 continuationToken: token,
                 excludeIds,
               }),
@@ -660,7 +664,7 @@ export default function YouTubeCatalogPage() {
 
   const handleAddChannel = async (channel: SubscribedChannel) => {
     const channelId = channel.channel_id || channel.id || "";
-    const channelTitle = channel.channel_title || channel.name || "Канал";
+    const channelTitle = channel.channel_title || channel.name || "";
     if (!channelId) return;
 
     const newSub: Subscription = {
@@ -1118,7 +1122,8 @@ export default function YouTubeCatalogPage() {
                     </button>
                     {subscriptions.map((ch) => {
                       const chId = ch.channel_id || ch.id || "";
-                      const chName = ch.channel_title || ch.name || "Канал";
+                      const chName = ch.channel_title || ch.name || "";
+                      const displayName = chName && chName.toLowerCase() !== "канал" ? chName : chId;
                       return (
                         <button
                           key={chId}
@@ -1129,7 +1134,7 @@ export default function YouTubeCatalogPage() {
                               : "bg-zinc-900 text-zinc-400 hover:text-white"
                           }`}
                         >
-                          {chName}
+                          {displayName}
                         </button>
                       );
                     })}

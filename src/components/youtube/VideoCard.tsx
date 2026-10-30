@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Play, Bookmark } from "lucide-react";
 import { YouTubeRecommendedVideo } from "@/types/youtube";
 import { useYouTube } from "@/context/YouTubeContext";
 
 import { LevelBadge, getLevelBadgeStyle } from "./LevelBadge";
-import { formatDuration } from "@/lib/youtube";
+import { formatDuration, resolveChannelName } from "@/lib/youtube";
 export { LevelBadge };
 
 export function isValidDuration(durationStr?: string, seconds?: number): boolean {
@@ -78,6 +78,34 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
     }
     return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
   });
+
+  const [channel, setChannel] = useState<string>(() => {
+    const raw = video.channel?.trim();
+    if (!raw || raw.toLowerCase() === "канал" || raw.toLowerCase() === "undefined") {
+      return "";
+    }
+    return raw;
+  });
+
+  useEffect(() => {
+    const raw = (video.channel || "").trim();
+    const isInvalid = !raw || raw.toLowerCase() === "канал" || raw.toLowerCase() === "undefined";
+
+    if (isInvalid && !isExternalUrl && videoId) {
+      let isMounted = true;
+      resolveChannelName(videoId, video.title).then((resolved) => {
+        if (isMounted && resolved) {
+          setChannel(resolved);
+          video.channel = resolved;
+        }
+      });
+      return () => {
+        isMounted = false;
+      };
+    } else if (!isInvalid) {
+      setChannel(raw);
+    }
+  }, [videoId, video.title, video.channel, isExternalUrl]);
 
   // Строгая клиентская проверка для YouTube: бан Shorts
   if (!isExternalUrl) {
@@ -210,7 +238,12 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
       <h3 className="mt-2 text-sm font-medium text-zinc-100 line-clamp-2 group-hover:text-white transition-colors leading-snug">
         {video.title}
       </h3>
-      <p className="text-xs text-zinc-500 mt-0.5 truncate">{video.channel}</p>
+      {/* Отображаем имя канала только если оно действительно определено и не равно заглушке */}
+      {channel && channel !== "Канал" && channel.toLowerCase() !== "undefined" && (
+        <p className="text-[12px] text-zinc-400 mt-0.5 truncate select-none">
+          {channel}
+        </p>
+      )}
     </div>
   );
 }
