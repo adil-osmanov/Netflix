@@ -32,39 +32,77 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
   }, []);
 
   useEffect(() => {
+    let active = true;
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       setLoading(true);
-      getEpisodesAction(movie.id).then(res => {
-        if (res.success && res.data) {
-          let hasSeasons = false;
-          const parsedData = res.data.map((ep: any) => {
-            try {
-              const parsed = JSON.parse(ep.title);
-              if (parsed.season) hasSeasons = true;
-              return { ...ep, parsedTitle: parsed.title, season: parsed.season || 1 };
-            } catch (e) {
-              return { ...ep, parsedTitle: ep.title, season: null };
-            }
-          });
 
-          setEpisodes(parsedData);
-          
-          const isActuallySeries = movie.collection_type === 'series';
-          if (isActuallySeries) {
-            setIsSeries(true);
-            const uniqueSeasons = Array.from(new Set(parsedData.map((e: any) => e.season).filter(Boolean))) as number[];
-            uniqueSeasons.sort((a, b) => a - b);
-            setSeasons(uniqueSeasons);
-            if (uniqueSeasons.length > 0) setActiveSeason(uniqueSeasons[0]);
-          } else {
-            setIsSeries(false);
+      const fetchEpisodes = async () => {
+        try {
+          let resData: any[] | null = null;
+
+          // 1. Try fast and reliable direct API route
+          try {
+            const apiRes = await fetch(`/api/episodes?contentId=${encodeURIComponent(movie.id)}`);
+            if (apiRes.ok) {
+              const json = await apiRes.json();
+              if (json?.success && Array.isArray(json.data)) {
+                resData = json.data;
+              }
+            }
+          } catch (e) {
+            console.warn("API route /api/episodes failed, attempting server action", e);
           }
+
+          // 2. Fallback to server action
+          if (!resData) {
+            const actionRes = await getEpisodesAction(movie.id);
+            if (actionRes?.success && Array.isArray(actionRes.data)) {
+              resData = actionRes.data;
+            }
+          }
+
+          if (!active) return;
+
+          if (resData && resData.length > 0) {
+            let hasSeasons = false;
+            const parsedData = resData.map((ep: any) => {
+              try {
+                const parsed = JSON.parse(ep.title);
+                if (parsed.season) hasSeasons = true;
+                return { ...ep, parsedTitle: parsed.title, season: parsed.season || 1 };
+              } catch (e) {
+                return { ...ep, parsedTitle: ep.title, season: null };
+              }
+            });
+
+            setEpisodes(parsedData);
+            
+            const isActuallySeries = movie.collection_type === 'series';
+            if (isActuallySeries) {
+              setIsSeries(true);
+              const uniqueSeasons = Array.from(new Set(parsedData.map((e: any) => e.season).filter(Boolean))) as number[];
+              uniqueSeasons.sort((a, b) => a - b);
+              setSeasons(uniqueSeasons);
+              if (uniqueSeasons.length > 0) setActiveSeason(uniqueSeasons[0]);
+            } else {
+              setIsSeries(false);
+            }
+          } else {
+            setEpisodes([]);
+          }
+        } catch (err) {
+          console.error("Failed to load episodes:", err);
+          if (active) setEpisodes([]);
+        } finally {
+          if (active) setLoading(false);
         }
-        setLoading(false);
-      });
+      };
+
+      fetchEpisodes();
       
       return () => {
+        active = false;
         document.body.style.overflow = '';
       };
     }
@@ -175,17 +213,21 @@ export default function CollectionViewerModal({ movie, isOpen, onClose }: Collec
                       role="button"
                       tabIndex={0}
                       onClick={() => {
-                        const urlParams = new URLSearchParams(window.location.search);
-                        const categoryType = urlParams.get('category') || 'all';
-                        setLastWatchedAction(categoryType, movie);
+                        const isSeriesItem = movie.collection_type === 'series' || movie.category?.toLowerCase()?.includes('сериал');
+                        const isCartoonItem = movie.category?.toLowerCase()?.includes('мульт');
+                        const targetCat = isSeriesItem ? 'series' : (isCartoonItem ? 'cartoons' : 'movies');
+                        setLastWatchedAction(targetCat, movie);
+                        setLastWatchedAction('all', movie);
                         playEpisode(ep);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          const urlParams = new URLSearchParams(window.location.search);
-                          const categoryType = urlParams.get('category') || 'all';
-                          setLastWatchedAction(categoryType, movie);
+                          const isSeriesItem = movie.collection_type === 'series' || movie.category?.toLowerCase()?.includes('сериал');
+                          const isCartoonItem = movie.category?.toLowerCase()?.includes('мульт');
+                          const targetCat = isSeriesItem ? 'series' : (isCartoonItem ? 'cartoons' : 'movies');
+                          setLastWatchedAction(targetCat, movie);
+                          setLastWatchedAction('all', movie);
                           playEpisode(ep);
                         }
                       }}

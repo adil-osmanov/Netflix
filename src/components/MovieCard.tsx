@@ -97,10 +97,12 @@ export default function MovieCard({ movie }: MovieCardProps) {
     e?.preventDefault();
     e?.stopPropagation();
     
-    const urlParams = new URLSearchParams(window.location.search);
-    const categoryType = urlParams.get('category') || 'all';
+    const isSeriesItem = movie.collection_type === 'series' || movie.category?.toLowerCase()?.includes('сериал');
+    const isCartoonItem = movie.category?.toLowerCase()?.includes('мульт');
+    const targetCat = isSeriesItem ? 'series' : (isCartoonItem ? 'cartoons' : 'movies');
     
-    setLastWatchedAction(categoryType, movie);
+    setLastWatchedAction(targetCat, movie);
+    setLastWatchedAction('all', movie);
 
     if (movie.is_collection) {
       setModalOpen(true);

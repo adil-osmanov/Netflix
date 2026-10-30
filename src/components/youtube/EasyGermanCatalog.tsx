@@ -11,6 +11,7 @@ import {
   addEasyGermanVideoAction,
   deleteEasyGermanVideoAction,
   fetchYouTubeVideoMetadataAction,
+  updateEasyGermanVideosAction,
 } from "@/app/youtube/actions";
 import EasyGermanPlayerModal from "./EasyGermanPlayerModal";
 import AddEasyGermanModal from "./AddEasyGermanModal";
@@ -103,15 +104,20 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
 
         if (res.customVideos.length > 0 || localCustom.length > 0) {
           const map = new Map<string, EasyGermanVideo>();
-          // Сначала Supabase, затем localCustom поверх — локальный стейт никогда не затирается!
+          // Сначала Supabase, затем localCustom поверх, сохраняя длительности и валидные названия
           for (const v of [...res.customVideos, ...localCustom]) {
             if (v && v.youtube_id) {
               const existing = map.get(v.youtube_id);
+              const durationStr = existing?.duration_str || v.duration_str || existing?.duration || v.duration || "";
+              const bestTitle = (existing?.title && !isPlaceholderTitle(existing.title))
+                ? existing.title
+                : ((v.title && !isPlaceholderTitle(v.title)) ? v.title : (existing?.title || v.title));
               map.set(v.youtube_id, {
                 ...existing,
                 ...v,
-                duration_str: v.duration_str || existing?.duration_str || "",
-                duration: v.duration || v.duration_str || existing?.duration || existing?.duration_str || "",
+                title: bestTitle,
+                duration_str: durationStr,
+                duration: durationStr,
                 order_index: v.order_index ?? existing?.order_index,
               });
             }
@@ -123,11 +129,11 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
             localStorage.setItem("easy_german_custom_videos", JSON.stringify(mergedCustom));
           } catch {}
 
-          // Фоновая подгрузка длительности, если у каких-то роликов она отсутствует
+          // Фоновая подгрузка длительности, если у каких-то роликов она всё ещё отсутствует
           const missing = mergedCustom.filter((v) => !v.duration_str && !v.duration && v.youtube_id);
           if (missing.length > 0) {
             Promise.all(
-              missing.map(async (v) => {
+              missing.slice(0, 15).map(async (v) => {
                 try {
                   const meta = await fetchYouTubeVideoMetadataAction(v.youtube_id);
                   return { youtube_id: v.youtube_id, duration_str: meta.duration_str };
@@ -153,6 +159,7 @@ export default function EasyGermanCatalog({ searchQuery = "" }: EasyGermanCatalo
                     localStorage.setItem("easy_german_videos", JSON.stringify(updated));
                     localStorage.setItem("easy_german_custom_videos", JSON.stringify(updated));
                   } catch {}
+                  updateEasyGermanVideosAction(updated).catch(() => {});
                   return updated;
                 });
               }

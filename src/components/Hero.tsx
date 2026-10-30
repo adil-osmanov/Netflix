@@ -36,19 +36,53 @@ export default function Hero({ movie }: { movie?: any }) {
 
 
   useEffect(() => {
+    setDisplayMovie(movie);
+  }, [movie]);
+
+  useEffect(() => {
+    let active = true;
     const category = searchParams.get('category') || 'all';
     
     async function loadLastWatched() {
-      const dbWatched = await getLastWatchedAction(category);
-      if (dbWatched) {
-        setDisplayMovie(dbWatched);
-      } else {
-        setDisplayMovie(movie);
+      try {
+        const dbWatched = await getLastWatchedAction(category);
+        if (!active) return;
+
+        if (dbWatched) {
+          const isSeries = dbWatched.collection_type === 'series' || 
+                           dbWatched.category?.toLowerCase()?.includes('сериал') || 
+                           dbWatched.category?.toLowerCase()?.includes('series');
+          const isCartoon = dbWatched.category?.toLowerCase()?.includes('мульт') || 
+                            dbWatched.category?.toLowerCase()?.includes('cartoon');
+          
+          let isValid = true;
+          if (category === 'movies' && (isSeries || isCartoon)) {
+            isValid = false;
+          } else if (category === 'series' && !isSeries) {
+            isValid = false;
+          } else if (category === 'cartoons' && !isCartoon) {
+            isValid = false;
+          }
+
+          if (isValid) {
+            setDisplayMovie(dbWatched);
+          } else {
+            setDisplayMovie(movie);
+          }
+        } else {
+          setDisplayMovie(movie);
+        }
+      } catch (e) {
+        if (active) setDisplayMovie(movie);
+      } finally {
+        if (active) setMounted(true);
       }
-      setMounted(true);
     }
     
     loadLastWatched();
+    return () => {
+      active = false;
+    };
   }, [searchParams, movie]);
 
 
@@ -58,8 +92,11 @@ export default function Hero({ movie }: { movie?: any }) {
   };
   const handlePlay = () => {
     if (displayMovie?.telegram_url && !displayMovie?.is_collection) {
-      const category = searchParams.get('category') || 'all';
-      setLastWatchedAction(category, displayMovie);
+      const isSeriesItem = displayMovie.collection_type === 'series' || displayMovie.category?.toLowerCase()?.includes('сериал');
+      const isCartoonItem = displayMovie.category?.toLowerCase()?.includes('мульт');
+      const targetCat = isSeriesItem ? 'series' : (isCartoonItem ? 'cartoons' : 'movies');
+      setLastWatchedAction(targetCat, displayMovie);
+      setLastWatchedAction('all', displayMovie);
       openTelegramLink(displayMovie.telegram_url);
     } else if (displayMovie?.is_collection) {
       setModalOpen(true);

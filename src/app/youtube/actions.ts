@@ -504,6 +504,24 @@ export async function addEasyGermanVideoAction(
 }
 
 /**
+ * Easy German: пакетное обновление роликов в global_settings
+ */
+export async function updateEasyGermanVideosAction(
+  videos: EasyGermanVideo[]
+): Promise<{ success: boolean }> {
+  try {
+    await Promise.all([
+      supabase.from("global_settings").upsert({ key: "easy_german_custom_videos", value: videos }),
+      supabase.from("global_settings").upsert({ key: "easy_german_videos", value: videos }),
+    ]);
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to update easy_german_videos:", err);
+    return { success: false };
+  }
+}
+
+/**
  * Easy German: удаление ролика из Supabase и global_settings
  */
 export async function deleteEasyGermanVideoAction(
