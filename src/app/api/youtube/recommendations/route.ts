@@ -537,6 +537,7 @@ async function handleRecommendationsRequest(
 }
 
 import englishVideosJson from "@/data/english_videos.json";
+import englishPodcastsJson from "@/data/english_podcasts.json";
 
 const EN_LEVEL_SEARCH_CLUSTERS: Record<"A1" | "A2" | "B1" | "B2" | "C1", string[]> = {
   A1: [
@@ -568,13 +569,35 @@ const EN_LEVEL_SEARCH_CLUSTERS: Record<"A1" | "A2" | "B1" | "B2" | "C1", string[
   ],
 };
 
-const EN_PODCAST_CLUSTERS = [
-  "Huberman Lab Podcast Episode",
-  "Lex Fridman Podcast Interview",
-  "The Diary Of A CEO Podcast",
-  "Conan O'Brien Needs A Friend Full Episode",
-  "Freakonomics Radio Podcast",
-];
+const EN_PODCAST_LEVEL_CLUSTERS: Record<"A1" | "A2" | "B1" | "B2" | "C1", string[]> = {
+  A1: [
+    "Spotlight English beginner podcast",
+    "6 Minute English BBC basics learning",
+    "Slow English Podcast A1 listening practice",
+  ],
+  A2: [
+    "Culips English Podcast simplified speech",
+    "Slow English conversation stories beginner A2",
+    "VOA Learning English American stories podcast",
+  ],
+  B1: [
+    "All Ears English podcast American",
+    "Rachel's English conversation podcast practice",
+    "Luke's English Podcast American accent",
+  ],
+  B2: [
+    "NPR Life Kit podcast episode",
+    "Modern Wisdom Chris Williamson podcast",
+    "The Daily New York Times podcast",
+  ],
+  C1: [
+    "Huberman Lab Podcast Full Episode",
+    "Lex Fridman Podcast AI Science",
+    "The Diary Of A CEO Podcast",
+    "Conan O'Brien Needs A Friend Podcast",
+    "Joe Rogan Experience full clip podcast",
+  ],
+};
 
 async function fetchEnglishClusterVideos(
   clusterQuery: string,
@@ -685,7 +708,12 @@ async function handleEnglishRecommendationsRequest(
   levelFilter: string = "ALL",
   categoryFilter?: string
 ) {
-  const curatedPool: YouTubeRecommendedVideo[] = (englishVideosJson as any[]).map((item) => ({
+  const curatedSource =
+    categoryFilter === "podcasts"
+      ? (englishPodcastsJson as any[])
+      : (englishVideosJson as any[]);
+
+  const curatedPool: YouTubeRecommendedVideo[] = curatedSource.map((item) => ({
     id: item.youtube_id,
     youtube_id: item.youtube_id,
     title: item.title,
@@ -696,22 +724,41 @@ async function handleEnglishRecommendationsRequest(
     category: item.category,
   }));
 
+  const isLevelActive = levelFilter && levelFilter !== "ALL" && levelFilter !== "Все" && levelFilter !== "all";
+
   let available = curatedPool.filter((v) => {
     if (excludeSet.has(v.id)) return false;
     if (categoryFilter === "podcasts" && v.category !== "podcasts") return false;
-    if (levelFilter !== "ALL" && v.level !== levelFilter) return false;
+    if (isLevelActive) {
+      if (!v.level) return false;
+      if (String(v.level).trim().toUpperCase() !== String(levelFilter).trim().toUpperCase()) return false;
+    }
     return true;
   });
 
   if (page > 1 || available.length < limit) {
     let clusters: { q: string; lvl?: "A1" | "A2" | "B1" | "B2" | "C1" }[] = [];
     if (categoryFilter === "podcasts") {
-      clusters = EN_PODCAST_CLUSTERS.map((q) => ({ q, lvl: "C1" }));
+      if (
+        isLevelActive &&
+        EN_PODCAST_LEVEL_CLUSTERS[levelFilter.toUpperCase() as keyof typeof EN_PODCAST_LEVEL_CLUSTERS]
+      ) {
+        const lvl = levelFilter.toUpperCase() as "A1" | "A2" | "B1" | "B2" | "C1";
+        clusters = EN_PODCAST_LEVEL_CLUSTERS[lvl].map((q) => ({ q, lvl }));
+      } else {
+        clusters = [
+          { q: EN_PODCAST_LEVEL_CLUSTERS.A1[0], lvl: "A1" },
+          { q: EN_PODCAST_LEVEL_CLUSTERS.A2[0], lvl: "A2" },
+          { q: EN_PODCAST_LEVEL_CLUSTERS.B1[0], lvl: "B1" },
+          { q: EN_PODCAST_LEVEL_CLUSTERS.B2[0], lvl: "B2" },
+          { q: EN_PODCAST_LEVEL_CLUSTERS.C1[0], lvl: "C1" },
+        ];
+      }
     } else if (
-      levelFilter !== "ALL" &&
-      EN_LEVEL_SEARCH_CLUSTERS[levelFilter as keyof typeof EN_LEVEL_SEARCH_CLUSTERS]
+      isLevelActive &&
+      EN_LEVEL_SEARCH_CLUSTERS[levelFilter.toUpperCase() as keyof typeof EN_LEVEL_SEARCH_CLUSTERS]
     ) {
-      const lvl = levelFilter as "A1" | "A2" | "B1" | "B2" | "C1";
+      const lvl = levelFilter.toUpperCase() as "A1" | "A2" | "B1" | "B2" | "C1";
       clusters = EN_LEVEL_SEARCH_CLUSTERS[lvl].map((q) => ({ q, lvl }));
     } else {
       clusters = [

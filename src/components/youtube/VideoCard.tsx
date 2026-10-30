@@ -6,6 +6,7 @@ import { YouTubeRecommendedVideo } from "@/types/youtube";
 import { useYouTube } from "@/context/YouTubeContext";
 
 import { LevelBadge, getLevelBadgeStyle } from "./LevelBadge";
+import { formatDuration } from "@/lib/youtube";
 export { LevelBadge };
 
 export function isValidDuration(durationStr?: string, seconds?: number): boolean {
@@ -65,7 +66,8 @@ export default function VideoCard({ video, onRemoveFavorite }: VideoCardProps) {
     videoId.startsWith("https://") ||
     Boolean(video.url_website);
 
-  const durationDisplay = video.durationText || video.duration_str;
+  const rawDuration = video.durationText || video.duration_str || video.duration;
+  const durationDisplay = rawDuration ? formatDuration(rawDuration) : "";
 
   const [thumbUrl, setThumbUrl] = useState(() => {
     if (video.thumbnailUrl && !video.thumbnailUrl.includes("maxresdefault")) {

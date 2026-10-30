@@ -1,0 +1,218 @@
+[
+  {
+    "id": "pod-a1-01",
+    "youtube_id": "PqXJxqp-GAE",
+    "title": "Episode 1: Introductions | Learn English with Spotlight Chats",
+    "channel": "Spotlight English",
+    "level": "A1",
+    "duration": "08:35",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-a1-02",
+    "youtube_id": "P2jvBE6DiHo",
+    "title": "How quickly can you learn English? 6 Minute English Basics",
+    "channel": "BBC Learning English",
+    "level": "A1",
+    "duration": "06:18",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-a1-03",
+    "youtube_id": "s2EYIDY8wSM",
+    "title": "Learning English Podcast for Beginners | A1 English Listening Practice",
+    "channel": "English Easy Practice",
+    "level": "A1",
+    "duration": "10:45",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-a1-04",
+    "youtube_id": "b9OVPcW1gfY",
+    "title": "Slow English Podcast #1 | Listen and learn clear, slow, natural English",
+    "channel": "Volka English",
+    "level": "A1",
+    "duration": "12:20",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-a2-01",
+    "youtube_id": "YrFV0nbw_no",
+    "title": "Slow English Conversation with my American friend!",
+    "channel": "English Cozy Chat",
+    "level": "A2",
+    "duration": "14:15",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-a2-02",
+    "youtube_id": "VGoJrwil_7c",
+    "title": "Slow English Podcast: My Trip to New York City",
+    "channel": "Miss Honey",
+    "level": "A2",
+    "duration": "12:30",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-a2-03",
+    "youtube_id": "oMW8Z1TaSeQ",
+    "title": "American Stories: How the Animals Lost Their Tails by Carl Sandburg",
+    "channel": "VOA Learning English",
+    "level": "A2",
+    "duration": "15:00",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-a2-04",
+    "youtube_id": "JGvpgbGy4QU",
+    "title": "Halloween in North America | English Podcast Conversation",
+    "channel": "Culips English Podcast",
+    "level": "A2",
+    "duration": "16:40",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-a2-05",
+    "youtube_id": "j-dCYmg3aAg",
+    "title": "Learn English with Andrew’s story of jet lag and snow",
+    "channel": "Culips English Podcast",
+    "level": "A2",
+    "duration": "18:20",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-b1-01",
+    "youtube_id": "cTpQBa8pKyU",
+    "title": "2713 - Take a Crack at These English Phrases",
+    "channel": "All Ears English",
+    "level": "B1",
+    "duration": "15:20",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-b1-02",
+    "youtube_id": "2JnnSu53QS0",
+    "title": "Real American English Conversation Practice",
+    "channel": "Rachel's English",
+    "level": "B1",
+    "duration": "14:25",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-b1-03",
+    "youtube_id": "BZObLA7OxX8",
+    "title": "Daily American English Conversation & Vocabulary",
+    "channel": "Speak English With Vanessa",
+    "level": "B1",
+    "duration": "19:40",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-b1-04",
+    "youtube_id": "VZZki0p0PMA",
+    "title": "844. Improve Your Pronunciation with Luke Nicholson - Accent Coach",
+    "channel": "Luke's English Podcast",
+    "level": "B1",
+    "duration": "22:15",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-b2-01",
+    "youtube_id": "eHnlKwk39nQ",
+    "title": "How to talk to your doctor | Life Kit",
+    "channel": "NPR",
+    "level": "B2",
+    "duration": "16:20",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-b2-02",
+    "youtube_id": "kQlQGF7vyxY",
+    "title": "How to deal with debt and smart spending | Life Kit",
+    "channel": "NPR",
+    "level": "B2",
+    "duration": "18:45",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-b2-03",
+    "youtube_id": "k8nO9gyQphI",
+    "title": "I Read 500 Self-Help Books So You Don't Have To",
+    "channel": "Modern Wisdom",
+    "level": "B2",
+    "duration": "21:30",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-b2-04",
+    "youtube_id": "vjFwzUs_H-I",
+    "title": "Middle Ground: Can Both Sides Agree?",
+    "channel": "Jubilee",
+    "level": "B2",
+    "duration": "16:45",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-b2-05",
+    "youtube_id": "r5Ps1TZXAN8",
+    "title": "How this border transformed a subcontinent",
+    "channel": "Vox",
+    "level": "B2",
+    "duration": "13:15",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-b2-06",
+    "youtube_id": "ObJ-BJ50Onc",
+    "title": "A Plan for Two Dans: How Democrats Manipulated Alaska's Ballot",
+    "channel": "The Daily (NYT)",
+    "level": "B2",
+    "duration": "28:10",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-c1-01",
+    "youtube_id": "lIo9FcrljDk",
+    "title": "Master Your Sleep & Be More Alert When Awake",
+    "channel": "Huberman Lab",
+    "level": "C1",
+    "duration": "18:50",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-c1-02",
+    "youtube_id": "EV7WhVT270Q",
+    "title": "State of AI in 2026: LLMs, Coding, Scaling",
+    "channel": "Lex Fridman",
+    "level": "C1",
+    "duration": "24:10",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-c1-03",
+    "youtube_id": "AcK_zgJjnoo",
+    "title": "Human Lie Detector: The #1 Sign They're Lying",
+    "channel": "The Diary Of A CEO",
+    "level": "C1",
+    "duration": "32:15",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-c1-04",
+    "youtube_id": "YlC0oomxFms",
+    "title": "Michael Douglas (Full Episode) | Conan O'Brien Needs A Friend",
+    "channel": "Team Coco",
+    "level": "C1",
+    "duration": "21:40",
+    "category": "podcasts"
+  },
+  {
+    "id": "pod-c1-05",
+    "youtube_id": "aHmRsF0laxE",
+    "title": "Joe Rogan on Quitting Coffee & Brain Chemistry",
+    "channel": "Joe Rogan Experience",
+    "level": "C1",
+    "duration": "15:45",
+    "category": "podcasts"
+  }
+]

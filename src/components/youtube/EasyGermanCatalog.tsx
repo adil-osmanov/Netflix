@@ -555,7 +555,7 @@ export default function EasyGermanCatalog({
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] cursor-pointer ${
                 selectedLevel === lvl
                   ? isEN
-                    ? "bg-[#E50914] text-white shadow-md shadow-red-950/50"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-950/50"
                     : "bg-emerald-500 text-black shadow-md shadow-emerald-950/50"
                   : "text-zinc-400 hover:text-white"
               }`}
@@ -567,14 +567,18 @@ export default function EasyGermanCatalog({
 
         {/* Центральная часть: Статус усвоения и прогресс */}
         <div className="flex-1 max-w-xs mx-auto flex flex-col items-center">
-          <span className="text-xs font-mono font-bold text-zinc-300 mb-1.5">
+          <span
+            className={`text-xs font-mono font-bold mb-1.5 ${
+              isEN ? "text-blue-400" : "text-zinc-300"
+            }`}
+          >
             {watchedCount} / {totalCount}
           </span>
           <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden p-[1px] border border-zinc-800">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
                 isEN
-                  ? "bg-gradient-to-r from-[#E50914] to-red-500 shadow-[0_0_10px_rgba(229,9,20,0.7)]"
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-500 shadow-[0_0_10px_rgba(37,99,235,0.7)]"
                   : "bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_10px_rgba(16,185,129,0.7)]"
               }`}
               style={{ width: `${totalCount > 0 ? (watchedCount / totalCount) * 100 : 0}%` }}
@@ -587,7 +591,7 @@ export default function EasyGermanCatalog({
           onClick={() => setIsAddModalOpen(true)}
           className={`px-4 py-2 rounded-xl font-semibold text-xs text-white transition-all shadow-lg flex items-center gap-1.5 active:scale-95 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] cursor-pointer ${
             isEN
-              ? "bg-[#E50914] hover:bg-red-700 shadow-red-950/50 border border-red-400/20"
+              ? "bg-blue-600 hover:bg-blue-500 shadow-blue-950/50 border border-blue-400/20"
               : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50 border border-emerald-400/20"
           }`}
         >
@@ -613,6 +617,7 @@ export default function EasyGermanCatalog({
               video={video}
               index={video.order_index ?? index + 1}
               isWatched={Boolean(video.is_watched)}
+              accentColor={isEN ? "blue" : "emerald"}
               onOpen={setActiveVideo}
               onToggleWatched={handleToggleWatched}
               onDelete={handleDeleteVideo}

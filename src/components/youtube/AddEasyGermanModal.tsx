@@ -124,7 +124,7 @@ export default function AddEasyGermanModal({
         {/* Шапка */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/80 bg-zinc-900/50">
           <div className="flex items-center gap-2.5">
-            <Video className={`w-5 h-5 ${isEN ? "text-[#E50914]" : "text-emerald-500"}`} />
+            <Video className={`w-5 h-5 ${isEN ? "text-blue-500" : "text-emerald-500"}`} />
             <h2 className="text-base font-bold text-white">Добавить видео ({level})</h2>
           </div>
           <button
@@ -157,7 +157,7 @@ export default function AddEasyGermanModal({
               onChange={(e) => setUrlOrId(e.target.value)}
               placeholder="https://youtube.com/watch?v=..."
               className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 ${
-                isEN ? "focus:border-[#E50914]" : "focus:border-emerald-500"
+                isEN ? "focus:border-blue-500" : "focus:border-emerald-500"
               } text-sm text-white placeholder:text-zinc-500 outline-none transition disabled:opacity-50`}
               autoFocus
             />
@@ -173,7 +173,7 @@ export default function AddEasyGermanModal({
                     ID:{" "}
                     <span
                       className={`font-mono font-semibold ${
-                        isEN ? "text-red-400" : "text-emerald-400"
+                        isEN ? "text-blue-400" : "text-emerald-400"
                       }`}
                     >
                       {extractedId}
@@ -193,7 +193,7 @@ export default function AddEasyGermanModal({
             disabled={isLoading}
             className={`w-full py-2.5 rounded-xl ${
               isEN
-                ? "bg-[#E50914] hover:bg-red-700 shadow-red-950/50"
+                ? "bg-blue-600 hover:bg-blue-500 shadow-blue-950/50"
                 : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50"
             } disabled:opacity-50 text-white text-sm font-semibold flex items-center justify-center gap-2 transition shadow-lg cursor-pointer active:scale-[0.99] outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]`}
           >

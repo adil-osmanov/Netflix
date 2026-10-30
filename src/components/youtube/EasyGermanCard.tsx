@@ -3,11 +3,13 @@
 import React, { useState, useEffect } from "react";
 import { Play, Check } from "lucide-react";
 import { EasyGermanVideo } from "@/types/youtube";
+import { formatDuration } from "@/lib/youtube";
 
 interface EasyGermanCardProps {
   video: EasyGermanVideo;
   isWatched: boolean;
   index?: number;
+  accentColor?: "emerald" | "blue";
   onOpen: (video: EasyGermanVideo) => void;
   onToggleWatched: (youtubeId: string, e?: React.MouseEvent) => void;
   onDelete?: (videoId: string) => void;
@@ -18,11 +20,13 @@ export default function EasyGermanCard({
   video,
   isWatched,
   index = 1,
+  accentColor = "emerald",
   onOpen,
   onToggleWatched,
   onDelete,
   onUpdateOrder,
 }: EasyGermanCardProps) {
+  const isBlue = accentColor === "blue";
   const currentOrder = video.order_index ?? index;
   const [isEditingOrder, setIsEditingOrder] = useState(false);
   const [orderVal, setOrderVal] = useState(String(currentOrder));
@@ -113,12 +117,20 @@ export default function EasyGermanCard({
               }}
               className={`px-2 py-0.5 rounded-md backdrop-blur-md text-[11px] font-mono font-bold flex items-center gap-1.5 transition-colors select-none cursor-default outline-none ${
                 isWatched
-                  ? "bg-black/75 text-emerald-400 border border-emerald-500/30"
+                  ? isBlue
+                    ? "bg-black/75 text-blue-400 border border-blue-500/30"
+                    : "bg-black/75 text-emerald-400 border border-emerald-500/30"
                   : "bg-black/75 text-zinc-300 border border-white/10"
               }`}
             >
               <span>#{String(currentOrder).padStart(2, "0")}</span>
-              {isWatched && <Check className="text-emerald-400" size={11} strokeWidth={3} />}
+              {isWatched && (
+                <Check
+                  className={isBlue ? "text-blue-400" : "text-emerald-400"}
+                  size={11}
+                  strokeWidth={3}
+                />
+              )}
             </div>
           )}
         </div>
@@ -134,7 +146,9 @@ export default function EasyGermanCard({
             }}
             className={`p-1.5 rounded-full transition-all outline-none focus:outline-none focus:ring-0 active:outline-none cursor-pointer select-none [-webkit-tap-highlight-color:transparent] ${
               isWatched
-                ? "bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-900"
+                ? isBlue
+                  ? "bg-blue-950/80 text-blue-400 border border-blue-500/40 hover:bg-blue-900"
+                  : "bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-900"
                 : "bg-black/60 text-zinc-500 hover:text-white border border-white/10"
             }`}
             title={isWatched ? "Отметить как непросмотренное" : "Отметить как выполненное"}
@@ -145,8 +159,14 @@ export default function EasyGermanCard({
 
         {/* Всплывающая кнопка Play при наведении */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-          <div className="w-12 h-12 rounded-full bg-emerald-500 text-black flex items-center justify-center shadow-lg shadow-emerald-950/80 transform group-hover:scale-110 transition-transform duration-300">
-            <Play className="fill-black ml-0.5" size={20} />
+          <div
+            className={`w-12 h-12 rounded-full flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300 ${
+              isBlue
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-950/80"
+                : "bg-emerald-500 text-black shadow-lg shadow-emerald-950/80"
+            }`}
+          >
+            <Play className={`${isBlue ? "fill-white" : "fill-black"} ml-0.5`} size={20} />
           </div>
         </div>
 
@@ -154,7 +174,7 @@ export default function EasyGermanCard({
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-950/80 overflow-hidden">
           <div
             className={`h-full transition-all duration-500 ${
-              isWatched ? "w-full bg-emerald-500" : "w-0"
+              isWatched ? (isBlue ? "w-full bg-blue-600" : "w-full bg-emerald-500") : "w-0"
             }`}
           />
         </div>
@@ -162,7 +182,7 @@ export default function EasyGermanCard({
         {/* Бейдж длительности видео */}
         {(video.duration_str || video.duration) && (
           <div className="absolute bottom-2.5 right-2.5 px-1.5 py-0.5 rounded bg-black/85 backdrop-blur-md border border-white/10 text-[10px] font-mono font-medium text-zinc-300 shadow-md pointer-events-none z-10">
-            {video.duration_str || video.duration}
+            {formatDuration(video.duration_str || video.duration!)}
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { 
   Loader2, 
   RotateCw,
@@ -24,10 +24,15 @@ import ManageChannelsModal, { SubscribedChannel } from "@/components/youtube/Man
 import EasyGermanCatalog from "@/components/youtube/EasyGermanCatalog";
 import MediathekCatalog from "@/components/mediathek/MediathekCatalog";
 import englishVideosJson from "@/data/english_videos.json";
+import englishPodcastsJson from "@/data/english_podcasts.json";
 
 export type TopCategory = "youtube" | "mediathek" | "podcasts" | "favorites";
 export type MainTab = "recommendations" | "subscriptions" | "easy_german";
 export type LevelType = "ALL" | "A1" | "A2" | "B1" | "B2" | "C1";
+
+export const DE_STANDARD_LEVELS: LevelType[] = ["A1", "A2", "B1", "B2", "C1"];
+export const EN_STANDARD_LEVELS: LevelType[] = ["A1", "A2", "B1", "B2", "C1"];
+export const EASY_GERMAN_LEVELS: LevelType[] = ["B1", "B2", "C1"];
 
 const DEFAULT_DE_SUBSCRIPTIONS: SubscribedChannel[] = [
   { id: "UCbxb2fqe9oNgglAoYqsYOtQ", name: "Easy German" },
@@ -187,20 +192,20 @@ export default function YouTubeCatalogPage() {
 
   // Podcasts state (for EN mode)
   const [podcasts, setPodcasts] = useState<YouTubeRecommendedVideo[]>(() =>
-    (englishVideosJson as any[])
-      .filter((item) => item.category === "podcasts")
-      .map((item) => ({
-        id: item.youtube_id,
-        youtube_id: item.youtube_id,
-        title: item.title,
-        channel: item.channel,
-        level: item.level as "A1" | "A2" | "B1" | "B2" | "C1",
-        thumbnailUrl: `https://i.ytimg.com/vi/${item.youtube_id}/hqdefault.jpg`,
-        durationText: item.duration,
-        category: item.category,
-      }))
+    (englishPodcastsJson as any[]).map((item) => ({
+      id: item.youtube_id,
+      youtube_id: item.youtube_id,
+      title: item.title,
+      channel: item.channel,
+      level: item.level as "A1" | "A2" | "B1" | "B2" | "C1",
+      thumbnailUrl: `https://i.ytimg.com/vi/${item.youtube_id}/hqdefault.jpg`,
+      durationText: item.duration,
+      category: item.category,
+    }))
   );
+  const [podcastVisibleCount, setPodcastVisibleCount] = useState<number>(12);
   const [isLoadingPodcasts, setIsLoadingPodcasts] = useState<boolean>(false);
+  const [isFetchingMorePodcasts, setIsFetchingMorePodcasts] = useState<boolean>(false);
 
   // Load isolated subscriptions when language changes
   useEffect(() => {
@@ -389,8 +394,9 @@ export default function YouTubeCatalogPage() {
   );
 
   // Fetch podcasts when in EN mode and Podcasts category is active
-  const fetchPodcasts = useCallback(async () => {
+  const fetchPodcasts = useCallback(async (levelToLoad?: LevelType) => {
     setIsLoadingPodcasts(true);
+    const lvl = levelToLoad !== undefined ? levelToLoad : selectedLevel;
     try {
       const res = await fetch(
         `/api/youtube/recommendations?t=${Date.now()}&rnd=${Math.random()}`,
@@ -400,8 +406,8 @@ export default function YouTubeCatalogPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             page: 1,
-            limit: 16,
-            level: "ALL",
+            limit: 24,
+            level: lvl,
             lang: "EN",
             category: "podcasts",
           }),
@@ -417,7 +423,7 @@ export default function YouTubeCatalogPage() {
     } catch {} finally {
       setIsLoadingPodcasts(false);
     }
-  }, []);
+  }, [selectedLevel]);
 
   useEffect(() => {
     if (isEN && activeCategory === "podcasts") {
@@ -425,18 +431,20 @@ export default function YouTubeCatalogPage() {
     }
   }, [isEN, activeCategory, fetchPodcasts]);
 
+  // Auto switch to B1 if user is on Easy German in DE mode and level is A1 or A2
+  useEffect(() => {
+    if (!isEN && activeCategory === "youtube" && activeTab === "easy_german") {
+      if (selectedLevel === "A1" || selectedLevel === "A2") {
+        setSelectedLevel("B1");
+      }
+    }
+  }, [isEN, activeCategory, activeTab, selectedLevel]);
+
   // Refetch recommendations when language changes
   useEffect(() => {
-    const validLevel =
-      !isEN && (selectedLevel === "A1" || selectedLevel === "A2")
-        ? "ALL"
-        : selectedLevel;
-    if (validLevel !== selectedLevel) {
-      setSelectedLevel("ALL");
-    }
     setRecommendations([]);
     setRecPage(1);
-    fetchRecommendations(1, false, validLevel, currentLang);
+    fetchRecommendations(1, false, selectedLevel, currentLang);
   }, [currentLang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch subscriptions when subscriptions list or selected channel changes
@@ -456,14 +464,27 @@ export default function YouTubeCatalogPage() {
     }
   };
 
+  // Переключение подвкладок YouTube
+  const handleTabChange = (tab: MainTab) => {
+    if (tab === "easy_german" && !isEN && (selectedLevel === "A1" || selectedLevel === "A2")) {
+      setSelectedLevel("B1");
+    }
+    setActiveTab(tab);
+  };
+
   // Смена уровня сложности
   const handleLevelChange = (lvl: LevelType) => {
     if (lvl === selectedLevel) return;
     setSelectedLevel(lvl);
-    setRecommendations([]);
-    setRecPage(1);
-    setHasMoreRec(true);
-    fetchRecommendations(1, false, lvl, currentLang);
+    setPodcastVisibleCount(12);
+    if (activeCategory === "youtube") {
+      setRecommendations([]);
+      setRecPage(1);
+      setHasMoreRec(true);
+      fetchRecommendations(1, false, lvl, currentLang);
+    } else if (activeCategory === "podcasts") {
+      fetchPodcasts(lvl);
+    }
   };
 
   // Load more handler for InfiniteVideoFeed
@@ -498,7 +519,10 @@ export default function YouTubeCatalogPage() {
   // Refresh feed
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    if (activeTab === "recommendations") {
+    if (activeCategory === "podcasts") {
+      setPodcastVisibleCount(12);
+      await fetchPodcasts();
+    } else if (activeTab === "recommendations") {
       await fetchRecommendations(1, false);
     } else if (activeTab === "subscriptions") {
       await fetchSubscriptionVideos(1, false);
@@ -521,27 +545,34 @@ export default function YouTubeCatalogPage() {
     }
   };
 
-  // Уровни в зависимости от выбранного языка (DE: B1-C1, EN: A1-C1)
+  // Уровни в зависимости от выбранного языка (A1-C1 для обоих в каталоге)
   const levelPills: { id: LevelType; label: string }[] = [
     { id: "ALL", label: "Все" },
-    ...(isEN ? EN_LEVELS : DE_LEVELS).map((l) => ({ id: l as LevelType, label: l })),
+    ...(isEN ? EN_STANDARD_LEVELS : DE_STANDARD_LEVELS).map((l) => ({ id: l as LevelType, label: l })),
   ];
 
   // Base videos for YouTube subtabs
   const baseVideos = activeTab === "recommendations" ? recommendations : subVideos;
   const minDurSec = isEN ? 180 : activeTab === "subscriptions" ? 200 : 600;
 
+  const isFilterActive =
+    Boolean(selectedLevel) &&
+    (selectedLevel as string) !== "ALL" &&
+    (selectedLevel as string) !== "Все" &&
+    (selectedLevel as string) !== "all";
+
   const currentVideos = baseVideos.filter((video) => {
     if (isYouTubeShort(video, minDurSec)) return false;
 
-    if (activeTab === "recommendations") {
-      return selectedLevel === "ALL" || video.level === selectedLevel;
+    // Строгая фильтрация по выбранному уровню: исключаем видео без level или с другим level
+    if (isFilterActive) {
+      if (!video.level) return false;
+      if (String(video.level).trim().toUpperCase() !== String(selectedLevel).trim().toUpperCase()) {
+        return false;
+      }
     }
 
     if (activeTab === "subscriptions") {
-      if (selectedLevel !== "ALL" && video.level && video.level !== selectedLevel) {
-        return false;
-      }
       if (selectedSubscribedChannel === "ALL") return true;
       const chClean = (video.channel || "").toLowerCase().trim();
       const selClean = selectedSubscribedChannel.toLowerCase().trim();
@@ -566,6 +597,34 @@ export default function YouTubeCatalogPage() {
     return true;
   });
 
+  // Строгая фильтрация и пагинация подкастов (порциями по 12 штук)
+  const filteredPodcasts = useMemo(() => {
+    let list = podcasts;
+    if (isFilterActive) {
+      list = list.filter((v) => {
+        if (!v.level) return false;
+        return String(v.level).trim().toUpperCase() === String(selectedLevel).trim().toUpperCase();
+      });
+    }
+    return list;
+  }, [podcasts, isFilterActive, selectedLevel]);
+
+  const visiblePodcasts = useMemo(() => {
+    return filteredPodcasts.slice(0, podcastVisibleCount);
+  }, [filteredPodcasts, podcastVisibleCount]);
+
+  const hasMorePodcasts = podcastVisibleCount < filteredPodcasts.length;
+
+  const handleLoadMorePodcasts = useCallback(() => {
+    if (podcastVisibleCount < filteredPodcasts.length) {
+      setIsFetchingMorePodcasts(true);
+      setTimeout(() => {
+        setPodcastVisibleCount((prev) => prev + 12);
+        setIsFetchingMorePodcasts(false);
+      }, 200);
+    }
+  }, [podcastVisibleCount, filteredPodcasts.length]);
+
   // Client-side deduplication of isolated favorites
   const uniqueFavorites = Array.from(
     new Map(
@@ -577,41 +636,36 @@ export default function YouTubeCatalogPage() {
 
   return (
     <div className="relative min-h-screen bg-black text-white pb-24 px-4 md:px-12 pt-1 transition-colors duration-500 overflow-x-hidden">
-      {/* Фоновая дымка в зависимости от режима DE / EN */}
-      {isEN ? (
-        /* Режим EN: глубокий фирменный кинематографичный оттенок Netflix (rgba(229,9,20,0.18)) */
-        <div
-          className="fixed -top-32 left-1/2 -translate-x-1/2 w-[1200px] h-[550px] pointer-events-none transition-opacity duration-1000 ease-out z-0 blur-[160px] opacity-100"
-          style={{
-            background:
-              "radial-gradient(ellipse at top, rgba(229,9,20,0.18), rgba(229,9,20,0.06) 50%, transparent 75%)",
-          }}
-        />
-      ) : (
-        <>
-          {/* Режим DE: изумрудная дымка (rgba(16,185,129,0.3)) при активном Easy German */}
-          <div
-            className={`fixed -top-32 left-1/2 -translate-x-1/2 w-[1200px] h-[550px] pointer-events-none transition-opacity duration-1000 ease-out z-0 blur-[160px] ${
-              activeCategory === "youtube" && activeTab === "easy_german"
-                ? "opacity-100"
-                : "opacity-0"
-            }`}
-            style={{
-              background:
-                "radial-gradient(ellipse at top, rgba(16,185,129,0.3), rgba(6,78,59,0.15) 45%, transparent 75%)",
-            }}
-          />
+      {/* 1. Основное кинематографичное красное свечение Netflix (1-в-1 для DE и EN) */}
+      <div 
+        className={`fixed -top-36 left-1/2 -translate-x-1/2 w-[1100px] h-[420px] pointer-events-none transition-opacity duration-700 ease-out z-0 blur-[150px] ${
+          activeCategory === "youtube" && activeTab === "easy_german"
+            ? "opacity-0"
+            : "opacity-25 bg-[radial-gradient(ellipse_at_top,rgba(229,9,20,0.8),transparent_70%)]"
+        }`}
+      />
 
-          {/* Обычный потолочный свет (Cinema Vignette) в остальных вкладках DE */}
-          <div
-            className={`fixed top-0 left-1/2 -translate-x-1/2 w-[900px] h-[320px] pointer-events-none transition-opacity duration-700 ease-out z-0 blur-[140px] ${
-              activeCategory === "youtube" && activeTab === "easy_german"
-                ? "opacity-0"
-                : "opacity-10 bg-[radial-gradient(ellipse_at_top,rgba(220,38,38,0.4),transparent_75%)]"
-            }`}
-          />
-        </>
-      )}
+      {/* 2. Синяя фоновая дымка (Blue Cinema Glow) для Easy English в режиме EN */}
+      <div 
+        className={`fixed -top-32 left-1/2 -translate-x-1/2 w-[1200px] h-[520px] pointer-events-none transition-opacity duration-1000 ease-out z-0 blur-[160px] ${
+          isEN && activeCategory === "youtube" && activeTab === "easy_german"
+            ? "opacity-35 bg-[radial-gradient(ellipse_at_top,rgba(37,99,235,0.7),rgba(30,58,138,0.25)_45%,transparent_75%)]"
+            : "opacity-0"
+        }`}
+      />
+
+      {/* 3. Изумрудная дымка (rgba(16,185,129,0.3)) для Easy German в режиме DE */}
+      <div
+        className={`fixed -top-32 left-1/2 -translate-x-1/2 w-[1200px] h-[550px] pointer-events-none transition-opacity duration-1000 ease-out z-0 blur-[160px] ${
+          !isEN && activeCategory === "youtube" && activeTab === "easy_german"
+            ? "opacity-100"
+            : "opacity-0"
+        }`}
+        style={{
+          background:
+            "radial-gradient(ellipse at top, rgba(16,185,129,0.3), rgba(6,78,59,0.15) 45%, transparent 75%)",
+        }}
+      />
 
       <div className="relative z-10">
         {/* Шапка: логотип Netflix + свитчер языка в правом верхнем углу + кнопки выбора источников */}
@@ -723,33 +777,81 @@ export default function YouTubeCatalogPage() {
           <MediathekCatalog />
         ) : activeCategory === "podcasts" && isEN ? (
           <div className="max-w-7xl mx-auto">
-            {isLoadingPodcasts && podcasts.length === 0 ? (
+            {/* Панель фильтра уровней Podcasts [ Все ] [ A1 ] [ A2 ] [ B1 ] [ B2 ] [ C1 ] */}
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                  Каталог подкастов
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <div className="flex items-center p-1 bg-zinc-900 rounded-full border border-zinc-800 flex-wrap">
+                  {levelPills.map((lvl) => {
+                    const isActive = selectedLevel === lvl.id;
+                    return (
+                      <button
+                        key={lvl.id}
+                        onClick={() => handleLevelChange(lvl.id)}
+                        className={`px-3 py-1 text-xs rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
+                          isActive
+                            ? "bg-white text-black font-semibold"
+                            : "text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        {lvl.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing || isLoadingPodcasts}
+                  className="p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] transition-colors duration-200 disabled:opacity-50 cursor-pointer shadow"
+                  title="Обновить"
+                >
+                  <RotateCw
+                    className={`w-4 h-4 text-red-500 ${isRefreshing ? "animate-spin" : ""}`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {isLoadingPodcasts && filteredPodcasts.length === 0 ? (
               <div className="py-24 flex flex-col items-center justify-center gap-3 text-zinc-400">
                 <Loader2 className="w-8 h-8 animate-spin text-[#E50914]" />
                 <span className="text-sm font-medium">
                   Загрузка полноформатных американских подкастов...
                 </span>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-                {podcasts.map((video) => (
-                  <VideoCard
-                    key={(video as any).youtube_id || video.id}
-                    video={video}
-                  />
-                ))}
+            ) : filteredPodcasts.length === 0 ? (
+              <div className="py-20 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl text-center flex flex-col items-center justify-center p-8 gap-3 max-w-lg mx-auto">
+                <Video className="w-10 h-10 text-zinc-600" />
+                <h3 className="text-base font-bold text-white">Подкасты не найдены</h3>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  По выбранному уровню ({selectedLevel}) пока нет подкастов.
+                </p>
               </div>
+            ) : (
+              <InfiniteVideoFeed
+                items={visiblePodcasts}
+                hasMore={hasMorePodcasts}
+                isFetchingMore={isFetchingMorePodcasts}
+                onLoadMore={handleLoadMorePodcasts}
+                loadingLabel="Загрузка подкастов..."
+              />
             )}
           </div>
         ) : (
           <>
-            {/* YouTube Подменю: [ Рекомендации ] [ Подписки ] [ Easy German / American English ] */}
+            {/* YouTube Подменю: [ Рекомендации ] [ Подписки ] [ Easy German / Easy English ] */}
             <div className="max-w-7xl mx-auto mb-6">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                   {/* Таб 1: Рекомендации */}
                   <button
-                    onClick={() => setActiveTab("recommendations")}
+                    onClick={() => handleTabChange("recommendations")}
                     className={`px-4 py-2 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
                       activeTab === "recommendations"
                         ? "bg-red-600 text-white shadow-lg shadow-red-950/40"
@@ -761,7 +863,7 @@ export default function YouTubeCatalogPage() {
 
                   {/* Таб 2: Подписки с бейджем количества каналов */}
                   <button
-                    onClick={() => setActiveTab("subscriptions")}
+                    onClick={() => handleTabChange("subscriptions")}
                     className={`px-4 py-2 rounded-full text-xs font-semibold outline-none flex items-center gap-2 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
                       activeTab === "subscriptions"
                         ? "bg-red-600 text-white shadow-lg shadow-red-950/40"
@@ -780,20 +882,20 @@ export default function YouTubeCatalogPage() {
                     </span>
                   </button>
 
-                  {/* Таб 3: Easy German (DE) / American English (EN) */}
+                  {/* Таб 3: Easy German (DE) / Easy English (EN) */}
                   <button
-                    onClick={() => setActiveTab("easy_german")}
+                    onClick={() => handleTabChange("easy_german")}
                     className={`px-4 py-2 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
                       activeTab === "easy_german"
                         ? isEN
-                          ? "bg-[#E50914] text-white shadow-lg shadow-red-950/60"
+                          ? "bg-blue-600 text-white shadow-lg shadow-blue-950/60"
                           : "bg-emerald-600 text-white shadow-lg shadow-emerald-950/60"
                         : isEN
-                        ? "bg-zinc-900/90 text-zinc-400 hover:text-white border border-zinc-800 hover:border-red-500/30"
+                        ? "bg-zinc-900/90 text-zinc-400 hover:text-white border border-zinc-800 hover:border-blue-500/30"
                         : "bg-zinc-900/90 text-zinc-400 hover:text-white border border-zinc-800 hover:border-emerald-500/30"
                     }`}
                   >
-                    {isEN ? "American English" : "Easy German"}
+                    {isEN ? "Easy English" : "Easy German"}
                   </button>
                 </div>
 
