@@ -1,73 +1,162 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { MovieCard, Movie } from './MovieCard';
-import { MovieModal } from './MovieModal';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { MovieCard } from './MovieCard';
+import { MovieModal, CinemaItem } from './MovieModal';
+import { CinemaCategories } from './CinemaCategories';
 import { Film, RotateCw, Search } from 'lucide-react';
 
 export function CinemaCatalog() {
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeQuery, setActiveQuery] = useState('');
+  const [items, setItems] = useState<CinemaItem[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('trending');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [activeQuery, setActiveQuery] = useState<string>('');
+  const [selectedMovie, setSelectedMovie] = useState<CinemaItem | null>(null);
 
-  const fetchMovies = useCallback(async (query: string = '') => {
+  const [page, setPage] = useState<number>(1);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isFetchingMore, setIsFetchingMore] = useState<boolean>(false);
+
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const activeRequestIdRef = useRef<number>(0);
+
+  // Загрузка первой страницы при смене категории или поискового запроса
+  const fetchInitialMovies = useCallback(async (cat: string, query: string) => {
+    const requestId = ++activeRequestIdRef.current;
     setIsLoading(true);
+    setPage(1);
+    setHasMore(true);
+
     try {
-      const url = query.trim()
-        ? `/api/movies?query=${encodeURIComponent(query.trim())}`
-        : '/api/movies';
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        setMovies(data.movies || []);
-      }
+      const q = query.trim();
+      const endpoint = q
+        ? `/api/movies?query=${encodeURIComponent(q)}&page=1`
+        : `/api/movies?category=${cat}&page=1`;
+
+      const res = await fetch(endpoint);
+      if (!res.ok) throw new Error('Ошибка загрузки');
+
+      const data = await res.json();
+      if (requestId !== activeRequestIdRef.current) return;
+
+      const newItems: CinemaItem[] = data.items || [];
+      setItems(newItems);
+      setHasMore(newItems.length > 0 && 1 < (data.totalPages || 1));
     } catch (err) {
-      console.error('Failed to load movies:', err);
+      if (requestId === activeRequestIdRef.current) {
+        console.error('Failed to load initial movies:', err);
+        setHasMore(false);
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === activeRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
+  // Первоначальная загрузка и смена категории/запроса
   useEffect(() => {
-    fetchMovies('');
-  }, [fetchMovies]);
+    fetchInitialMovies(selectedCategory, activeQuery);
+  }, [selectedCategory, activeQuery, fetchInitialMovies]);
 
+  // Подгрузка следующей страницы (Infinite Scroll)
+  const loadMore = useCallback(async () => {
+    if (isLoading || isFetchingMore || !hasMore) return;
+    setIsFetchingMore(true);
+
+    const nextPage = page + 1;
+    try {
+      const q = activeQuery.trim();
+      const endpoint = q
+        ? `/api/movies?query=${encodeURIComponent(q)}&page=${nextPage}`
+        : `/api/movies?category=${selectedCategory}&page=${nextPage}`;
+
+      const res = await fetch(endpoint);
+      if (!res.ok) throw new Error('Ошибка загрузки следующей страницы');
+
+      const data = await res.json();
+      const newItems: CinemaItem[] = data.items || [];
+
+      if (newItems.length > 0) {
+        setItems((prev) => {
+          const existingIds = new Set(prev.map((i) => i.id));
+          const uniqueItems = newItems.filter((i) => !existingIds.has(i.id));
+          return [...prev, ...uniqueItems];
+        });
+        setPage(nextPage);
+        setHasMore(nextPage < (data.totalPages || 1));
+      } else {
+        setHasMore(false);
+      }
+    } catch (err) {
+      console.error('Failed to load more movies:', err);
+      setHasMore(false);
+    } finally {
+      setIsFetchingMore(false);
+    }
+  }, [isLoading, isFetchingMore, hasMore, page, activeQuery, selectedCategory]);
+
+  // Наблюдатель IntersectionObserver для бесконечной ленты
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasMore || isLoading || isFetchingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: '400px' }
+    );
+
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, isLoading, isFetchingMore, loadMore]);
+
+  // Обработчик отправки поиска
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setActiveQuery(searchQuery);
-    fetchMovies(searchQuery);
   };
 
-  const handleRefresh = () => {
+  // Очистка поиска
+  const handleClearSearch = () => {
     setSearchQuery('');
     setActiveQuery('');
-    fetchMovies('');
+  };
+
+  // Смена категории
+  const handleCategorySelect = (catId: string) => {
+    if (catId === selectedCategory && !activeQuery) return;
+    setSearchQuery('');
+    setActiveQuery('');
+    setSelectedCategory(catId);
+  };
+
+  // Принудительное обновление
+  const handleRefresh = () => {
+    fetchInitialMovies(selectedCategory, activeQuery);
   };
 
   return (
     <div className="w-full">
-      {/* Верхняя строка управления: Поиск и обновление */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+      {/* Верхняя строка управления: Поиск и кнопка обновления */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Поиск фильмов на английском (напр. Inception, Dune)..."
+            placeholder="Поиск любых фильмов и сериалов мира на английском..."
             className="w-full pl-9 pr-7 py-2 bg-zinc-900 border border-zinc-800 rounded-full text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 transition-colors"
           />
           <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5 pointer-events-none" />
           {searchQuery && (
             <button
               type="button"
-              onClick={() => {
-                setSearchQuery('');
-                setActiveQuery('');
-                fetchMovies('');
-              }}
-              className="absolute right-3 top-2 text-xs text-zinc-500 hover:text-white"
+              onClick={handleClearSearch}
+              className="absolute right-3 top-2 text-xs text-zinc-500 hover:text-white cursor-pointer"
             >
               ✕
             </button>
@@ -84,10 +173,18 @@ export function CinemaCatalog() {
         </button>
       </div>
 
-      {/* Скелетон во время загрузки */}
+      {/* Полоса категорий Cinema (скрывается во время активного поиска для чистоты) */}
+      {!activeQuery && (
+        <CinemaCategories
+          selected={selectedCategory}
+          onSelect={handleCategorySelect}
+        />
+      )}
+
+      {/* Скелетоны во время первой загрузки */}
       {isLoading && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 py-4">
-          {Array.from({ length: 12 }).map((_, i) => (
+          {Array.from({ length: 18 }).map((_, i) => (
             <div key={i} className="flex flex-col gap-2 animate-pulse">
               <div className="aspect-[2/3] w-full rounded-md bg-zinc-800/60" />
               <div className="w-4/5 h-3 rounded bg-zinc-800/80 mt-1" />
@@ -98,35 +195,42 @@ export function CinemaCatalog() {
       )}
 
       {/* Пустое состояние */}
-      {!isLoading && movies.length === 0 && (
+      {!isLoading && items.length === 0 && (
         <div className="py-24 text-center space-y-3">
           <Film className="w-10 h-10 text-zinc-600 mx-auto" />
-          <h3 className="text-base font-bold text-white">Фильмы не найдены</h3>
-          <p className="text-xs text-zinc-400">
+          <h3 className="text-base font-bold text-white">Ничего не найдено</h3>
+          <p className="text-xs text-zinc-400 max-w-sm mx-auto">
             {activeQuery
-              ? `По запросу "${activeQuery}" ничего не найдено. Попробуйте изменить название.`
-              : 'Каталог временно недоступен. Нажмите ↻ для повторной попытки.'}
+              ? `По запросу "${activeQuery}" ничего не найдено. Попробуйте ввести другое название.`
+              : 'Фильмы временно недоступны. Нажмите ↻ для повторной попытки.'}
           </p>
         </div>
       )}
 
-      {/* Сетка фильмов */}
-      {!isLoading && movies.length > 0 && (
+      {/* Сетка фильмов и сериалов */}
+      {!isLoading && items.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 py-4">
-          {movies.map((movie) => (
+          {items.map((item) => (
             <MovieCard
-              key={movie.id}
-              movie={movie}
-              onSelect={() => setSelectedMovie(movie)}
+              key={`${item.media_type}-${item.id}`}
+              item={item}
+              onSelect={() => setSelectedMovie(item)}
             />
           ))}
         </div>
       )}
 
-      {/* Модальное окно просмотра / выбора плеера */}
+      {/* Доводчик пагинации (Infinite Scroll) */}
+      {hasMore && items.length > 0 && (
+        <div ref={loadMoreRef} className="flex justify-center py-8">
+          <div className="w-5 h-5 border-2 border-zinc-600 border-t-red-600 rounded-full animate-spin" />
+        </div>
+      )}
+
+      {/* Встроенное модальное окно с плеером */}
       {selectedMovie && (
         <MovieModal
-          movie={selectedMovie}
+          item={selectedMovie}
           onClose={() => setSelectedMovie(null)}
         />
       )}

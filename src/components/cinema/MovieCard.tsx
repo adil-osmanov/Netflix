@@ -2,20 +2,10 @@
 
 import React from 'react';
 import { Play } from 'lucide-react';
+import { CinemaItem } from './MovieModal';
 
-export interface Movie {
-  id: number | string;
-  title: string;
-  original_title?: string;
-  overview: string;
-  poster: string | null;
-  backdrop: string | null;
-  year: string;
-  vote_average: string;
-}
-
-export function MovieCard({ movie, onSelect }: { movie: Movie; onSelect: () => void }) {
-  if (!movie.poster) return null;
+export function MovieCard({ item, onSelect }: { item: CinemaItem; onSelect: () => void }) {
+  if (!item.poster) return null;
 
   return (
     <div
@@ -32,19 +22,19 @@ export function MovieCard({ movie, onSelect }: { movie: Movie; onSelect: () => v
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-md bg-zinc-900 border border-zinc-800/50 shadow-md">
         <img
-          src={movie.poster}
-          alt={movie.title}
+          src={item.poster}
+          alt={item.title}
           loading="lazy"
           className="h-full w-full object-cover transition-opacity duration-300 group-hover:opacity-90"
         />
 
-        {/* Бейдж качества / года */}
+        {/* Бейдж качества / года / типа медиа */}
         <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 select-none pointer-events-none">
           <span className="bg-black/80 backdrop-blur-sm text-zinc-200 border border-zinc-700/60 font-black px-1.5 py-0.5 rounded text-[10px]">
-            {movie.year || '2024'}
+            {item.year || '2024'}
           </span>
-          <span className="bg-blue-600/90 text-white font-extrabold px-1.5 py-0.5 rounded text-[10px]">
-            EN
+          <span className={`${item.media_type === 'tv' ? 'bg-purple-600/90' : 'bg-blue-600/90'} text-white font-extrabold px-1.5 py-0.5 rounded text-[10px]`}>
+            {item.media_type === 'tv' ? 'TV' : 'EN'}
           </span>
         </div>
 
@@ -57,9 +47,11 @@ export function MovieCard({ movie, onSelect }: { movie: Movie; onSelect: () => v
       </div>
 
       <h3 className="mt-2 text-xs font-semibold text-zinc-200 line-clamp-1 group-hover:text-white transition-colors">
-        {movie.title}
+        {item.title}
       </h3>
-      <p className="text-[11px] text-zinc-500">{movie.vote_average} ★ • English</p>
+      <p className="text-[11px] text-zinc-500">
+        {item.vote_average} ★ • {item.media_type === 'tv' ? 'Series' : 'English'}
+      </p>
     </div>
   );
 }
