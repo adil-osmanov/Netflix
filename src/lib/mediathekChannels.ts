@@ -109,6 +109,108 @@ export function getLevelBadgeColor(level?: string): string {
 }
 
 /**
+ * Сопоставление ID кнопок интерфейса с реальными именами вещателей в MediathekViewWeb
+ */
+export const SENDER_API_MAP: Record<string, string> = {
+  ARD: 'ARD',
+  ZDF: 'ZDF',
+  ARTE: 'ARTE.DE',       // В MediathekView немецкий Arte всегда ARTE.DE
+  '3SAT': '3Sat',
+  ZDF_NEO: 'ZDFneo',    // В API MediathekViewWeb
+  BR: 'BR',
+  SWR: 'SWR',
+  WDR: 'WDR',
+  NDR: 'NDR',
+  MDR: 'MDR',
+  HR: 'HR',
+  RBB: 'RBB',
+  SR: 'SR',
+  PHOENIX: 'PHOENIX',    // Строго капсом
+  ONE: 'ONE',
+  DW: 'DW',
+  ORF: 'ORF',
+  SRF: 'SRF',
+  KIKA: 'KiKa',
+  TAGESSCHAU24: 'Tagesschau24',
+  RADIO_BREMEN: 'Radio Bremen',
+  ZDF_INFO: 'ZDFinfo',
+};
+
+/**
+ * Реальный алгоритм классификации уровней языка (A1–C1)
+ */
+export function determineGermanLevel(video: {
+  title: string;
+  topic?: string;
+  description?: string;
+  sender?: string;
+  channel?: string;
+  duration?: number;
+}): 'A1' | 'A2' | 'B1' | 'B2' | 'C1' {
+  const text = `${video.title || ''} ${video.topic || ''} ${video.description || ''}`.toLowerCase();
+  const sender = (video.sender || video.channel || '').toUpperCase();
+
+  // A1: Простейший детский контент, медленная речь с артикуляцией, передачи на упрощенном немецком
+  if (
+    text.includes('einfache sprache') ||
+    text.includes('sesamstraße') ||
+    text.includes('sandmännchen') ||
+    text.includes('die sendung mit der maus') ||
+    text.includes('elefant') ||
+    text.includes('kika') ||
+    text.includes('deutsch lernen a1') ||
+    sender.includes('KIKA')
+  ) {
+    return 'A1';
+  }
+
+  // A2: Познавательные передачи для детей и подростков, визуальные шоу, четкая артикуляция
+  if (
+    text.includes('checker') || // Checker Tobi, Checker Can, Checker Julian
+    text.includes('löwenzahn') ||
+    text.includes('logo!') || // Детские новости с простыми терминами
+    text.includes('wissen macht ah') ||
+    text.includes('pur+') ||
+    text.includes('anna und die wilden tiere') ||
+    text.includes('neuneinhalb')
+  ) {
+    return 'A2';
+  }
+
+  // B1: Репортажи о ремеслах, природе, путешествиях и простые новости
+  if (
+    text.includes('handwerkskunst') ||
+    text.includes('wdr reisen') ||
+    text.includes('kurzgesagt') ||
+    text.includes('terra xpress') ||
+    text.includes('tagesschau') ||
+    text.includes('mittagsmagazin') ||
+    text.includes('servicezeit') ||
+    text.includes('markt')
+  ) {
+    return 'B1';
+  }
+
+  // B2: Научно-популярные фильмы, аналитические документалки, история
+  if (
+    text.includes('terra x') ||
+    text.includes('zdfinfo') ||
+    text.includes('planb') ||
+    text.includes('auslandsjournal') ||
+    text.includes('odysso') ||
+    text.includes('lesch') ||
+    text.includes('nano') ||
+    sender.includes('ARTE')
+  ) {
+    return 'B2';
+  }
+
+  // C1: Художественные фильмы, криминальные драмы, ток-шоу, дебаты носителей на полной скорости
+  // Spielfilm, Tatort, Maybrit Illner, Markus Lanz, Hart aber fair
+  return 'C1';
+}
+
+/**
  * Строгая проверка и фильтрация видео без реальных обложек
  */
 export function filterValidMediathekVideos<T extends {
@@ -138,3 +240,4 @@ export function filterValidMediathekVideos<T extends {
     );
   });
 }
+

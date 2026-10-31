@@ -725,7 +725,12 @@ export default function YouTubeCatalogPage() {
 
   // Base videos for YouTube subtabs
   const baseVideos = activeTab === "recommendations" ? recommendations : subVideos;
-  const minDurSec = isEN ? 180 : activeTab === "subscriptions" ? 200 : 600;
+  const minDurSec =
+    isEN || selectedLevel === "A1" || selectedLevel === "A2"
+      ? 180
+      : activeTab === "subscriptions"
+      ? 200
+      : 600;
 
   const isFilterActive =
     Boolean(selectedLevel) &&

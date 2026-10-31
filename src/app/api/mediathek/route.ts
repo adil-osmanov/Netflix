@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ALL_CHANNELS, normalizeSender } from '@/lib/mediathekChannels';
+import { ALL_CHANNELS, normalizeSender, SENDER_API_MAP, determineGermanLevel } from '@/lib/mediathekChannels';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -13,39 +13,9 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   knowledge: ['Wissen', 'Handwerk', 'Galileo', "c't", 'Terra X', 'Markt'],
 };
 
-// Расширенный пул тем для глубокого скролла (когда высокий offset исчерпывает основные запросы)
-const CATEGORY_EXPANSION_KEYWORDS: Record<string, string[]> = {
-  all: [
-    'Arte', 'ZDFinfo', 'Kultur', 'Abenteuer', 'Gesellschaft', 'Krimi',
-    'Natur', 'Technik', 'Geschichte', 'Komödie', 'Wissenschaft', 'Erde',
-  ],
-  films: [
-    'Krimi', 'Komödie', 'Tatort', 'Polizeiruf', 'Liebesfilm',
-    'Abenteuer', 'Romanze', 'Spielfilm', 'Fernsehfilm', 'Kino',
-  ],
-  docs: [
-    'Terra X', 'Wissenschaft', 'Gesellschaft', 'Kultur', 'Erde',
-    'Kosmos', 'Biografie', 'Archäologie', 'Technik', 'Abenteuer', 'Arte',
-  ],
-  series: [
-    'Staffel 1', 'Episode 1', 'Teil 1', 'Folge 1', 'S01', 'Serie',
-  ],
-  knowledge: [
-    'Quarks', 'Planet Wissen', 'Nano', 'Forschung', 'Gesundheit',
-    'Psychologie', 'Ratgeber', 'Technik', 'Zukunft', 'Experiment',
-  ],
-};
-
-// Специфические ключевые слова под начальные уровни A1 и A2 для поиска в медиатеке
-const LEVEL_KEYWORDS_EXTRA: Record<string, string[]> = {
-  A1: ['Die Sendung mit der Maus', 'Maus', 'Elefant', 'Kinder'],
-  A2: ['logo!', 'Nachrichten für Kinder', 'Tiere', 'Märchen', 'Wissen'],
-  C1: ['Arte Kino', 'Philosophie', 'Debatte', 'Kulturzeit', 'Aspekte'],
-};
-
-// Черный список: новости, ток-шоу, тифлокомментарии, оригинальные иноязычные дорожки, мыльные оперы
+// Черный список: технические передачи, трейлеры, тифлокомментарии
 const TRASH_REGEX =
-  /(tagesschau|heute-journal|heute journal|nachrichten|wetter|presseclub|talkshow|maischberger|markus lanz|hart aber fair|illner|kölner treff|riverboat|landesschau|abendschau|gottesdienst|audiodeskription|hörfassung|gebärdensprache|originalversion|rote rosen|sturm der liebe|in aller freundschaft|berlin direkt|morgenmagazin|mittagsmagazin|zeitzeugen|trailer|vorschau)/i;
+  /(wetter|gottesdienst|audiodeskription|hörfassung|gebärdensprache|originalversion|rote rosen|sturm der liebe|in aller freundschaft|trailer|vorschau)/i;
 
 const ogImageCache = new Map<string, string>();
 
@@ -56,79 +26,6 @@ function shuffleArray<T>(array: T[]): T[] {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
-}
-
-// Стильный брендовый постер-заглушка (SVG Data-URI) с градиентом и логотипом канала
-export function getFallbackPoster(channel: string, topic: string): string {
-  const ch = channel || 'ARD / ZDF';
-  const bg = ch.toUpperCase().includes('ZDF')
-    ? '#e05a10'
-    : ch.toUpperCase().includes('ARTE')
-    ? '#c82828'
-    : '#003366';
-
-  const safeChannel = ch.replace(/[<>&"']/g, '');
-  const safeTopic = (topic || 'Mediathek').slice(0, 35).replace(/[<>&"']/g, '');
-
-  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" fill="%2318181b"/><rect width="640" height="360" fill="${encodeURIComponent(
-    bg
-  )}" opacity="0.35"/><text x="40" y="80" fill="%23ffffff" font-family="sans-serif" font-weight="900" font-size="28">${encodeURIComponent(
-    safeChannel
-  )}</text><text x="40" y="140" fill="%23e4e4e7" font-family="sans-serif" font-weight="bold" font-size="22">${encodeURIComponent(
-    safeTopic
-  )}</text></svg>`;
-}
-
-// Определение уровня программы по шкале CEFR (A1–C1)
-export function detectMediathekLevel(
-  channel: string,
-  topic: string,
-  title: string,
-  durationSec: number = 0
-): 'A1' | 'A2' | 'B1' | 'B2' | 'C1' {
-  const combined = `${channel} ${topic} ${title}`.toLowerCase();
-
-  // A1: Sendung mit der Maus, базовые детские передачи, медленный простой язык
-  if (
-    /\b(a1|maus|elefant|anfänger|slow german|erste schritte|grundstufe)\b/i.test(
-      combined
-    )
-  ) {
-    return 'A1';
-  }
-
-  // A2: Logo! (ZDF), легкий язык, короткие простые сюжеты, животные, сказки
-  if (
-    /\b(a2|logo!|leichte sprache|einfach|alltag|dialog|tiere|märchen|kinder)\b/i.test(
-      combined
-    )
-  ) {
-    return 'A2';
-  }
-
-  // C1: Arte, полнометражные фильмы, глубокие дискуссии, философия, наука, кино
-  if (
-    channel.toLowerCase().includes('arte') ||
-    /\b(c1|c2|arte|kino|spielfilm|philosophie|debatte|politik|wissenschaft|literatur|theater|analyse|aspekte|krimi)\b/i.test(
-      combined
-    ) ||
-    durationSec >= 3600
-  ) {
-    return 'C1';
-  }
-
-  // B2: аналитика, социальные темы, расследования, Terra X, ZDFinfo
-  if (
-    /\b(b2|terra x|zdfinfo|investigativ|geschichte|psychologie|zukunft|reportage|doku)\b/i.test(
-      combined
-    ) ||
-    durationSec >= 2400
-  ) {
-    return 'B2';
-  }
-
-  // B1: повседневные репортажи (WDR, SWR Handwerkskunst, путешествия, ремесло, быт, рынок)
-  return 'B1';
 }
 
 // ЖЕЛЕЗНОЕ ПРАВИЛО ДЛЯ СЕРИАЛОВ: только 1 сезон 1 серия (пилот) или основная страница сериала
@@ -146,7 +43,7 @@ function isValidSeriesPilot(title: string, topic: string): boolean {
   return true;
 }
 
-// Быстрый парсер og:image (таймаут строго 800 мс)
+// Быстрый парсер og:image (таймаут 1500 мс)
 async function fetchPosterFast(url: string): Promise<string | null> {
   if (!url || !url.startsWith('http')) return null;
   if (ogImageCache.has(url)) {
@@ -207,19 +104,13 @@ async function fetchPosterFast(url: string): Promise<string | null> {
   }
 }
 
-async function queryMediathekKeyword(
-  keyword: string,
+// Прямой запрос к MediathekViewWeb API
+async function queryMediathekRaw(
+  queries: Array<{ fields: string[]; query: string }>,
   offset: number,
-  size: number,
-  fields: string[] = ['topic', 'title'],
-  channelQuery?: string
+  size: number
 ): Promise<any[]> {
   try {
-    const queries: any[] = [{ fields, query: keyword }];
-    if (channelQuery && channelQuery !== 'all' && channelQuery !== 'ALL') {
-      queries.push({ fields: ['channel'], query: channelQuery });
-    }
-
     const response = await fetch('https://mediathekviewweb.de/api/query', {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
@@ -248,15 +139,15 @@ function filterAndDeduplicateCandidates(
   excludeSet: Set<string>,
   selectedChannel?: string
 ): any[] {
-  // Для A1/A2 допускаем передачи от 10 мин (600с), для остальных — стандартные пороги
+  // Для начальных уровней допускаем передачи от 3 минут (180с)
   const minDurationSec =
     level === 'A1' || level === 'A2'
-      ? 600
+      ? 180
       : category === 'films'
-      ? 2700
+      ? 2400
       : category === 'docs'
-      ? 1200
-      : 900;
+      ? 900
+      : 300;
 
   const targetChannelNorm =
     selectedChannel && selectedChannel !== 'all' && selectedChannel !== 'ALL'
@@ -273,7 +164,7 @@ function filterAndDeduplicateCandidates(
       return false;
     }
 
-    // Фильтр по выбранному телеканалу
+    // Фильтр по выбранному телеканалу (сверка по ID)
     if (targetChannelNorm) {
       const itemNorm = normalizeSender(item.channel || '').toUpperCase();
       if (itemNorm !== targetChannelNorm) {
@@ -281,14 +172,11 @@ function filterAndDeduplicateCandidates(
       }
     }
 
-    const hasSubtitles = Boolean(
-      (item.url_subtitles && item.url_subtitles.length > 5) ||
-        (item.url_subtitle && item.url_subtitle.length > 5)
-    );
-    if (!hasSubtitles) return false;
-
     const fullText = `${item.topic || ''} ${item.title || ''}`;
-    if (TRASH_REGEX.test(fullText)) return false;
+    // Отсекаем мусорные передачи, но сохраняем новости на простом немецком (einfache sprache)
+    if (TRASH_REGEX.test(fullText) && !fullText.toLowerCase().includes('einfache sprache')) {
+      return false;
+    }
 
     const looksLikeEpisode =
       category === 'series' ||
@@ -298,13 +186,22 @@ function filterAndDeduplicateCandidates(
       return false;
     }
 
-    const itemLevel = detectMediathekLevel(
-      item.channel || 'ARD / ZDF',
-      item.topic || '',
-      item.title || '',
-      item.duration || 0
-    );
-    if (level !== 'ALL' && itemLevel !== level) return false;
+    // Точная детерминированная классификация уровня языка CEFR
+    const itemLevel = determineGermanLevel({
+      title: item.title || '',
+      topic: item.topic || '',
+      description: item.description || '',
+      sender: item.channel || '',
+      channel: item.channel || '',
+      duration: item.duration || 0,
+    });
+
+    if (level !== 'ALL' && itemLevel !== level) {
+      return false;
+    }
+
+    // Сохраняем вычисленный уровень
+    item._computedLevel = itemLevel;
 
     return true;
   });
@@ -359,47 +256,96 @@ export async function POST(req: Request) {
     const excludeSet = new Set<string>(Array.isArray(excludeIds) ? excludeIds : []);
     let rawResults: any[] = [];
 
-    // Находим конфигурацию выбранного канала для точного запроса в MediathekViewWeb
-    const channelConfig =
+    // Точный вещатель для API MediathekViewWeb
+    const mappedSender =
       channel && channel !== 'all' && channel !== 'ALL'
-        ? ALL_CHANNELS.find((c) => c.id.toUpperCase() === channel.toUpperCase())
-        : undefined;
-    const channelQueryTerm = channelConfig ? channelConfig.aliases[0] : undefined;
+        ? SENDER_API_MAP[channel] || channel
+        : null;
 
-    // 1. Получение данных из MediathekViewWeb с честным растущим оффсетом
+    // 1. Формирование запросов к API MediathekViewWeb
     if (query && query.trim()) {
-      rawResults = await queryMediathekKeyword(
-        query.trim(),
-        cleanOffset,
-        70,
-        ['title', 'topic'],
-        channelQueryTerm
-      );
-    } else {
-      let keywords = CATEGORY_KEYWORDS[category] || CATEGORY_KEYWORDS.all;
-      // Если выбран специфический уровень A1 или A2, добавляем ключевые слова для детского/легкого немецкого
-      if (LEVEL_KEYWORDS_EXTRA[level]) {
-        keywords = [...keywords, ...LEVEL_KEYWORDS_EXTRA[level]];
+      // Пользовательский поиск
+      const queries: any[] = [{ fields: ['title', 'topic'], query: query.trim() }];
+      if (mappedSender) {
+        queries.push({ fields: ['channel', 'sender'], query: mappedSender });
       }
+      rawResults = await queryMediathekRaw(queries, cleanOffset, 70);
+    } else if (level === 'A1' || level === 'A2') {
+      // Для уровней A1 и A2 запрашиваем детский и адаптивный контент
+      const aLevelKeywords =
+        level === 'A1'
+          ? ['Maus', 'Elefant', 'Sesamstraße', 'Sandmännchen', 'Einfache Sprache', 'Deutsch lernen']
+          : ['Checker', 'Löwenzahn', 'logo!', 'Wissen macht Ah', 'pur+', 'Anna und die wilden Tiere'];
 
+      const batchLists = await Promise.all(
+        aLevelKeywords.map((kw) => {
+          const queries: any[] = [{ fields: ['title', 'topic'], query: kw }];
+          if (mappedSender) {
+            queries.push({ fields: ['channel', 'sender'], query: mappedSender });
+          }
+          return queryMediathekRaw(queries, Math.floor(cleanOffset / 2), 25);
+        })
+      );
+      rawResults = batchLists.flat();
+    } else if (mappedSender) {
+      // Выбран конкретный канал (ARTE, Phoenix, ONE, DW, ZDFneo и т.д.)
+      if (category && category !== 'all' && CATEGORY_KEYWORDS[category]) {
+        // Канал + выбранная подкатегория
+        const catKw = CATEGORY_KEYWORDS[category].slice(0, 4);
+        const batchLists = await Promise.all(
+          catKw.map((kw) =>
+            queryMediathekRaw(
+              [
+                { fields: ['channel', 'sender'], query: mappedSender },
+                { fields: ['title', 'topic'], query: kw },
+              ],
+              Math.floor(cleanOffset / 2),
+              25
+            )
+          )
+        );
+        rawResults = batchLists.flat();
+      } else {
+        // Запрос передач конкретного канала напрямую (без лишних ограничивающих слов)
+        rawResults = await queryMediathekRaw(
+          [{ fields: ['channel', 'sender'], query: mappedSender }],
+          cleanOffset,
+          60
+        );
+      }
+    } else {
+      // Общий каталог всех каналов
+      const keywords = CATEGORY_KEYWORDS[category] || CATEGORY_KEYWORDS.all;
       const perKeywordOffset = Math.floor(cleanOffset / 2);
-      const perKeywordSize = category === 'series' ? 40 : 28;
+      const perKeywordSize = category === 'series' ? 35 : 25;
 
       const batchLists = await Promise.all(
         keywords.map((kw) =>
-          queryMediathekKeyword(
-            kw,
+          queryMediathekRaw(
+            [{ fields: ['title', 'topic'], query: kw }],
             perKeywordOffset,
-            perKeywordSize,
-            ['topic', 'title'],
-            channelQueryTerm
+            perKeywordSize
           )
         )
       );
       rawResults = batchLists.flat();
     }
 
-    let candidates = filterAndDeduplicateCandidates(
+    if (rawResults.length === 0) {
+      return NextResponse.json(
+        { items: [], hasMore: false },
+        {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
+          },
+        }
+      );
+    }
+
+    // 2. Фильтрация и дедупликация кандидатов
+    const candidates = filterAndDeduplicateCandidates(
       rawResults,
       category,
       level,
@@ -407,43 +353,17 @@ export async function POST(req: Request) {
       channel
     );
 
-    // 2. Если на высоком оффсете кандидатов мало — плавно расширяем тему запроса!
-    if (!query?.trim() && candidates.length < size) {
-      let expansionPool =
-        CATEGORY_EXPANSION_KEYWORDS[category] || CATEGORY_EXPANSION_KEYWORDS.all;
-      if (LEVEL_KEYWORDS_EXTRA[level]) {
-        expansionPool = [...expansionPool, ...LEVEL_KEYWORDS_EXTRA[level]];
-      }
-
-      const step = Math.floor(cleanOffset / 24);
-      const pickedExpansion = [
-        expansionPool[step % expansionPool.length],
-        expansionPool[(step + 1) % expansionPool.length],
-        expansionPool[(step + 2) % expansionPool.length],
-        expansionPool[(step + 3) % expansionPool.length],
-      ];
-      const expOffset = (step * 15) % 120;
-
-      const expLists = await Promise.all(
-        pickedExpansion.map((kw) =>
-          queryMediathekKeyword(
-            kw,
-            expOffset,
-            35,
-            ['topic', 'title'],
-            channelQueryTerm
-          )
-        )
+    if (candidates.length === 0) {
+      return NextResponse.json(
+        { items: [], hasMore: false },
+        {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
+          },
+        }
       );
-      const combinedRaw = [...rawResults, ...expLists.flat()];
-      candidates = filterAndDeduplicateCandidates(
-        combinedRaw,
-        category,
-        level,
-        excludeSet,
-        channel
-      );
-      rawResults = combinedRaw;
     }
 
     const shuffledCandidates = shuffleArray(candidates);
@@ -460,12 +380,16 @@ export async function POST(req: Request) {
             return null;
           }
 
-          const itemLevel = detectMediathekLevel(
-            item.channel || 'ARD / ZDF',
-            item.topic || '',
-            item.title || '',
-            item.duration || 0
-          );
+          const itemLevel =
+            item._computedLevel ||
+            determineGermanLevel({
+              title: item.title || '',
+              topic: item.topic || '',
+              description: item.description || '',
+              sender: item.channel || '',
+              channel: item.channel || '',
+              duration: item.duration || 0,
+            });
 
           let displayTitle = item.title || '';
           if (
@@ -480,7 +404,7 @@ export async function POST(req: Request) {
             id: item.id || `${item.timestamp}-${(item.title || '').slice(0, 15)}`,
             title: displayTitle,
             topic: item.topic || '',
-            channel: item.channel || 'ARD / ZDF',
+            channel: item.channel || 'ARD',
             duration: Math.round(item.duration / 60),
             url_website: item.url_website,
             posterUrl: realPoster,
@@ -499,11 +423,12 @@ export async function POST(req: Request) {
     }
 
     const finalItems = shuffleArray(enriched);
+    const hasMore = rawResults.length > 0 && finalItems.length > 0;
 
     return NextResponse.json(
       {
         items: finalItems,
-        hasMore: rawResults.length > 0 || finalItems.length > 0,
+        hasMore,
       },
       {
         headers: {

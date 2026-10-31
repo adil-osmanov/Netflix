@@ -36,42 +36,37 @@ const SEARCH_CLUSTERS = [
 // Кластеры тем, прицельно подобранные под шкалу CEFR (A1–C1)
 const LEVEL_SEARCH_CLUSTERS: Record<"A1" | "A2" | "B1" | "B2" | "C1", string[]> = {
   A1: [
-    "Die Sendung mit der Maus Sachgeschichten",
-    "ZDF logo! Kindernachrichten",
-    "Slow German Deutsch lernen A1",
-    "Nicos Weg A1 Deutsche Welle",
-    "Deutsch lernen für Anfänger A1",
+    "Nicos Weg A1",
+    "Deutsch sprechen lernen A1",
+    "Hallo Deutschschule A1",
+    "Easy German Super Easy A1",
+    "Slow German for Beginners",
   ],
   A2: [
-    "Easy German Alltag Deutsch A2",
-    "Deutsch lernen Dialoge A2",
-    "Logo! Nachrichten für Kinder ZDF",
-    "Slow German mit Annik",
-    "Nicos Weg A2 Deutsche Welle",
+    "Nicos Weg A2",
+    "Checker Tobi Wissen",
+    "Mein Weg nach Deutschland A2",
+    "Deutsch lernen mit Geschichten A2",
   ],
   B1: [
+    "Dinge Erklärt Kurzgesagt",
     "SWR Handwerkskunst",
-    "WDR Doku Leben Alltag",
-    "Easy German Straßenumfrage",
-    "NDR Doku Reportage Reise",
-    "Galileo Experimente Wissen",
-    "Quarks Alltag Wissen",
+    "Tagesschau in einfacher Sprache",
+    "MrWissen2go Geschichte",
   ],
   B2: [
-    "MrWissen2go Geschichte Analyse",
-    "Simplicissimus Video Essay",
-    "Terra X ZDF Dokumentation",
-    "ZDFinfo Kriminalität Ermittler",
-    "STRG_F Reportage Recherche",
-    "Y-Kollektiv Reportage",
+    "Terra X Lesch & Co",
+    "Simplicissimus",
+    "WDR Doku",
+    "STRG_F",
+    "ZDF Magazin Royale",
   ],
   C1: [
-    "Arte Dokumentarfilm Kino",
-    "c’t uplink Technik Analyse",
-    "ZDF Aspekte Kultur Debatte",
-    "Spiegel TV Dokumentation",
-    "Deutschland Gesellschaft Politik Doku",
-    "Sternstunde Philosophie SRF Arte",
+    "Terra X Lesch & Co",
+    "Simplicissimus",
+    "WDR Doku",
+    "STRG_F",
+    "ZDF Magazin Royale",
   ],
 };
 
@@ -84,18 +79,26 @@ export function detectVideoLevel(
 ): "A1" | "A2" | "B1" | "B2" | "C1" {
   const combined = `${channelName} ${title} ${cluster}`.toLowerCase();
 
-  // A1: основы, детский немецкий, медленный темп, алфавит, базовые слова
+  // Документалки, расследования, криминал и взрослые темы НИКОГДА не могут быть уровнем A1
+  const isAdultDoc =
+    /\b(doku|dokumentation|reportage|krimi|mord|investigativ|politik|wirtschaft|analyse|terra x|simplicissimus|strg_f|spiegel tv|y-kollektiv|lesch|zdf magazin|pulse)\b/i.test(
+      combined
+    );
+
+  // A1: основы, детский немецкий, медленный темп, Nicos Weg, Hallo Deutschschule, Super Easy German
   if (
-    /\b(a1|anfänger|grundstufe|basics|slow german|kinder|maus|logo!|sendung mit der maus|deutsch lernen a1|lerne deutsch|erste schritte)\b/i.test(
+    !isAdultDoc &&
+    /\b(nicos weg|deutsch sprechen|deutsch lernen a1|hallo deutschschule|easy german super easy|super easy german|slow german for beginners|slow german|sesamstraße|sandmännchen|die sendung mit der maus|\ba1\b)\b/i.test(
       combined
     )
   ) {
     return "A1";
   }
 
-  // A2: бытовой немецкий, простые диалоги, легкие опросы
+  // A2: бытовой немецкий, Checker Tobi, простые диалоги, легкие опросы
   if (
-    /\b(a2|alltag|einfach|leichte sprache|dialog|kurzgeschichte|deutsch a2|easy german a2)\b/i.test(
+    !isAdultDoc &&
+    /\b(nicos weg a2|checker tobi|checker|mein weg nach deutschland|mit geschichten a2|löwenzahn|logo!|alltag|einfach|leichte sprache|dialog|\ba2\b)\b/i.test(
       combined
     )
   ) {
@@ -115,23 +118,23 @@ export function detectVideoLevel(
 
   // B2: аналитика, социальные темы, расследования
   if (
-    /\b(b2|mrwissen2go|simplicissimus|terra x|zdfinfo|investigativ|puls|strg_f|y-kollektiv|wirtschaft|geschichte)\b/i.test(
+    /\b(b2|mrwissen2go|simplicissimus|terra x|zdfinfo|investigativ|puls|strg_f|y-kollektiv|wirtschaft|geschichte|zdf magazin royale)\b/i.test(
       combined
     )
   ) {
     return "B2";
   }
 
-  // B1: повседневные репортажи (WDR, SWR Handwerkskunst, ремесло, путешествия, быт)
+  // B1: повседневные репортажи (WDR, SWR Handwerkskunst, ремесло, путешествия, быт, Kurzgesagt, Tagesschau in einfacher Sprache)
   if (
-    /\b(b1|handwerk|swr|wdr|ndr|hr|br|mdr|reise|markt|kultur|leben)\b/i.test(
+    /\b(b1|handwerk|kurzgesagt|tagesschau in einfacher sprache|swr|wdr|ndr|hr|br|mdr|reise|markt|kultur|leben)\b/i.test(
       combined
     )
   ) {
     return "B1";
   }
 
-  // Fallback: если видео очень длинное — B2, иначе B1
+  // Fallback: если видео длинное — B2, иначе B1
   const parts = durationText.split(":").map(Number);
   if (parts.length === 3 || (parts.length === 2 && parts[0] >= 30)) {
     return "B2";
@@ -456,22 +459,32 @@ async function handleRecommendationsRequest(
   excludeSet: Set<string>,
   levelFilter: string = "ALL"
 ) {
-  const pool = await getRecommendationsPool();
+  const isLevelActive =
+    levelFilter &&
+    levelFilter !== "ALL" &&
+    levelFilter !== "Все" &&
+    levelFilter !== "all";
 
-  // 1. Фильтруем уже показанные ролики и уровень CEFR (A1, A2, B1, B2, C1)
-  let available = pool.filter((v) => {
-    const vid = (v as any).youtube_id || v.id;
-    if (excludeSet.has(vid)) return false;
-    if (isBlockedVideo(v)) return false;
-    if (!isValidDuration(v.durationText)) return false;
-    if (levelFilter !== "ALL" && v.level !== levelFilter) return false;
-    return true;
-  });
+  let available: YouTubeRecommendedVideo[] = [];
 
-  // 2. Если роликов мало или page > 1 — динамически подгружаем кластеры
-  if (page > 1 || available.length < limit) {
+  // 1. Для уровней B1, B2, C1 или ALL берем кэшированный пул каналов,
+  // а для A1 и A2 не подмешиваем взрослые каналы из CORE_CHANNELS
+  if (levelFilter !== "A1" && levelFilter !== "A2") {
+    const pool = await getRecommendationsPool();
+    available = pool.filter((v) => {
+      const vid = (v as any).youtube_id || v.id;
+      if (excludeSet.has(vid)) return false;
+      if (isBlockedVideo(v)) return false;
+      if (!isValidDuration(v.durationText)) return false;
+      if (isLevelActive && v.level !== levelFilter) return false;
+      return true;
+    });
+  }
+
+  // 2. Если роликов мало, page > 1 или выбран A1/A2 — динамически подгружаем кластеры
+  if (page > 1 || available.length < limit || levelFilter === "A1" || levelFilter === "A2") {
     const clusterPool =
-      levelFilter !== "ALL" && LEVEL_SEARCH_CLUSTERS[levelFilter as keyof typeof LEVEL_SEARCH_CLUSTERS]
+      isLevelActive && LEVEL_SEARCH_CLUSTERS[levelFilter as keyof typeof LEVEL_SEARCH_CLUSTERS]
         ? LEVEL_SEARCH_CLUSTERS[levelFilter as keyof typeof LEVEL_SEARCH_CLUSTERS]
         : SEARCH_CLUSTERS;
 
@@ -495,7 +508,15 @@ async function handleRecommendationsRequest(
           cachedAllFeedVideos.push(v);
         }
         if (!excludeSet.has(v.id)) {
-          if (levelFilter === "ALL" || v.level === levelFilter) {
+          if (levelFilter === "A1") {
+            if (v.level === "A1") {
+              available.push(v);
+            }
+          } else if (levelFilter === "A2") {
+            if (v.level === "A2") {
+              available.push(v);
+            }
+          } else if (levelFilter === "ALL" || v.level === levelFilter) {
             available.push(v);
           }
         }

@@ -151,7 +151,12 @@ export default function MediathekCatalog() {
           handleAppend(validItems);
         }
 
-        setHasMore(Boolean(data.hasMore));
+        // Если вернулся пустой массив или hasMore=false, сразу прекращаем пагинацию
+        if (!data.items || data.items.length === 0 || !data.hasMore) {
+          setHasMore(false);
+        } else {
+          setHasMore(Boolean(data.hasMore));
+        }
       } catch (err: any) {
         if (requestId === activeRequestIdRef.current) {
           console.error("Error loading Mediathek items:", err);
@@ -395,15 +400,17 @@ export default function MediathekCatalog() {
         </div>
       )}
 
-      {/* Intersection Sentinel */}
-      <div ref={sentinelRef} className="h-24 flex items-center justify-center my-4">
-        {isFetchingMore && (
-          <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-zinc-900/90 border border-zinc-800 shadow-lg text-zinc-300 text-xs sm:text-sm font-medium">
-            <Loader2 className="w-4 h-4 animate-spin text-[#E50914]" />
-            <span>Загрузка следующих передач...</span>
-          </div>
-        )}
-      </div>
+      {/* Intersection Sentinel (показывается только если есть еще страницы для загрузки) */}
+      {hasMore && displayedVideos.length > 0 && (
+        <div ref={sentinelRef} className="h-24 flex items-center justify-center my-4">
+          {isFetchingMore && (
+            <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-zinc-900/90 border border-zinc-800 shadow-lg text-zinc-300 text-xs sm:text-sm font-medium">
+              <Loader2 className="w-4 h-4 animate-spin text-[#E50914]" />
+              <span>Загрузка следующих передач...</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
