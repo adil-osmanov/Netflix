@@ -9,6 +9,8 @@ import { Film, RotateCw, Search } from 'lucide-react';
 export function CinemaCatalog() {
   const [items, setItems] = useState<CinemaItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('trending');
+  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [minRating, setMinRating] = useState<string>('6.0');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeQuery, setActiveQuery] = useState<string>('');
   const [selectedMovie, setSelectedMovie] = useState<CinemaItem | null>(null);
@@ -21,44 +23,47 @@ export function CinemaCatalog() {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const activeRequestIdRef = useRef<number>(0);
 
-  // Загрузка первой страницы при смене категории или поискового запроса
-  const fetchInitialMovies = useCallback(async (cat: string, query: string) => {
-    const requestId = ++activeRequestIdRef.current;
-    setIsLoading(true);
-    setPage(1);
-    setHasMore(true);
+  // Загрузка первой страницы при смене категории, года, рейтинга или поискового запроса
+  const fetchInitialMovies = useCallback(
+    async (cat: string, query: string, yr: string, rating: string) => {
+      const requestId = ++activeRequestIdRef.current;
+      setIsLoading(true);
+      setPage(1);
+      setHasMore(true);
 
-    try {
-      const q = query.trim();
-      const endpoint = q
-        ? `/api/movies?query=${encodeURIComponent(q)}&page=1`
-        : `/api/movies?category=${cat}&page=1`;
+      try {
+        const q = query.trim();
+        const endpoint = q
+          ? `/api/movies?query=${encodeURIComponent(q)}&page=1`
+          : `/api/movies?category=${cat}&year=${yr}&minRating=${rating}&page=1`;
 
-      const res = await fetch(endpoint);
-      if (!res.ok) throw new Error('Ошибка загрузки');
+        const res = await fetch(endpoint);
+        if (!res.ok) throw new Error('Ошибка загрузки');
 
-      const data = await res.json();
-      if (requestId !== activeRequestIdRef.current) return;
+        const data = await res.json();
+        if (requestId !== activeRequestIdRef.current) return;
 
-      const newItems: CinemaItem[] = data.items || [];
-      setItems(newItems);
-      setHasMore(newItems.length > 0 && 1 < (data.totalPages || 1));
-    } catch (err) {
-      if (requestId === activeRequestIdRef.current) {
-        console.error('Failed to load initial movies:', err);
-        setHasMore(false);
+        const newItems: CinemaItem[] = data.items || [];
+        setItems(newItems);
+        setHasMore(newItems.length > 0 && 1 < (data.totalPages || 1));
+      } catch (err) {
+        if (requestId === activeRequestIdRef.current) {
+          console.error('Failed to load initial movies:', err);
+          setHasMore(false);
+        }
+      } finally {
+        if (requestId === activeRequestIdRef.current) {
+          setIsLoading(false);
+        }
       }
-    } finally {
-      if (requestId === activeRequestIdRef.current) {
-        setIsLoading(false);
-      }
-    }
-  }, []);
+    },
+    []
+  );
 
-  // Первоначальная загрузка и смена категории/запроса
+  // Первоначальная загрузка и смена фильтров/запроса
   useEffect(() => {
-    fetchInitialMovies(selectedCategory, activeQuery);
-  }, [selectedCategory, activeQuery, fetchInitialMovies]);
+    fetchInitialMovies(selectedCategory, activeQuery, selectedYear, minRating);
+  }, [selectedCategory, activeQuery, selectedYear, minRating, fetchInitialMovies]);
 
   // Подгрузка следующей страницы (Infinite Scroll)
   const loadMore = useCallback(async () => {
@@ -70,7 +75,7 @@ export function CinemaCatalog() {
       const q = activeQuery.trim();
       const endpoint = q
         ? `/api/movies?query=${encodeURIComponent(q)}&page=${nextPage}`
-        : `/api/movies?category=${selectedCategory}&page=${nextPage}`;
+        : `/api/movies?category=${selectedCategory}&year=${selectedYear}&minRating=${minRating}&page=${nextPage}`;
 
       const res = await fetch(endpoint);
       if (!res.ok) throw new Error('Ошибка загрузки следующей страницы');
@@ -95,7 +100,7 @@ export function CinemaCatalog() {
     } finally {
       setIsFetchingMore(false);
     }
-  }, [isLoading, isFetchingMore, hasMore, page, activeQuery, selectedCategory]);
+  }, [isLoading, isFetchingMore, hasMore, page, activeQuery, selectedCategory, selectedYear, minRating]);
 
   // Наблюдатель IntersectionObserver для бесконечной ленты
   useEffect(() => {
@@ -142,7 +147,7 @@ export function CinemaCatalog() {
       const q = activeQuery.trim();
       const endpoint = q
         ? `/api/movies?query=${encodeURIComponent(q)}&refresh=true&page=1`
-        : `/api/movies?category=${selectedCategory}&refresh=true`;
+        : `/api/movies?category=${selectedCategory}&year=${selectedYear}&minRating=${minRating}&refresh=true`;
 
       const res = await fetch(endpoint);
       const data = await res.json();
@@ -173,8 +178,8 @@ export function CinemaCatalog() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Поиск любых фильмов и сериалов мира на английском..."
-            className="w-full pl-9 pr-7 py-2 bg-zinc-900 border border-zinc-800 rounded-full text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 transition-colors"
+            placeholder=""
+            className="w-full pl-9 pr-7 py-2 bg-zinc-900 border border-zinc-800 rounded-full text-xs text-white focus:outline-none focus:border-red-600 transition-colors"
           />
           <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5 pointer-events-none" />
           {searchQuery && (
@@ -198,11 +203,15 @@ export function CinemaCatalog() {
         </button>
       </div>
 
-      {/* Полоса категорий Cinema (скрывается во время активного поиска для чистоты) */}
+      {/* Полоса категорий Cinema и фильтров (скрывается во время активного поиска) */}
       {!activeQuery && (
         <CinemaCategories
           selected={selectedCategory}
           onSelect={handleCategorySelect}
+          selectedYear={selectedYear}
+          onSelectYear={setSelectedYear}
+          minRating={minRating}
+          onSelectRating={setMinRating}
         />
       )}
 
@@ -227,7 +236,7 @@ export function CinemaCatalog() {
           <p className="text-xs text-zinc-400 max-w-sm mx-auto">
             {activeQuery
               ? `По запросу "${activeQuery}" ничего не найдено. Попробуйте ввести другое название.`
-              : 'Фильмы временно недоступны. Нажмите ↻ для повторной попытки.'}
+              : 'Фильмы временно недоступны. Попробуйте изменить фильтры или нажмите ↻.'}
           </p>
         </div>
       )}
