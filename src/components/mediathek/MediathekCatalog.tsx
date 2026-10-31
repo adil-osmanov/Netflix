@@ -10,7 +10,7 @@ import {
 import { useYouTube } from "@/context/YouTubeContext";
 import { ChannelFilter } from "./ChannelFilter";
 import { MediathekCard } from "./MediathekCard";
-import { normalizeSender, filterValidMediathekVideos } from "@/lib/mediathekChannels";
+import { normalizeSender, filterValidMediathekVideos, sanitizeThumbnailUrl } from "@/lib/mediathek";
 
 export interface MediathekMediaItem {
   id: string;
@@ -138,10 +138,14 @@ export default function MediathekCatalog() {
         const data = await res.json();
         if (requestId !== activeRequestIdRef.current) return;
 
-        const newItems: MediathekMediaItem[] = (data.items || []).map((it: MediathekMediaItem) => ({
-          ...it,
-          posterUrl: it.posterUrl || it.thumbnailUrl || "",
-        }));
+        const newItems: MediathekMediaItem[] = (data.items || []).map((it: MediathekMediaItem) => {
+          const cleanPoster = sanitizeThumbnailUrl(it.posterUrl || it.thumbnailUrl || "") || "";
+          return {
+            ...it,
+            posterUrl: cleanPoster,
+            thumbnailUrl: cleanPoster,
+          };
+        });
 
         const validItems = filterValidMediathekVideos(newItems);
 

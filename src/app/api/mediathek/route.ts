@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ALL_CHANNELS, normalizeSender, SENDER_API_MAP, determineGermanLevel } from '@/lib/mediathekChannels';
+import { ALL_CHANNELS, normalizeSender, SENDER_API_MAP, determineGermanLevel, sanitizeThumbnailUrl } from '@/lib/mediathek';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -77,25 +77,36 @@ async function fetchPosterFast(url: string): Promise<string | null> {
     let img = match && match[1] ? match[1].trim() : null;
 
     if (!img) {
-      const zdfMatch =
-        html.match(/"dim1280X720":\s*"([^"]+)"/i) || html.match(/"dim1920X1080":\s*"([^"]+)"/i);
-      if (zdfMatch && zdfMatch[1]) {
-        img = zdfMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/').trim();
+      // Поддержка CDN изображений ARTE (//api-cdn.arte.tv)
+      const arteMatch =
+        html.match(/"url":\s*"((?:https?:)?\/\/[^"]*api-cdn\.arte\.tv\/img\/v2\/[^"]+)"/i) ||
+        html.match(/"((?:https?:)?\/\/api-cdn\.arte\.tv\/img\/v2\/[^"]+)"/i);
+      if (arteMatch && arteMatch[1]) {
+        img = arteMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/').trim();
       } else {
-        const ardMatch = html.match(
-          /(https?:\/\/[^"'\s]*api\.ardmediathek\.de\/image-service[^"'\s]*)/i
-        );
-        if (ardMatch && ardMatch[1]) {
-          img = ardMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/').trim();
+        const zdfMatch =
+          html.match(/"dim1280X720":\s*"([^"]+)"/i) || html.match(/"dim1920X1080":\s*"([^"]+)"/i);
+        if (zdfMatch && zdfMatch[1]) {
+          img = zdfMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/').trim();
+        } else {
+          const ardMatch = html.match(
+            /(https?:\/\/[^"'\s]*api\.ardmediathek\.de\/image-service[^"'\s]*)/i
+          );
+          if (ardMatch && ardMatch[1]) {
+            img = ardMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/').trim();
+          }
         }
       }
     }
 
-    if (img && img.startsWith('http')) {
-      const lower = img.toLowerCase();
-      if (!lower.includes('placeholder') && !lower.includes('default_logo')) {
-        ogImageCache.set(url, img);
-        return img;
+    if (img) {
+      const cleanImg = sanitizeThumbnailUrl(img);
+      if (cleanImg && (cleanImg.startsWith('http://') || cleanImg.startsWith('https://'))) {
+        const lower = cleanImg.toLowerCase();
+        if (!lower.includes('placeholder') && !lower.includes('default_logo')) {
+          ogImageCache.set(url, cleanImg);
+          return cleanImg;
+        }
       }
     }
     return null;
@@ -376,7 +387,8 @@ export async function POST(req: Request) {
       const batchResults = await Promise.all(
         batch.map(async (item: any) => {
           const realPoster = await fetchPosterFast(item.url_website);
-          if (!realPoster || !realPoster.startsWith('http')) {
+          const sanitizedPoster = sanitizeThumbnailUrl(realPoster);
+          if (!sanitizedPoster || !sanitizedPoster.startsWith('http')) {
             return null;
           }
 
@@ -407,8 +419,8 @@ export async function POST(req: Request) {
             channel: item.channel || 'ARD',
             duration: Math.round(item.duration / 60),
             url_website: item.url_website,
-            posterUrl: realPoster,
-            thumbnailUrl: realPoster,
+            posterUrl: sanitizedPoster,
+            thumbnailUrl: sanitizedPoster,
             level: itemLevel,
             date: new Date(item.timestamp * 1000).toLocaleDateString('de-DE'),
           };

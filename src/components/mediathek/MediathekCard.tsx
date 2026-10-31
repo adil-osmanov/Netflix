@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { Play, Bookmark } from "lucide-react";
 import { MediathekMediaItem } from "./MediathekCatalog";
 import { getSenderBadgeLabel, getLevelBadgeColor } from "@/lib/mediathekChannels";
+import { sanitizeThumbnailUrl } from "@/lib/mediathek";
 
 interface MediathekCardProps {
   video: MediathekMediaItem;
@@ -20,19 +22,18 @@ export function MediathekCard({
 }: MediathekCardProps) {
   const [imgError, setImgError] = useState(false);
 
-  // Если изображение не загрузилось или вернуло 404/500, полностью скрываем карточку
-  if (imgError) return null;
-
-  const poster =
+  // Санитизация ссылки на изображение (устранение relative protocol //, Mixed Content и спецсимволов)
+  const rawPoster =
     video.posterUrl ||
     video.thumbnailUrl ||
+    (video as any).thumbnail ||
     (video as any).imageUrl ||
     (video as any).preview_url ||
-    (video as any).thumbnail ||
     "";
+  const poster = sanitizeThumbnailUrl(rawPoster);
 
-  // Если URL обложки пустой или это SVG заглушка — скрываем карточку
-  if (!poster || poster.startsWith("data:image/svg") || poster.length < 12) {
+  // Если изображение не загрузилось, отсутствует или вернуло ошибку, полностью скрываем карточку
+  if (imgError || !poster || poster.startsWith("data:image/svg") || poster.length < 12) {
     return null;
   }
 
@@ -53,12 +54,15 @@ export function MediathekCard({
     >
       {/* 1. Превью 16:9 с постером */}
       <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-all duration-300">
-        <img
+        <Image
           src={poster}
-          alt={video.title}
+          alt={video.title || "Постер передачи"}
+          fill
+          unoptimized={true} // КРИТИЧНО: убирает 400 Bad Request и отключает прокси Next.js
           onError={() => setImgError(true)}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          className="object-cover group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
 
