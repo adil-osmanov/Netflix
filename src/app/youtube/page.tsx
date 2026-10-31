@@ -7,7 +7,8 @@ import {
   Video,
   Bookmark,
   Tv,
-  Plus
+  Plus,
+  Film
 } from "lucide-react";
 import { NetflixLogo } from "@/components/common/NetflixLogo";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
@@ -23,8 +24,8 @@ import InfiniteVideoFeed, { appendUniqueVideos } from "@/components/youtube/Infi
 import ManageChannelsModal, { SubscribedChannel } from "@/components/youtube/ManageChannelsModal";
 import EasyGermanCatalog from "@/components/youtube/EasyGermanCatalog";
 import MediathekCatalog from "@/components/mediathek/MediathekCatalog";
+import CinemaEmbed from "@/components/cinema/CinemaEmbed";
 import englishVideosJson from "@/data/english_videos.json";
-import englishPodcastsJson from "@/data/english_podcasts.json";
 import { shuffleArray } from "@/lib/youtube";
 
 import {
@@ -37,7 +38,7 @@ import {
   DEFAULT_EN_SUBSCRIPTIONS,
 } from "@/lib/subscriptions";
 
-export type TopCategory = "youtube" | "mediathek" | "podcasts" | "favorites";
+export type TopCategory = "youtube" | "mediathek" | "cinema" | "favorites";
 export type MainTab = "recommendations" | "subscriptions" | "easy_german";
 export type LevelType = "ALL" | "A1" | "A2" | "B1" | "B2" | "C1";
 
@@ -187,36 +188,13 @@ export default function YouTubeCatalogPage() {
   const recommendationsRef = useRef<YouTubeRecommendedVideo[]>([]);
   recommendationsRef.current = recommendations;
 
-  // Podcasts state (for EN mode)
-  const [podcasts, setPodcasts] = useState<YouTubeRecommendedVideo[]>(() =>
-    shuffleArray(
-      (englishPodcastsJson as any[]).map((item) => ({
-        id: item.youtube_id,
-        youtube_id: item.youtube_id,
-        title: item.title,
-        channel: item.channel,
-        level: item.level as "A1" | "A2" | "B1" | "B2" | "C1",
-        thumbnailUrl: `https://i.ytimg.com/vi/${item.youtube_id}/hqdefault.jpg`,
-        durationText: item.duration,
-        category: item.category,
-      }))
-    )
-  );
-  const [podcastPage, setPodcastPage] = useState<number>(1);
-  const [hasMorePodcasts, setHasMorePodcasts] = useState<boolean>(true);
-  const [isLoadingPodcasts, setIsLoadingPodcasts] = useState<boolean>(false);
-  const [isFetchingMorePodcasts, setIsFetchingMorePodcasts] = useState<boolean>(false);
-
-  const podcastsRef = useRef<YouTubeRecommendedVideo[]>([]);
-  podcastsRef.current = podcasts;
-
-  // Поддержка прямых ссылок с параметром категории (например, /youtube?category=mediathek)
+  // Поддержка прямых ссылок с параметром категории (например, /youtube?category=cinema)
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const cat = params.get("category");
-      if (cat === "mediathek" || cat === "podcasts" || cat === "favorites" || cat === "youtube") {
-        setActiveCategory(cat as TopCategory);
+      if (cat === "mediathek" || cat === "cinema" || cat === "podcasts" || cat === "favorites" || cat === "youtube") {
+        setActiveCategory(cat === "podcasts" ? "cinema" : (cat as TopCategory));
       }
     }
   }, []);
@@ -449,69 +427,6 @@ export default function YouTubeCatalogPage() {
   );
 
   // Динамическая загрузка подкастов (порциями по 12 штук)
-  const fetchPodcastsFeed = useCallback(
-    async (
-      pageToLoad: number,
-      append: boolean = false,
-      levelOverride?: LevelType,
-      reset: boolean = false
-    ) => {
-      if (append && !reset) {
-        setIsFetchingMorePodcasts(true);
-      } else {
-        setIsLoadingPodcasts(true);
-      }
-
-      const lvl = levelOverride !== undefined ? levelOverride : selectedLevel;
-      const excludeIds =
-        append && !reset
-          ? podcastsRef.current.map((v) => (v as any).youtube_id || v.id)
-          : [];
-
-      try {
-        const res = await fetch(
-          `/api/youtube/recommendations?t=${Date.now()}&rnd=${Math.random()}`,
-          {
-            method: "POST",
-            cache: "no-store",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              page: pageToLoad,
-              limit: 12,
-              level: lvl,
-              lang: "EN",
-              category: "podcasts",
-              excludeIds,
-              timestamp: Date.now(),
-            }),
-          }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          const newVideos: YouTubeRecommendedVideo[] = data.videos || data.items || [];
-          setPodcasts((prev) =>
-            append && !reset ? appendUniqueVideos(prev, newVideos) : newVideos
-          );
-          setHasMorePodcasts(data.hasMore ?? true);
-          setPodcastPage(pageToLoad);
-        }
-      } catch (err) {
-        console.error("Failed to fetch podcasts:", err);
-      } finally {
-        setIsLoadingPodcasts(false);
-        setIsFetchingMorePodcasts(false);
-      }
-    },
-    [selectedLevel]
-  );
-
-  // Первоначальная загрузка подкастов при открытии вкладки
-  useEffect(() => {
-    if (isEN && activeCategory === "podcasts" && podcasts.length === 0) {
-      fetchPodcastsFeed(1, false, selectedLevel);
-    }
-  }, [isEN, activeCategory, fetchPodcastsFeed, selectedLevel, podcasts.length]);
-
   // Auto switch to B1 if user is on Easy German in DE mode and level is A1 or A2
   useEffect(() => {
     if (!isEN && activeCategory === "youtube" && activeTab === "easy_german") {
@@ -540,13 +455,10 @@ export default function YouTubeCatalogPage() {
 
     if (newLang === "EN") {
       if (activeCategory === "mediathek") {
-        setActiveCategory("podcasts");
-        setPodcasts([]);
-        setPodcastPage(1);
-        fetchPodcastsFeed(1, false, selectedLevel);
+        setActiveCategory("cinema");
       }
     } else if (newLang === "DE") {
-      if (activeCategory === "podcasts") {
+      if (activeCategory === "cinema" || (activeCategory as string) === "podcasts") {
         setActiveCategory("mediathek");
       }
     }
@@ -570,11 +482,6 @@ export default function YouTubeCatalogPage() {
       setRecPage(1);
       setHasMoreRec(true);
       fetchRecommendations(1, false, lvl, currentLang, true);
-    } else if (activeCategory === "podcasts") {
-      setPodcasts([]);
-      setPodcastPage(1);
-      setHasMorePodcasts(true);
-      fetchPodcastsFeed(1, false, lvl, true);
     }
   };
 
@@ -607,33 +514,11 @@ export default function YouTubeCatalogPage() {
     fetchSubscriptionVideos,
   ]);
 
-  // Load more handler for Podcasts Infinite Feed
-  const handleLoadMorePodcasts = useCallback(() => {
-    if (
-      activeCategory === "podcasts" &&
-      hasMorePodcasts &&
-      !isLoadingPodcasts &&
-      !isFetchingMorePodcasts
-    ) {
-      fetchPodcastsFeed(podcastPage + 1, true);
-    }
-  }, [
-    activeCategory,
-    hasMorePodcasts,
-    isLoadingPodcasts,
-    isFetchingMorePodcasts,
-    podcastPage,
-    fetchPodcastsFeed,
-  ]);
-
   // Refresh feed: рандомизация и перезагрузка свежей порции без дублей
   const handleRefresh = async () => {
     setIsRefreshing(true);
     if (currentLang === "EN") {
-      if (activeCategory === "podcasts") {
-        setPodcastPage(1);
-        await fetchPodcastsFeed(1, false, selectedLevel, true);
-      } else if (activeTab === "recommendations") {
+      if (activeTab === "recommendations") {
         setRecPage(1);
         await fetchRecommendations(1, false, selectedLevel, "EN", true);
       } else if (activeTab === "subscriptions") {
@@ -785,24 +670,6 @@ export default function YouTubeCatalogPage() {
     return true;
   });
 
-  // Строгая фильтрация подкастов по выбранному уровню и дедупликация по ID
-  const filteredPodcasts = useMemo(() => {
-    let list = podcasts;
-    if (isFilterActive) {
-      list = list.filter((v) => {
-        if (!v.level) return false;
-        return String(v.level).trim().toUpperCase() === String(selectedLevel).trim().toUpperCase();
-      });
-    }
-    const seenP = new Set<string>();
-    return list.filter((v) => {
-      const vid = (v as any).youtube_id || v.id;
-      if (!vid || seenP.has(vid)) return false;
-      seenP.add(vid);
-      return true;
-    });
-  }, [podcasts, isFilterActive, selectedLevel]);
-
   // Client-side deduplication of isolated favorites
   const uniqueFavorites = Array.from(
     new Map(
@@ -876,17 +743,18 @@ export default function YouTubeCatalogPage() {
               <span>YouTube</span>
             </button>
 
-            {/* Второй источник: Mediathek (DE) или Podcasts (EN) */}
+            {/* Второй источник: Mediathek (DE) или Cinema (EN) */}
             {isEN ? (
               <button
-                onClick={() => setActiveCategory("podcasts")}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
-                  activeCategory === "podcasts"
-                    ? "bg-white text-black shadow-md"
-                    : "bg-zinc-900 text-zinc-400 hover:text-white"
+                onClick={() => setActiveCategory("cinema")}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-all duration-200 cursor-pointer ${
+                  activeCategory === "cinema"
+                    ? "bg-white text-black shadow-lg shadow-white/10"
+                    : "bg-zinc-900/80 text-zinc-400 hover:text-white hover:bg-zinc-800"
                 }`}
               >
-                Podcasts
+                <Film className="w-3.5 h-3.5" />
+                <span>Cinema</span>
               </button>
             ) : (
               <button
@@ -935,7 +803,7 @@ export default function YouTubeCatalogPage() {
                 </h3>
                 <p className="text-xs text-zinc-400 leading-relaxed">
                   {isEN
-                    ? "Нажмите на значок закладки на любой карточке в YouTube или Podcasts, чтобы добавить видео в избранное английского раздела."
+                    ? "Нажмите на значок закладки на любой карточке в YouTube, чтобы добавить видео в избранное английского раздела."
                     : "Нажмите на значок закладки на любой карточке в YouTube или ARD & ZDF, чтобы добавить видео в этот список."}
                 </p>
               </div>
@@ -953,75 +821,9 @@ export default function YouTubeCatalogPage() {
           </div>
         ) : activeCategory === "mediathek" && !isEN ? (
           <MediathekCatalog />
-        ) : activeCategory === "podcasts" && isEN ? (
+        ) : activeCategory === "cinema" ? (
           <div className="max-w-7xl mx-auto">
-            {/* Панель фильтра уровней Podcasts [ Все ] [ A1 ] [ A2 ] [ B1 ] [ B2 ] [ C1 ] */}
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  Каталог подкастов
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                <div className="flex items-center p-1 bg-zinc-900 rounded-full border border-zinc-800 flex-wrap">
-                  {levelPills.map((lvl) => {
-                    const isActive = selectedLevel === lvl.id;
-                    return (
-                      <button
-                        key={lvl.id}
-                        onClick={() => handleLevelChange(lvl.id)}
-                        className={`px-3 py-1 text-xs rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
-                          isActive
-                            ? "bg-white text-black font-semibold"
-                            : "text-zinc-400 hover:text-white"
-                        }`}
-                      >
-                        {lvl.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  onClick={handleRefresh}
-                  disabled={isRefreshing || isLoadingPodcasts}
-                  className="p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 [-webkit-tap-highlight-color:transparent] transition-colors duration-200 disabled:opacity-50 cursor-pointer shadow"
-                  title="Обновить"
-                >
-                  <RotateCw
-                    className={`w-4 h-4 transition-transform duration-500 ${
-                      isRefreshing ? "rotate-180 animate-spin text-white" : "text-red-500 hover:scale-110"
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {isLoadingPodcasts && filteredPodcasts.length === 0 ? (
-              <div className="py-24 flex flex-col items-center justify-center gap-3 text-zinc-400">
-                <Loader2 className="w-8 h-8 animate-spin text-[#E50914]" />
-                <span className="text-sm font-medium">
-                  Загрузка полноформатных американских подкастов...
-                </span>
-              </div>
-            ) : filteredPodcasts.length === 0 ? (
-              <div className="py-20 bg-zinc-900/30 border border-zinc-800/80 rounded-2xl text-center flex flex-col items-center justify-center p-8 gap-3 max-w-lg mx-auto">
-                <Video className="w-10 h-10 text-zinc-600" />
-                <h3 className="text-base font-bold text-white">Подкасты не найдены</h3>
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  По выбранному уровню ({selectedLevel}) пока нет подкастов.
-                </p>
-              </div>
-            ) : (
-              <InfiniteVideoFeed
-                items={filteredPodcasts}
-                hasMore={hasMorePodcasts}
-                isFetchingMore={isFetchingMorePodcasts}
-                onLoadMore={handleLoadMorePodcasts}
-                loadingLabel="Загрузка подкастов..."
-              />
-            )}
+            <CinemaEmbed />
           </div>
         ) : (
           <>
