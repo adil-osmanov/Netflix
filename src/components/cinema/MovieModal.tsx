@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { EMBED_SERVERS } from '@/config/movieEmbeds';
-import { X, Star, Calendar, Server, Film, Tv } from 'lucide-react';
+import { STREAMING_SERVERS, StreamingServer } from '@/config/streamingServers';
+import { X, ExternalLink, RefreshCw, ChevronDown } from 'lucide-react';
 
 export interface CinemaItem {
   id: number | string;
@@ -22,10 +22,10 @@ interface MovieModalProps {
 }
 
 export function MovieModal({ item, onClose }: MovieModalProps) {
-  const [activeServer, setActiveServer] = useState(EMBED_SERVERS[0]);
+  const [activeServer, setActiveServer] = useState<StreamingServer>(STREAMING_SERVERS[0]);
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
-  const [isPlayerActive, setIsPlayerActive] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Закрытие по Escape
   useEffect(() => {
@@ -44,137 +44,115 @@ export function MovieModal({ item, onClose }: MovieModalProps) {
       : activeServer.getMovieUrl(item.id);
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 animate-in fade-in duration-200"
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-black/95 backdrop-blur-xl animate-in fade-in duration-200"
       onClick={onClose}
     >
+      {/* Верхняя панель встроенного In-App браузера */}
       <div
-        className="relative w-full max-w-5xl bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[94vh]"
+        className="w-full h-14 bg-zinc-950 border-b border-zinc-800/80 px-4 flex items-center justify-between select-none z-20 shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Кнопка закрытия */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-30 p-2 rounded-full bg-black/70 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer select-none outline-none"
-          title="Закрыть"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {/* Левая часть: название и метаданные */}
+        <div className="flex items-center gap-3 overflow-hidden">
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+            title="Назад к каталогу"
+          >
+            <X className="w-5 h-5" />
+          </button>
 
-        {/* Видеоплеер или постер-превью */}
-        <div className="relative aspect-video w-full bg-black overflow-hidden border-b border-zinc-800/80">
-          {isPlayerActive ? (
-            <iframe
-              key={`${activeServer.id}-${item.id}-${season}-${episode}`}
-              src={embedUrl}
-              className="w-full h-full border-0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-              allowFullScreen
-            />
-          ) : (
-            <div className="relative w-full h-full">
-              <img
-                src={item.backdrop || item.poster || ''}
-                alt={item.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/30 to-transparent" />
-
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <button
-                  onClick={() => setIsPlayerActive(true)}
-                  className="flex items-center gap-2.5 px-6 py-3 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-sm tracking-wide shadow-2xl transition-transform hover:scale-105 cursor-pointer outline-none"
-                >
-                  <Film className="w-4 h-4 fill-current" />
-                  <span>Смотреть в приложении</span>
-                </button>
-              </div>
-
-              <div className="absolute bottom-4 left-6 right-16">
-                <h2 className="text-xl sm:text-2xl font-black text-white line-clamp-1">{item.title}</h2>
-                <div className="flex items-center gap-3 mt-1 text-xs text-zinc-300 font-semibold flex-wrap">
-                  <span className="flex items-center gap-1 text-amber-400">
-                    <Star className="w-3.5 h-3.5 fill-current" /> {item.vote_average}
-                  </span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" /> {item.year}
-                  </span>
-                  <span>•</span>
-                  <span className="bg-blue-600/90 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase">
-                    {item.media_type === 'tv' ? 'Сериал' : 'Фильм'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="flex items-center gap-2 truncate">
+            <span className="font-bold text-sm text-white truncate max-w-[180px] sm:max-w-xs md:max-w-md">
+              {item.title}
+            </span>
+            <span className="text-zinc-500 text-xs hidden sm:inline">({item.year})</span>
+            <span className="bg-zinc-800 text-zinc-300 text-[10px] font-black px-1.5 py-0.5 rounded uppercase hidden md:inline">
+              {item.media_type === 'tv' ? 'Сериал' : 'Фильм'}
+            </span>
+          </div>
         </div>
 
-        {/* Панель выбора серверов и сезонов */}
-        <div className="p-4 sm:p-6 space-y-4 overflow-y-auto">
-          {/* Переключатель серверов */}
-          <div>
-            <div className="flex items-center gap-2 text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2.5">
-              <Server className="w-3.5 h-3.5" />
-              <span>Сервер трансляции (переключите, если не грузит):</span>
+        {/* Правая часть: селектор серверов, сезонов и кнопки управления */}
+        <div className="flex items-center gap-2">
+          {/* Селектор сезонов и серий для сериалов */}
+          {item.media_type === 'tv' && (
+            <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-zinc-300">
+              <span className="text-zinc-500 font-semibold">S</span>
+              <input
+                type="number"
+                min={1}
+                max={40}
+                value={season}
+                onChange={(e) => setSeason(Math.max(1, Number(e.target.value)))}
+                className="w-8 bg-transparent text-center font-bold text-white focus:outline-none"
+              />
+              <span className="text-zinc-500 font-semibold">E</span>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={episode}
+                onChange={(e) => setEpisode(Math.max(1, Number(e.target.value)))}
+                className="w-8 bg-transparent text-center font-bold text-white focus:outline-none"
+              />
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {EMBED_SERVERS.map((server) => {
-                const isSelected = activeServer.id === server.id;
-                return (
-                  <button
-                    key={server.id}
-                    onClick={() => {
-                      setActiveServer(server);
-                      setIsPlayerActive(true);
-                    }}
-                    className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-zinc-800 border-red-600 text-white shadow-md'
-                        : 'bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-850'
-                    }`}
-                  >
-                    <span className="text-xs font-bold">{server.name}</span>
-                    <span className="text-[10px] text-zinc-500">{server.badge}</span>
-                  </button>
-                );
-              })}
-            </div>
+          )}
+
+          {/* Быстрый выбор сервера */}
+          <div className="relative group">
+            <select
+              value={activeServer.id}
+              onChange={(e) => {
+                const found = STREAMING_SERVERS.find((s) => s.id === e.target.value);
+                if (found) setActiveServer(found);
+              }}
+              className="appearance-none bg-zinc-900 hover:bg-zinc-850 text-white text-xs font-semibold px-3 py-1.5 pr-7 rounded-lg border border-zinc-700/80 cursor-pointer focus:outline-none"
+            >
+              {STREAMING_SERVERS.map((server) => (
+                <option key={server.id} value={server.id} className="bg-zinc-900 text-white">
+                  {server.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-zinc-400 absolute right-2 top-2.5 pointer-events-none" />
           </div>
 
-          {/* Селектор сезона и серии (если сериал) */}
-          {item.media_type === 'tv' && (
-            <div className="flex items-center gap-4 bg-zinc-900/90 p-3 rounded-xl border border-zinc-800 flex-wrap">
-              <div className="flex items-center gap-2 text-xs font-semibold text-zinc-300">
-                <Tv className="w-4 h-4 text-red-500" />
-                <span>Сезон:</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={season}
-                  onChange={(e) => setSeason(Math.max(1, Number(e.target.value)))}
-                  className="w-14 px-2 py-1 bg-black border border-zinc-700 rounded text-center text-xs text-white focus:outline-none focus:border-red-600"
-                />
-              </div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-zinc-300">
-                <span>Серия:</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={episode}
-                  onChange={(e) => setEpisode(Math.max(1, Number(e.target.value)))}
-                  className="w-14 px-2 py-1 bg-black border border-zinc-700 rounded text-center text-xs text-white focus:outline-none focus:border-red-600"
-                />
-              </div>
-            </div>
-          )}
+          {/* Перезагрузка плеера */}
+          <button
+            onClick={() => setReloadKey((prev) => prev + 1)}
+            className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            title="Перезагрузить плеер"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
 
-          <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-            {item.overview || 'Описание фильма временно отсутствует.'}
-          </p>
+          {/* Аварийное открытие во внешнем браузере */}
+          <a
+            href={embedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            title="Открыть в новой вкладке"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
         </div>
+      </div>
+
+      {/* Рабочая область встроенного браузера */}
+      <div
+        className="relative flex-1 w-full h-full bg-black flex items-center justify-center overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <iframe
+          key={`${reloadKey}-${activeServer.id}-${item.id}-${season}-${episode}`}
+          src={embedUrl}
+          className="w-full h-full border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          allowFullScreen
+        />
       </div>
     </div>
   );
