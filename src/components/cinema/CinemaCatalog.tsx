@@ -134,9 +134,34 @@ export function CinemaCatalog() {
     setSelectedCategory(catId);
   };
 
-  // Принудительное обновление
-  const handleRefresh = () => {
-    fetchInitialMovies(selectedCategory, activeQuery);
+  // Обновление ленты с рандомизацией и Smart Shuffle
+  const refreshFeed = async () => {
+    const requestId = ++activeRequestIdRef.current;
+    setIsLoading(true);
+    try {
+      const q = activeQuery.trim();
+      const endpoint = q
+        ? `/api/movies?query=${encodeURIComponent(q)}&refresh=true&page=1`
+        : `/api/movies?category=${selectedCategory}&refresh=true`;
+
+      const res = await fetch(endpoint);
+      const data = await res.json();
+      if (requestId !== activeRequestIdRef.current) return;
+
+      if (data.items) {
+        setItems(data.items);
+        setPage(1);
+        setHasMore(data.items.length > 0 && 1 < (data.totalPages || 1));
+      }
+    } catch (err) {
+      if (requestId === activeRequestIdRef.current) {
+        console.error('Failed to refresh feed:', err);
+      }
+    } finally {
+      if (requestId === activeRequestIdRef.current) {
+        setIsLoading(false);
+      }
+    }
   };
 
   return (
@@ -164,7 +189,7 @@ export function CinemaCatalog() {
         </form>
 
         <button
-          onClick={handleRefresh}
+          onClick={refreshFeed}
           disabled={isLoading}
           className="p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 outline-none transition-colors disabled:opacity-40 cursor-pointer shadow"
           title="Обновить каталог"

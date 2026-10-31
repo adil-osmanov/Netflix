@@ -4,6 +4,16 @@ const TMDB_API_KEY = process.env.TMDB_API_KEY || '844dba0bfd8f3a4f3799f6130ef9e3
 
 export const dynamic = 'force-dynamic';
 
+// Алгоритм перемешивания Фишера-Йетса для создания ощущения "живой" персонализированной ленты
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 const FALLBACK_ITEMS = [
   {
     id: 155,
@@ -31,7 +41,7 @@ const FALLBACK_ITEMS = [
     id: 872585,
     title: 'Oppenheimer',
     original_title: 'Oppenheimer',
-    overview: 'The story of J. Robert Oppenheimer\'s role in the development of the atomic bomb during World War II.',
+    overview: "The story of J. Robert Oppenheimer's role in the development of the atomic bomb during World War II.",
     poster: 'https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg',
     backdrop: 'https://image.tmdb.org/t/p/w1280/fm6KqXpk3M2HVveHwCrBSSBaO0V.jpg',
     year: '2023',
@@ -77,64 +87,85 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('query');
   const category = searchParams.get('category') || 'trending';
-  const page = searchParams.get('page') || '1';
+  const pageParam = searchParams.get('page');
+  const isRefresh = searchParams.get('refresh') === 'true';
 
   try {
     let endpoint = '';
 
     if (query && query.trim().length > 0) {
+      // Полнотекстовый поиск по запросу пользователя
+      const p = pageParam || '1';
       endpoint = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(
         query.trim()
-      )}&page=${page}&language=en-US&include_adult=false`;
+      )}&page=${p}&language=en-US&include_adult=false`;
     } else {
+      // Если это клик на "обновить", выбираем случайную страницу из топ-пула (1-4)
+      const targetPage = isRefresh ? Math.floor(Math.random() * 4) + 1 : Number(pageParam || '1');
+
       switch (category) {
+        case 'trending':
+          // Микс из трендов с высоким рейтингом
+          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&sort_by=popularity.desc&vote_count.gte=350&vote_average.gte=6.7&with_original_language=en&page=${targetPage}&language=en-US`;
+          break;
         case 'series':
-          endpoint = `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_API_KEY}&sort_by=popularity.desc&vote_count.gte=100&page=${page}&language=en-US&with_original_language=en`;
+          // Только признанные сериалы с оригинальной английской озвучкой
+          endpoint = `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_API_KEY}&sort_by=popularity.desc&vote_count.gte=250&vote_average.gte=7.0&with_original_language=en&page=${targetPage}&language=en-US`;
           break;
         case 'top_rated':
-          endpoint = `https://api.themoviedb.org/3/movie/top_rated?api_key=${TMDB_API_KEY}&vote_count.gte=500&page=${page}&language=en-US`;
+          // Золотой фонд кинематографа (рейтинг от 7.8+)
+          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&sort_by=vote_average.desc&vote_count.gte=1000&with_original_language=en&page=${targetPage}&language=en-US`;
           break;
         case 'action':
-          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=28&sort_by=popularity.desc&vote_count.gte=150&page=${page}&language=en-US`;
+          // Боевики и приключения без мусора
+          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=28,878&sort_by=popularity.desc&vote_count.gte=300&vote_average.gte=6.5&with_original_language=en&page=${targetPage}&language=en-US`;
           break;
         case 'scifi':
-          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=878,14&sort_by=popularity.desc&vote_count.gte=150&page=${page}&language=en-US`;
+          // Фантастика и фэнтези
+          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=878,14&sort_by=popularity.desc&vote_count.gte=300&vote_average.gte=6.5&with_original_language=en&page=${targetPage}&language=en-US`;
           break;
         case 'drama':
-          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=18,80&sort_by=popularity.desc&vote_count.gte=200&page=${page}&language=en-US`;
+          // Детективы, криминал, драмы
+          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=18,80&sort_by=popularity.desc&vote_count.gte=300&vote_average.gte=7.0&with_original_language=en&page=${targetPage}&language=en-US`;
           break;
         case 'comedy':
-          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=35&sort_by=popularity.desc&vote_count.gte=150&page=${page}&language=en-US`;
+          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=35&sort_by=popularity.desc&vote_count.gte=300&vote_average.gte=6.5&with_original_language=en&page=${targetPage}&language=en-US`;
           break;
         case 'animation':
-          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=16&sort_by=popularity.desc&vote_count.gte=100&page=${page}&language=en-US`;
+          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=16&sort_by=popularity.desc&vote_count.gte=200&vote_average.gte=6.5&with_original_language=en&page=${targetPage}&language=en-US`;
           break;
-        case 'trending':
         default:
-          endpoint = `https://api.themoviedb.org/3/trending/all/week?api_key=${TMDB_API_KEY}&page=${page}&language=en-US`;
+          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&sort_by=popularity.desc&vote_count.gte=300&vote_average.gte=6.7&with_original_language=en&page=${targetPage}&language=en-US`;
           break;
       }
     }
 
-    const res = await fetch(endpoint, { next: { revalidate: 3600 } });
+    const res = await fetch(endpoint, { cache: 'no-store' });
     if (!res.ok) throw new Error('Ошибка запроса к TMDB');
 
     const data = await res.json();
-    const results = (data.results || [])
+    let results = (data.results || [])
       .filter((m: any) => m.poster_path && (m.title || m.name))
+      // Отсеиваем фильмы с рейтингом ниже 6.0
+      .filter((m: any) => (query ? true : (m.vote_average || 0) >= 6.0))
       .map((m: any) => ({
         id: m.id,
         title: m.title || m.name,
         original_title: m.original_title || m.original_name,
-        overview: m.overview,
+        overview: m.overview || '',
         poster: `https://image.tmdb.org/t/p/w500${m.poster_path}`,
         backdrop: m.backdrop_path ? `https://image.tmdb.org/t/p/w1280${m.backdrop_path}` : null,
         year: (m.release_date || m.first_air_date || '').split('-')[0] || '2026',
-        vote_average: m.vote_average ? m.vote_average.toFixed(1) : '7.5',
+        vote_average: m.vote_average ? m.vote_average.toFixed(1) : '7.0',
         media_type: m.media_type === 'tv' || category === 'series' ? ('tv' as const) : ('movie' as const),
       }));
 
-    if (results.length === 0 && !query && page === '1') {
+    // Если это рекомендации или обновление, слегка перемешиваем выдачу
+    if (isRefresh || category === 'trending') {
+      results = shuffleArray(results);
+    }
+
+    if (results.length === 0 && !query && (!pageParam || pageParam === '1')) {
       return NextResponse.json({
         items: FALLBACK_ITEMS,
         page: 1,
@@ -144,12 +175,12 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       items: results,
-      page: data.page || Number(page),
-      totalPages: data.total_pages || 100,
+      page: data.page || (pageParam ? Number(pageParam) : 1),
+      totalPages: data.total_pages || 10,
     });
   } catch (error) {
     console.error('Movies API Error:', error);
-    if (!query && page === '1') {
+    if (!query && (!pageParam || pageParam === '1')) {
       return NextResponse.json({
         items: FALLBACK_ITEMS,
         page: 1,
