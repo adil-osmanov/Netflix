@@ -8,9 +8,8 @@ import {
   AlertCircle
 } from "lucide-react";
 import { useYouTube } from "@/context/YouTubeContext";
-import { ChannelFilter } from "./ChannelFilter";
 import { MediathekCard } from "./MediathekCard";
-import { normalizeSender, filterValidMediathekVideos, sanitizeThumbnailUrl } from "@/lib/mediathek";
+import { filterValidMediathekVideos, sanitizeThumbnailUrl } from "@/lib/mediathek";
 
 export interface MediathekMediaItem {
   id: string;
@@ -51,7 +50,6 @@ export default function MediathekCatalog() {
   const [items, setItems] = useState<MediathekMediaItem[]>([]);
   const [category, setCategory] = useState<CategoryType>("all");
   const [level, setLevel] = useState<LevelType>("ALL");
-  const [selectedChannel, setSelectedChannel] = useState<string>("all");
 
   const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
@@ -84,21 +82,18 @@ export default function MediathekCatalog() {
     async ({
       newCategory,
       newLevel,
-      newChannel,
       newQuery,
       newOffset = 0,
       append = false,
     }: {
       newCategory?: CategoryType;
       newLevel?: LevelType;
-      newChannel?: string;
       newQuery?: string;
       newOffset?: number;
       append?: boolean;
     } = {}) => {
       const catToUse = newCategory !== undefined ? newCategory : category;
       const lvlToUse = newLevel !== undefined ? newLevel : level;
-      const chanToUse = newChannel !== undefined ? newChannel : selectedChannel;
       const queryToUse = newQuery !== undefined ? newQuery : "";
 
       const requestId = ++activeRequestIdRef.current;
@@ -124,7 +119,7 @@ export default function MediathekCatalog() {
             size: 24,
             category: catToUse,
             level: lvlToUse,
-            channel: chanToUse,
+            channel: "all",
             query: queryToUse,
             excludeIds,
             timestamp: Date.now(),
@@ -174,12 +169,12 @@ export default function MediathekCatalog() {
         }
       }
     },
-    [category, level, selectedChannel, handleAppend]
+    [category, level, handleAppend]
   );
 
   // Первоначальная загрузка
   useEffect(() => {
-    fetchMediaItems({ newCategory: "all", newLevel: "ALL", newChannel: "all", newOffset: 0, append: false });
+    fetchMediaItems({ newCategory: "all", newLevel: "ALL", newOffset: 0, append: false });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Мгновенная реакция при смене категории
@@ -202,16 +197,6 @@ export default function MediathekCatalog() {
     fetchMediaItems({ newLevel, newOffset: 0, append: false });
   };
 
-  // Мгновенная реакция при смене канала
-  const handleChannelChange = (newChan: string) => {
-    if (newChan === selectedChannel) return;
-    setSelectedChannel(newChan);
-    setItems([]);
-    setOffset(0);
-    setHasMore(true);
-    fetchMediaItems({ newChannel: newChan, newOffset: 0, append: false });
-  };
-
   // Принудительное обновление
   const handleRefresh = () => {
     setItems([]);
@@ -228,16 +213,10 @@ export default function MediathekCatalog() {
     fetchMediaItems({ newOffset: nextOffset, append: true });
   }, [isLoading, isFetchingMore, hasMore, offset, fetchMediaItems]);
 
-  // Двойная клиентская фильтрация по уровню и каналу + валидация обложек
+  // Клиентская фильтрация по уровню + валидация обложек
   const displayedVideos = useMemo(() => {
     const valid = filterValidMediathekVideos(items);
     return valid.filter((item) => {
-      if (selectedChannel && selectedChannel !== "all" && selectedChannel !== "ALL") {
-        const itemNorm = normalizeSender(item.channel || "");
-        if (itemNorm.toUpperCase() !== selectedChannel.toUpperCase()) {
-          return false;
-        }
-      }
       if (level && level !== "ALL") {
         if (item.level !== level) {
           return false;
@@ -245,7 +224,7 @@ export default function MediathekCatalog() {
       }
       return true;
     });
-  }, [items, selectedChannel, level]);
+  }, [items, level]);
 
   // Intersection Sentinel (rootMargin: 400px)
   useEffect(() => {
@@ -284,7 +263,7 @@ export default function MediathekCatalog() {
   return (
     <div className="w-full">
       {/* Панель управления в одну строку (One-Row Layout) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         {/* Категории слева */}
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
           {[
@@ -344,9 +323,6 @@ export default function MediathekCatalog() {
           </button>
         </div>
       </div>
-
-      {/* Премиальный фильтр каналов в стиле Netflix */}
-      <ChannelFilter selectedChannel={selectedChannel} onSelectChannel={handleChannelChange} />
 
       {/* Ошибка */}
       {error && (
