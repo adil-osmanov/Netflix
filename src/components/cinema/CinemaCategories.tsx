@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ChevronDown } from 'lucide-react';
+import { CinemaFilters } from './CinemaFilters';
 
 export const CINEMA_CATEGORIES = [
   { id: 'trending', label: 'В тренде' },
@@ -17,19 +17,21 @@ export const CINEMA_CATEGORIES = [
 interface CinemaCategoriesProps {
   selected: string;
   onSelect: (id: string) => void;
-  selectedYear: string;
-  onSelectYear: (year: string) => void;
-  minRating: string;
-  onSelectRating: (rating: string) => void;
+  yearRange: [number, number];
+  onYearChange: (range: [number, number]) => void;
+  minRating: number;
+  onRatingChange: (rating: number) => void;
+  onResetFilters: () => void;
 }
 
 export function CinemaCategories({
   selected,
   onSelect,
-  selectedYear,
-  onSelectYear,
+  yearRange,
+  onYearChange,
   minRating,
-  onSelectRating,
+  onRatingChange,
+  onResetFilters,
 }: CinemaCategoriesProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 my-4">
@@ -53,42 +55,16 @@ export function CinemaCategories({
         })}
       </div>
 
-      {/* Регуляторы года и рейтинга */}
-      <div className="flex items-center gap-2 shrink-0">
-        {/* Фильтр года */}
-        <div className="relative">
-          <select
-            value={selectedYear}
-            onChange={(e) => onSelectYear(e.target.value)}
-            className="appearance-none bg-zinc-900/90 text-zinc-300 hover:text-white text-xs font-semibold px-3 py-1.5 pr-7 rounded-full border border-zinc-800 cursor-pointer focus:outline-none"
-          >
-            <option value="all">Все года</option>
-            <option value="2026">2026</option>
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
-            <option value="2023">2023</option>
-            <option value="2022">2022</option>
-            <option value="2020">2020-е</option>
-            <option value="2010">2010-е</option>
-          </select>
-          <ChevronDown className="w-3.5 h-3.5 text-zinc-500 absolute right-2.5 top-2.5 pointer-events-none" />
-        </div>
-
-        {/* Фильтр рейтинга */}
-        <div className="relative">
-          <select
-            value={minRating}
-            onChange={(e) => onSelectRating(e.target.value)}
-            className="appearance-none bg-zinc-900/90 text-amber-400 hover:text-amber-300 text-xs font-bold px-3 py-1.5 pr-7 rounded-full border border-zinc-800 cursor-pointer focus:outline-none"
-          >
-            <option value="6.0">Рейтинг: 6.0+</option>
-            <option value="7.0">Рейтинг: 7.0+</option>
-            <option value="7.5">Рейтинг: 7.5+</option>
-            <option value="8.0">Рейтинг: 8.0+</option>
-          </select>
-          <ChevronDown className="w-3.5 h-3.5 text-zinc-500 absolute right-2.5 top-2.5 pointer-events-none" />
-        </div>
-      </div>
+      {/* Единая кнопка вызова параметров и ползунков фильтров в стиле Netflix */}
+      <CinemaFilters
+        yearRange={yearRange}
+        onYearChange={onYearChange}
+        minRating={minRating}
+        onRatingChange={onRatingChange}
+        onReset={onResetFilters}
+      />
     </div>
   );
 }
+
+export default CinemaCategories;

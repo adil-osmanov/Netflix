@@ -88,7 +88,9 @@ export async function GET(request: Request) {
   const query = searchParams.get('query');
   const category = searchParams.get('category') || 'trending';
   const page = searchParams.get('page') || '1';
-  const year = searchParams.get('year');
+  const yearParam = searchParams.get('year');
+  const yearGte = searchParams.get('yearGte') || (yearParam && yearParam !== 'all' ? yearParam : '1990');
+  const yearLte = searchParams.get('yearLte') || (yearParam && yearParam !== 'all' ? yearParam : '2026');
   const minRating = searchParams.get('minRating') || '6.0';
   const isRefresh = searchParams.get('refresh') === 'true';
 
@@ -101,23 +103,10 @@ export async function GET(request: Request) {
       )}&page=${page}&language=ru-RU&include_adult=false`;
     } else {
       const targetPage = isRefresh ? Math.floor(Math.random() * 4) + 1 : Number(page || '1');
-      let baseParams = `api_key=${TMDB_API_KEY}&language=ru-RU&page=${targetPage}&vote_average.gte=${minRating}`;
-
-      if (year && year !== 'all') {
-        if (year === '2020') {
-          baseParams += category === 'series'
-            ? `&first_air_date.gte=2020-01-01&first_air_date.lte=2029-12-31`
-            : `&primary_release_date.gte=2020-01-01&primary_release_date.lte=2029-12-31`;
-        } else if (year === '2010') {
-          baseParams += category === 'series'
-            ? `&first_air_date.gte=2010-01-01&first_air_date.lte=2019-12-31`
-            : `&primary_release_date.gte=2010-01-01&primary_release_date.lte=2019-12-31`;
-        } else {
-          baseParams += category === 'series'
-            ? `&first_air_date_year=${year}`
-            : `&primary_release_year=${year}`;
-        }
-      }
+      let baseParams = `api_key=${TMDB_API_KEY}&language=ru-RU&page=${targetPage}`;
+      baseParams += `&primary_release_date.gte=${yearGte}-01-01&primary_release_date.lte=${yearLte}-12-31`;
+      baseParams += `&first_air_date.gte=${yearGte}-01-01&first_air_date.lte=${yearLte}-12-31`;
+      baseParams += `&vote_average.gte=${minRating}`;
 
       switch (category) {
         case 'top_rated':

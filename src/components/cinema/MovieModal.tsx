@@ -27,6 +27,16 @@ export function MovieModal({ item, onClose }: MovieModalProps) {
   const [episode, setEpisode] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
 
+  // Запрещаем скролл фона при открытии плеера
+  useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, []);
+
   // Закрытие по Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -45,7 +55,7 @@ export function MovieModal({ item, onClose }: MovieModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-black/95 backdrop-blur-xl animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex flex-col bg-black/95 backdrop-blur-xl animate-in fade-in duration-200 overscroll-contain"
       onClick={onClose}
     >
       {/* Верхняя навигационная панель */}

@@ -22,12 +22,12 @@ export const STREAMING_SERVERS: StreamingServer[] = [
     getTvUrl: (id, s, e) => `https://vidsrc.su/embed/tv/${id}/${s}/${e}`,
   },
   {
-    id: 'vidsrc_cc',
-    name: 'VidSrc CC v2',
-    badge: '1080p • Официальный FMHY',
-    // Без редиректов и всплывающего спама
-    getMovieUrl: (id) => `https://vidsrc.cc/v2/embed/movie/${id}`,
-    getTvUrl: (id, s, e) => `https://vidsrc.cc/v2/embed/tv/${id}/${s}/${e}`,
+    id: 'vidsrc_pm',
+    name: 'VidSrc PM',
+    badge: '1080p • Быстрый CDN',
+    // Надежный FMHY шлюз без черного экрана и без блокировок фрейма
+    getMovieUrl: (id) => `https://vidsrc.pm/embed/movie/${id}`,
+    getTvUrl: (id, s, e) => `https://vidsrc.pm/embed/tv/${id}/${s}-${e}`,
   },
   {
     id: 'twoembed',

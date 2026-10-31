@@ -42,13 +42,10 @@ export function MovieCard({ movie, item, onSelect }: MovieCardProps) {
           className="h-full w-full object-cover transition-opacity duration-300 group-hover:opacity-85 select-none"
         />
 
-        {/* Левый верхний угол: Год и бейдж качества HD вместо EN */}
-        <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 select-none pointer-events-none">
-          <span className="bg-black/85 backdrop-blur-sm text-zinc-200 border border-zinc-700/60 font-black px-1.5 py-0.5 rounded text-[10px]">
+        {/* Левый верхний угол: Только год (Бейдж HD удален) */}
+        <div className="absolute top-2 left-2 z-10 select-none pointer-events-none">
+          <span className="bg-black/80 backdrop-blur-sm text-zinc-200 border border-zinc-700/60 font-black px-2 py-0.5 rounded text-[10px]">
             {current.year}
-          </span>
-          <span className="bg-zinc-800/90 text-zinc-300 border border-zinc-700/50 font-black px-1.5 py-0.5 rounded text-[10px] tracking-wider">
-            HD
           </span>
         </div>
 

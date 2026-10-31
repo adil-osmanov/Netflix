@@ -9,8 +9,8 @@ import { Film, RotateCw, Search } from 'lucide-react';
 export function CinemaCatalog() {
   const [items, setItems] = useState<CinemaItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('trending');
-  const [selectedYear, setSelectedYear] = useState<string>('all');
-  const [minRating, setMinRating] = useState<string>('6.0');
+  const [yearRange, setYearRange] = useState<[number, number]>([1990, 2026]);
+  const [minRating, setMinRating] = useState<number>(6.0);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeQuery, setActiveQuery] = useState<string>('');
   const [selectedMovie, setSelectedMovie] = useState<CinemaItem | null>(null);
@@ -23,9 +23,15 @@ export function CinemaCatalog() {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const activeRequestIdRef = useRef<number>(0);
 
-  // Загрузка первой страницы при смене категории, года, рейтинга или поискового запроса
+  // Сброс фильтров в значения по умолчанию
+  const handleResetFilters = useCallback(() => {
+    setYearRange([1990, 2026]);
+    setMinRating(6.0);
+  }, []);
+
+  // Загрузка первой страницы при смене категории, диапазона лет, рейтинга или поиска
   const fetchInitialMovies = useCallback(
-    async (cat: string, query: string, yr: string, rating: string) => {
+    async (cat: string, query: string, yrs: [number, number], rating: number) => {
       const requestId = ++activeRequestIdRef.current;
       setIsLoading(true);
       setPage(1);
@@ -35,7 +41,7 @@ export function CinemaCatalog() {
         const q = query.trim();
         const endpoint = q
           ? `/api/movies?query=${encodeURIComponent(q)}&page=1`
-          : `/api/movies?category=${cat}&year=${yr}&minRating=${rating}&page=1`;
+          : `/api/movies?category=${cat}&yearGte=${yrs[0]}&yearLte=${yrs[1]}&minRating=${rating}&page=1`;
 
         const res = await fetch(endpoint);
         if (!res.ok) throw new Error('Ошибка загрузки');
@@ -62,8 +68,8 @@ export function CinemaCatalog() {
 
   // Первоначальная загрузка и смена фильтров/запроса
   useEffect(() => {
-    fetchInitialMovies(selectedCategory, activeQuery, selectedYear, minRating);
-  }, [selectedCategory, activeQuery, selectedYear, minRating, fetchInitialMovies]);
+    fetchInitialMovies(selectedCategory, activeQuery, yearRange, minRating);
+  }, [selectedCategory, activeQuery, yearRange, minRating, fetchInitialMovies]);
 
   // Подгрузка следующей страницы (Infinite Scroll)
   const loadMore = useCallback(async () => {
@@ -75,7 +81,7 @@ export function CinemaCatalog() {
       const q = activeQuery.trim();
       const endpoint = q
         ? `/api/movies?query=${encodeURIComponent(q)}&page=${nextPage}`
-        : `/api/movies?category=${selectedCategory}&year=${selectedYear}&minRating=${minRating}&page=${nextPage}`;
+        : `/api/movies?category=${selectedCategory}&yearGte=${yearRange[0]}&yearLte=${yearRange[1]}&minRating=${minRating}&page=${nextPage}`;
 
       const res = await fetch(endpoint);
       if (!res.ok) throw new Error('Ошибка загрузки следующей страницы');
@@ -100,7 +106,7 @@ export function CinemaCatalog() {
     } finally {
       setIsFetchingMore(false);
     }
-  }, [isLoading, isFetchingMore, hasMore, page, activeQuery, selectedCategory, selectedYear, minRating]);
+  }, [isLoading, isFetchingMore, hasMore, page, activeQuery, selectedCategory, yearRange, minRating]);
 
   // Наблюдатель IntersectionObserver для бесконечной ленты
   useEffect(() => {
@@ -147,7 +153,7 @@ export function CinemaCatalog() {
       const q = activeQuery.trim();
       const endpoint = q
         ? `/api/movies?query=${encodeURIComponent(q)}&refresh=true&page=1`
-        : `/api/movies?category=${selectedCategory}&year=${selectedYear}&minRating=${minRating}&refresh=true`;
+        : `/api/movies?category=${selectedCategory}&yearGte=${yearRange[0]}&yearLte=${yearRange[1]}&minRating=${minRating}&refresh=true`;
 
       const res = await fetch(endpoint);
       const data = await res.json();
@@ -194,6 +200,7 @@ export function CinemaCatalog() {
         </form>
 
         <button
+          type="button"
           onClick={refreshFeed}
           disabled={isLoading}
           className="p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 outline-none transition-colors disabled:opacity-40 cursor-pointer shadow"
@@ -208,10 +215,11 @@ export function CinemaCatalog() {
         <CinemaCategories
           selected={selectedCategory}
           onSelect={handleCategorySelect}
-          selectedYear={selectedYear}
-          onSelectYear={setSelectedYear}
+          yearRange={yearRange}
+          onYearChange={setYearRange}
           minRating={minRating}
-          onSelectRating={setMinRating}
+          onRatingChange={setMinRating}
+          onResetFilters={handleResetFilters}
         />
       )}
 
