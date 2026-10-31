@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ALL_CHANNELS, normalizeSender, SENDER_API_MAP, determineGermanLevel, sanitizeThumbnailUrl } from '@/lib/mediathek';
+import { ALL_CHANNELS, normalizeSender, SENDER_API_MAP, determineGermanLevel, sanitizeThumbnailUrl, buildChannelQuery } from '@/lib/mediathek';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -267,19 +267,14 @@ export async function POST(req: Request) {
     const excludeSet = new Set<string>(Array.isArray(excludeIds) ? excludeIds : []);
     let rawResults: any[] = [];
 
-    // Точный вещатель для API MediathekViewWeb
-    const mappedSender =
-      channel && channel !== 'all' && channel !== 'ALL'
-        ? SENDER_API_MAP[channel] || channel
-        : null;
+    // Точные запросы по вещателю из реестра MediathekViewWeb
+    const isChannelActive = channel && channel !== 'all' && channel !== 'ALL';
+    const channelQueries = isChannelActive ? buildChannelQuery(channel) : [];
 
     // 1. Формирование запросов к API MediathekViewWeb
     if (query && query.trim()) {
       // Пользовательский поиск
-      const queries: any[] = [{ fields: ['title', 'topic'], query: query.trim() }];
-      if (mappedSender) {
-        queries.push({ fields: ['channel', 'sender'], query: mappedSender });
-      }
+      const queries: any[] = [{ fields: ['title', 'topic'], query: query.trim() }, ...channelQueries];
       rawResults = await queryMediathekRaw(queries, cleanOffset, 70);
     } else if (level === 'A1' || level === 'A2') {
       // Для уровней A1 и A2 запрашиваем детский и адаптивный контент
@@ -290,15 +285,12 @@ export async function POST(req: Request) {
 
       const batchLists = await Promise.all(
         aLevelKeywords.map((kw) => {
-          const queries: any[] = [{ fields: ['title', 'topic'], query: kw }];
-          if (mappedSender) {
-            queries.push({ fields: ['channel', 'sender'], query: mappedSender });
-          }
+          const queries: any[] = [{ fields: ['title', 'topic'], query: kw }, ...channelQueries];
           return queryMediathekRaw(queries, Math.floor(cleanOffset / 2), 25);
         })
       );
       rawResults = batchLists.flat();
-    } else if (mappedSender) {
+    } else if (isChannelActive) {
       // Выбран конкретный канал (ARTE, Phoenix, ONE, DW, ZDFneo и т.д.)
       if (category && category !== 'all' && CATEGORY_KEYWORDS[category]) {
         // Канал + выбранная подкатегория
@@ -307,7 +299,7 @@ export async function POST(req: Request) {
           catKw.map((kw) =>
             queryMediathekRaw(
               [
-                { fields: ['channel', 'sender'], query: mappedSender },
+                ...channelQueries,
                 { fields: ['title', 'topic'], query: kw },
               ],
               Math.floor(cleanOffset / 2),
@@ -317,12 +309,8 @@ export async function POST(req: Request) {
         );
         rawResults = batchLists.flat();
       } else {
-        // Запрос передач конкретного канала напрямую (без лишних ограничивающих слов)
-        rawResults = await queryMediathekRaw(
-          [{ fields: ['channel', 'sender'], query: mappedSender }],
-          cleanOffset,
-          60
-        );
+        // Запрос передач конкретного канала напрямую через buildChannelQuery
+        rawResults = await queryMediathekRaw(channelQueries, cleanOffset, 60);
       }
     } else {
       // Общий каталог всех каналов

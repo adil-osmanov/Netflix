@@ -210,6 +210,17 @@ export default function YouTubeCatalogPage() {
   const podcastsRef = useRef<YouTubeRecommendedVideo[]>([]);
   podcastsRef.current = podcasts;
 
+  // Поддержка прямых ссылок с параметром категории (например, /youtube?category=mediathek)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const cat = params.get("category");
+      if (cat === "mediathek" || cat === "podcasts" || cat === "favorites" || cat === "youtube") {
+        setActiveCategory(cat as TopCategory);
+      }
+    }
+  }, []);
+
   // Загрузка актуальных подписок при смене языка или открытии
   useEffect(() => {
     let isMounted = true;

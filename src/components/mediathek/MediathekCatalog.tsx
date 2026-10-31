@@ -155,7 +155,7 @@ export default function MediathekCatalog() {
           handleAppend(validItems);
         }
 
-        // Если вернулся пустой массив или hasMore=false, сразу прекращаем пагинацию
+        // Если вернулся пустой массив или меньше страницы, либо hasMore=false, сразу прекращаем пагинацию
         if (!data.items || data.items.length === 0 || !data.hasMore) {
           setHasMore(false);
         } else {
@@ -165,6 +165,7 @@ export default function MediathekCatalog() {
         if (requestId === activeRequestIdRef.current) {
           console.error("Error loading Mediathek items:", err);
           setError("Не удалось связаться с медиатекой. Проверьте интернет или повторите запрос.");
+          setHasMore(false);
         }
       } finally {
         if (requestId === activeRequestIdRef.current) {
@@ -406,11 +407,13 @@ export default function MediathekCatalog() {
 
       {/* Intersection Sentinel (показывается только если есть еще страницы для загрузки) */}
       {hasMore && displayedVideos.length > 0 && (
-        <div ref={sentinelRef} className="h-24 flex items-center justify-center my-4">
+        <div ref={sentinelRef} className="w-full">
           {isFetchingMore && (
-            <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-zinc-900/90 border border-zinc-800 shadow-lg text-zinc-300 text-xs sm:text-sm font-medium">
-              <Loader2 className="w-4 h-4 animate-spin text-[#E50914]" />
-              <span>Загрузка следующих передач...</span>
+            <div className="flex items-center justify-center py-8">
+              <div className="flex items-center gap-2 text-zinc-400 text-xs">
+                <div className="w-4 h-4 border-2 border-zinc-600 border-t-red-600 rounded-full animate-spin" />
+                <span>Загрузка следующих передач...</span>
+              </div>
             </div>
           )}
         </div>
