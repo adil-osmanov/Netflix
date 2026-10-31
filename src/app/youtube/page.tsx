@@ -747,7 +747,7 @@ export default function YouTubeCatalogPage() {
             {isEN ? (
               <button
                 onClick={() => setActiveCategory("cinema")}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-all duration-200 cursor-pointer ${
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-all duration-200 cursor-pointer ${
                   activeCategory === "cinema"
                     ? "bg-white text-black shadow-lg shadow-white/10"
                     : "bg-zinc-900/80 text-zinc-400 hover:text-white hover:bg-zinc-800"
@@ -759,13 +759,14 @@ export default function YouTubeCatalogPage() {
             ) : (
               <button
                 onClick={() => setActiveCategory("mediathek")}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200 cursor-pointer ${
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none active:ring-0 ring-0 border-none [-webkit-tap-highlight-color:transparent] transition-all duration-200 cursor-pointer ${
                   activeCategory === "mediathek"
-                    ? "bg-white text-black shadow-md"
-                    : "bg-zinc-900 text-zinc-400 hover:text-white"
+                    ? "bg-white text-black shadow-lg shadow-white/10"
+                    : "bg-zinc-900/80 text-zinc-400 hover:text-white hover:bg-zinc-800"
                 }`}
               >
-                Mediathek
+                <Film className="w-3.5 h-3.5" />
+                <span>Mediathek</span>
               </button>
             )}
 
