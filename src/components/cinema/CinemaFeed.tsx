@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { CinemaRow } from './CinemaRow';
-import { CinemaLandscapeCard } from './CinemaLandscapeCard';
+import React, { useState, useEffect, useCallback } from 'react';
+import { MovieCard } from './MovieCard';
 import { CinemaFilters } from './CinemaFilters';
 import { MovieModal } from './MovieModal';
-import { Search, RotateCw, Film } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 const MAIN_TABS = [
   { id: 'trending', label: 'В тренде' },
@@ -14,98 +13,105 @@ const MAIN_TABS = [
   { id: 'cartoons', label: 'Мультфильмы' },
 ];
 
-export function CinemaFeed() {
+const MOVIE_GENRES = [
+  { id: 'all', label: 'Все жанры' },
+  { id: '28', label: 'Боевики' },
+  { id: '878', label: 'Фантастика' },
+  { id: '18', label: 'Драмы' },
+  { id: '27', label: 'Ужасы' },
+  { id: '35', label: 'Комедии' },
+  { id: '80', label: 'Криминал' },
+];
+
+const TV_GENRES = [
+  { id: 'all', label: 'Все сериалы' },
+  { id: '18', label: 'Драмы' },
+  { id: '10765', label: 'Фантастика' },
+  { id: '80', label: 'Детективы' },
+  { id: '35', label: 'Комедии' },
+];
+
+const CARTOON_GENRES = [
+  { id: 'all', label: 'Все мультфильмы' },
+  { id: 'family', label: 'Семейные' },
+  { id: 'anime', label: 'Аниме' },
+];
+
+interface CinemaFeedProps {
+  searchQuery?: string;
+}
+
+export function CinemaFeed({ searchQuery: propSearchQuery }: CinemaFeedProps) {
   const [activeTab, setActiveTab] = useState('trending');
-  const [sections, setSections] = useState<any[]>([]);
+  const [activeGenre, setActiveGenre] = useState('all');
+  const [items, setItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Поиск
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeQuery, setActiveQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  // Поисковый запрос
+  const [searchQuery, setSearchQuery] = useState(propSearchQuery || '');
+  const [activeQuery, setActiveQuery] = useState(propSearchQuery || '');
 
-  // Фильтры с ползунками
+  // Фильтры диапазона года и рейтинга
   const [yearRange, setYearRange] = useState<[number, number]>([1990, 2026]);
   const [minRating, setMinRating] = useState(6.0);
 
-  // Выбранный фильм для полноэкранного In-App плеера
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  // Открытие фильма в полноэкранном плеере
+  const [selectedMovie, setSelectedMovie] = useState<any>(null);
 
-  const activeRequestIdRef = useRef<number>(0);
+  // Сброс под-жанра при переключении главной вкладки
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    setActiveGenre('all');
+    if (activeQuery) {
+      setSearchQuery('');
+      setActiveQuery('');
+    }
+  };
 
-  const fetchSections = useCallback(async () => {
-    const requestId = ++activeRequestIdRef.current;
+  const loadMovies = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(
-        `/api/movies/sections?tab=${activeTab}&yearGte=${yearRange[0]}&yearLte=${yearRange[1]}&minRating=${minRating}`
-      );
-      if (!res.ok) throw new Error('Ошибка загрузки секций');
-      const data = await res.json();
-      if (requestId !== activeRequestIdRef.current) return;
-      setSections(data.sections || []);
-    } catch (e) {
-      if (requestId === activeRequestIdRef.current) {
-        console.error('Failed to fetch sections:', e);
-      }
-    } finally {
-      if (requestId === activeRequestIdRef.current) {
-        setIsLoading(false);
-      }
-    }
-  }, [activeTab, yearRange, minRating]);
+      const q = activeQuery.trim();
+      const endpoint = q
+        ? `/api/movies?query=${encodeURIComponent(q)}&page=1`
+        : `/api/movies?tab=${activeTab}&genre=${activeGenre}&yearGte=${yearRange[0]}&yearLte=${yearRange[1]}&minRating=${minRating}`;
 
-  // Загрузка каруселей при смене вкладки или фильтров
+      const res = await fetch(endpoint);
+      const data = await res.json();
+      setItems(data.items || []);
+    } catch (e) {
+      console.error('Failed to load movies:', e);
+      setItems([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeTab, activeGenre, yearRange, minRating, activeQuery]);
+
   useEffect(() => {
-    if (!activeQuery) {
-      fetchSections();
-    }
-  }, [activeQuery, fetchSections]);
-
-  // Поиск по TMDB
-  const handleSearch = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setActiveQuery('');
-      setSearchResults([]);
-      return;
-    }
-
-    setIsSearching(true);
-    try {
-      const res = await fetch(`/api/movies?query=${encodeURIComponent(query.trim())}&page=1`);
-      const data = await res.json();
-      setSearchResults(data.items || []);
-    } catch (e) {
-      console.error('Search error:', e);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  }, []);
+    loadMovies();
+  }, [loadMovies]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setActiveQuery(searchQuery);
-    handleSearch(searchQuery);
   };
 
   const handleClearSearch = () => {
     setSearchQuery('');
     setActiveQuery('');
-    setSearchResults([]);
   };
 
-  const handleResetFilters = () => {
-    setYearRange([1990, 2026]);
-    setMinRating(6.0);
-  };
+  // Выбор списка под-жанров
+  let currentGenres: { id: string; label: string }[] = [];
+  if (activeTab === 'movies') currentGenres = MOVIE_GENRES;
+  if (activeTab === 'series') currentGenres = TV_GENRES;
+  if (activeTab === 'cartoons') currentGenres = CARTOON_GENRES;
 
   return (
     <div className="w-full space-y-4 pb-12">
-      {/* Верхняя строка: Вкладки, поиск и фильтры в стиле Netflix */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-3">
-        {/* Кнопки вкладок */}
+      {/* Верхний бар: 4 главные вкладки + поиск + кнопка фильтра */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
+        {/* Главные вкладки */}
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
           {MAIN_TABS.map((tab) => {
             const isActive = activeTab === tab.id && !activeQuery;
@@ -113,14 +119,11 @@ export function CinemaFeed() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => {
-                  if (activeQuery) handleClearSearch();
-                  setActiveTab(tab.id);
-                }}
-                className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer outline-none select-none ${
+                onClick={() => handleTabChange(tab.id)}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer outline-none select-none ${
                   isActive
-                    ? 'bg-white text-black shadow-lg shadow-white/10 scale-105'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent'
+                    ? 'bg-white text-black shadow-lg shadow-white/10'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
                 }`}
               >
                 {tab.label}
@@ -129,10 +132,9 @@ export function CinemaFeed() {
           })}
         </div>
 
-        {/* Правая часть: поиск, кнопка обновления и ползунки фильтра */}
+        {/* Поиск и фильтры */}
         <div className="flex items-center gap-2">
-          {/* Поле поиска */}
-          <form onSubmit={handleSearchSubmit} className="relative w-44 sm:w-56 md:w-64">
+          <form onSubmit={handleSearchSubmit} className="relative w-40 sm:w-52 md:w-60">
             <input
               type="text"
               value={searchQuery}
@@ -152,107 +154,72 @@ export function CinemaFeed() {
             )}
           </form>
 
-          {/* Обновить */}
-          <button
-            type="button"
-            onClick={fetchSections}
-            disabled={isLoading}
-            className="p-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 outline-none transition-colors disabled:opacity-40 cursor-pointer shadow"
-            title="Обновить карусели"
-          >
-            <RotateCw className={`w-3.5 h-3.5 text-red-500 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
-
-          {/* Кнопка фильтра с ползунками */}
+          {/* Регулятор фильтров с ползунками */}
           <CinemaFilters
             minRating={minRating}
             onRatingChange={setMinRating}
             yearRange={yearRange}
             onYearChange={setYearRange}
-            onReset={handleResetFilters}
+            onReset={() => {
+              setYearRange([1990, 2026]);
+              setMinRating(6.0);
+            }}
           />
         </div>
       </div>
 
-      {/* Режим результатов поиска */}
-      {activeQuery ? (
-        <div className="space-y-4 pt-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-white">
-              Результаты поиска: &ldquo;{activeQuery}&rdquo;
-            </h2>
-            <button
-              type="button"
-              onClick={handleClearSearch}
-              className="text-xs text-red-500 hover:underline cursor-pointer"
-            >
-              Сбросить поиск
-            </button>
-          </div>
+      {/* Второй уровень: аккуратная строка под-жанров */}
+      {!activeQuery && currentGenres.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+          {currentGenres.map((g) => {
+            const isGenreActive = activeGenre === g.id;
+            return (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => setActiveGenre(g.id)}
+                className={`px-3 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all duration-150 cursor-pointer outline-none select-none ${
+                  isGenreActive
+                    ? 'bg-zinc-800 text-white border border-zinc-700'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {g.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-          {isSearching ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pt-2">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="aspect-video bg-zinc-900 rounded-md animate-pulse" />
-              ))}
-            </div>
-          ) : searchResults.length === 0 ? (
-            <div className="py-20 text-center space-y-2">
-              <Film className="w-8 h-8 text-zinc-600 mx-auto" />
-              <p className="text-xs text-zinc-400">Ничего не найдено по вашему запросу</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pt-2">
-              {searchResults.map((item) => (
-                <CinemaLandscapeCard
-                  key={`${item.media_type}-${item.id}`}
-                  item={{
-                    ...item,
-                    backdrop: item.backdrop || item.poster,
-                  }}
-                  onSelect={() => setSelectedItem(item)}
-                />
-              ))}
-            </div>
-          )}
+      {/* Вертикальная сетка 2:3 */}
+      {isLoading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-2">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div
+              key={i}
+              className="aspect-[2/3] w-full rounded-md bg-zinc-900/60 animate-pulse border border-zinc-800/40"
+            />
+          ))}
+        </div>
+      ) : items.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-2">
+          {items.map((movie) => (
+            <MovieCard
+              key={`${movie.media_type || 'm'}-${movie.id}`}
+              movie={movie}
+              onSelect={() => setSelectedMovie(movie)}
+            />
+          ))}
         </div>
       ) : (
-        /* Горизонтальные карусели по жанрам */
-        <>
-          {isLoading ? (
-            <div className="space-y-6 pt-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="space-y-2">
-                  <div className="h-4 w-40 bg-zinc-900 rounded animate-pulse" />
-                  <div className="flex gap-3 overflow-hidden">
-                    {[1, 2, 3, 4].map((j) => (
-                      <div
-                        key={j}
-                        className="h-36 w-64 bg-zinc-900 rounded-md animate-pulse flex-none"
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-6 pt-2">
-              {sections.map((section) => (
-                <CinemaRow
-                  key={section.id}
-                  title={section.title}
-                  items={section.items}
-                  onSelectItem={setSelectedItem}
-                />
-              ))}
-            </div>
-          )}
-        </>
+        <div className="py-20 text-center text-xs text-zinc-500">
+          Фильмы по выбранным критериям не найдены.
+        </div>
       )}
 
       {/* Полноэкранный плеер */}
-      {selectedItem && (
-        <MovieModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+      {selectedMovie && (
+        <MovieModal item={selectedMovie} onClose={() => setSelectedMovie(null)} />
       )}
     </div>
   );
