@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { ALL_CHANNELS, normalizeSender } from '@/lib/mediathekChannels';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -154,7 +155,7 @@ async function fetchPosterFast(url: string): Promise<string | null> {
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 800);
+    const timer = setTimeout(() => controller.abort(), 1500);
 
     const res = await fetch(url, {
       signal: controller.signal,
@@ -210,14 +211,20 @@ async function queryMediathekKeyword(
   keyword: string,
   offset: number,
   size: number,
-  fields: string[] = ['topic', 'title']
+  fields: string[] = ['topic', 'title'],
+  channelQuery?: string
 ): Promise<any[]> {
   try {
+    const queries: any[] = [{ fields, query: keyword }];
+    if (channelQuery && channelQuery !== 'all' && channelQuery !== 'ALL') {
+      queries.push({ fields: ['channel'], query: channelQuery });
+    }
+
     const response = await fetch('https://mediathekviewweb.de/api/query', {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({
-        queries: [{ fields, query: keyword }],
+        queries,
         sortBy: 'timestamp',
         sortOrder: 'desc',
         future: false,
@@ -238,7 +245,8 @@ function filterAndDeduplicateCandidates(
   rawResults: any[],
   category: string,
   level: string,
-  excludeSet: Set<string>
+  excludeSet: Set<string>,
+  selectedChannel?: string
 ): any[] {
   // Для A1/A2 допускаем передачи от 10 мин (600с), для остальных — стандартные пороги
   const minDurationSec =
@@ -250,6 +258,11 @@ function filterAndDeduplicateCandidates(
       ? 1200
       : 900;
 
+  const targetChannelNorm =
+    selectedChannel && selectedChannel !== 'all' && selectedChannel !== 'ALL'
+      ? selectedChannel.toUpperCase()
+      : null;
+
   const filtered = rawResults.filter((item: any) => {
     if (!item || typeof item.duration !== 'number' || item.duration < minDurationSec) {
       return false;
@@ -258,6 +271,14 @@ function filterAndDeduplicateCandidates(
     const itemId = item.id || `${item.timestamp}-${(item.title || '').slice(0, 15)}`;
     if (excludeSet.has(itemId) || (item.url_website && excludeSet.has(item.url_website))) {
       return false;
+    }
+
+    // Фильтр по выбранному телеканалу
+    if (targetChannelNorm) {
+      const itemNorm = normalizeSender(item.channel || '').toUpperCase();
+      if (itemNorm !== targetChannelNorm) {
+        return false;
+      }
     }
 
     const hasSubtitles = Boolean(
@@ -327,6 +348,7 @@ export async function POST(req: Request) {
     const {
       category = 'all',
       level = 'ALL',
+      channel = 'all',
       query = '',
       offset = 0,
       size = 24,
@@ -337,9 +359,22 @@ export async function POST(req: Request) {
     const excludeSet = new Set<string>(Array.isArray(excludeIds) ? excludeIds : []);
     let rawResults: any[] = [];
 
+    // Находим конфигурацию выбранного канала для точного запроса в MediathekViewWeb
+    const channelConfig =
+      channel && channel !== 'all' && channel !== 'ALL'
+        ? ALL_CHANNELS.find((c) => c.id.toUpperCase() === channel.toUpperCase())
+        : undefined;
+    const channelQueryTerm = channelConfig ? channelConfig.aliases[0] : undefined;
+
     // 1. Получение данных из MediathekViewWeb с честным растущим оффсетом
     if (query && query.trim()) {
-      rawResults = await queryMediathekKeyword(query.trim(), cleanOffset, 70, ['title', 'topic']);
+      rawResults = await queryMediathekKeyword(
+        query.trim(),
+        cleanOffset,
+        70,
+        ['title', 'topic'],
+        channelQueryTerm
+      );
     } else {
       let keywords = CATEGORY_KEYWORDS[category] || CATEGORY_KEYWORDS.all;
       // Если выбран специфический уровень A1 или A2, добавляем ключевые слова для детского/легкого немецкого
@@ -351,12 +386,26 @@ export async function POST(req: Request) {
       const perKeywordSize = category === 'series' ? 40 : 28;
 
       const batchLists = await Promise.all(
-        keywords.map((kw) => queryMediathekKeyword(kw, perKeywordOffset, perKeywordSize))
+        keywords.map((kw) =>
+          queryMediathekKeyword(
+            kw,
+            perKeywordOffset,
+            perKeywordSize,
+            ['topic', 'title'],
+            channelQueryTerm
+          )
+        )
       );
       rawResults = batchLists.flat();
     }
 
-    let candidates = filterAndDeduplicateCandidates(rawResults, category, level, excludeSet);
+    let candidates = filterAndDeduplicateCandidates(
+      rawResults,
+      category,
+      level,
+      excludeSet,
+      channel
+    );
 
     // 2. Если на высоком оффсете кандидатов мало — плавно расширяем тему запроса!
     if (!query?.trim() && candidates.length < size) {
@@ -376,53 +425,78 @@ export async function POST(req: Request) {
       const expOffset = (step * 15) % 120;
 
       const expLists = await Promise.all(
-        pickedExpansion.map((kw) => queryMediathekKeyword(kw, expOffset, 35))
+        pickedExpansion.map((kw) =>
+          queryMediathekKeyword(
+            kw,
+            expOffset,
+            35,
+            ['topic', 'title'],
+            channelQueryTerm
+          )
+        )
       );
       const combinedRaw = [...rawResults, ...expLists.flat()];
-      candidates = filterAndDeduplicateCandidates(combinedRaw, category, level, excludeSet);
+      candidates = filterAndDeduplicateCandidates(
+        combinedRaw,
+        category,
+        level,
+        excludeSet,
+        channel
+      );
       rawResults = combinedRaw;
     }
 
     const shuffledCandidates = shuffleArray(candidates);
-    const slicedCandidates = shuffledCandidates.slice(0, size);
+    const enriched: any[] = [];
+    const BATCH_SIZE = 12;
 
-    // 3. Параллельный сбор обложек (с SVG фоллбеком за 800 мс — без выбрасывания роликов!)
-    const enriched = await Promise.all(
-      slicedCandidates.map(async (item: any) => {
-        const realPoster = await fetchPosterFast(item.url_website);
-        const poster =
-          realPoster || getFallbackPoster(item.channel || 'ARD / ZDF', item.topic || category);
+    // 3. Параллельный сбор обложек пачками: только РЕАЛЬНЫЕ обложки (без пустых заглушек!)
+    for (let i = 0; i < shuffledCandidates.length && enriched.length < size; i += BATCH_SIZE) {
+      const batch = shuffledCandidates.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (item: any) => {
+          const realPoster = await fetchPosterFast(item.url_website);
+          if (!realPoster || !realPoster.startsWith('http')) {
+            return null;
+          }
 
-        const itemLevel = detectMediathekLevel(
-          item.channel || 'ARD / ZDF',
-          item.topic || '',
-          item.title || '',
-          item.duration || 0
-        );
+          const itemLevel = detectMediathekLevel(
+            item.channel || 'ARD / ZDF',
+            item.topic || '',
+            item.title || '',
+            item.duration || 0
+          );
 
-        let displayTitle = item.title || '';
-        if (
-          category === 'series' &&
-          item.topic &&
-          !displayTitle.toLowerCase().includes(item.topic.toLowerCase())
-        ) {
-          displayTitle = `${item.topic}: ${displayTitle}`;
+          let displayTitle = item.title || '';
+          if (
+            category === 'series' &&
+            item.topic &&
+            !displayTitle.toLowerCase().includes(item.topic.toLowerCase())
+          ) {
+            displayTitle = `${item.topic}: ${displayTitle}`;
+          }
+
+          return {
+            id: item.id || `${item.timestamp}-${(item.title || '').slice(0, 15)}`,
+            title: displayTitle,
+            topic: item.topic || '',
+            channel: item.channel || 'ARD / ZDF',
+            duration: Math.round(item.duration / 60),
+            url_website: item.url_website,
+            posterUrl: realPoster,
+            thumbnailUrl: realPoster,
+            level: itemLevel,
+            date: new Date(item.timestamp * 1000).toLocaleDateString('de-DE'),
+          };
+        })
+      );
+
+      for (const res of batchResults) {
+        if (res && enriched.length < size) {
+          enriched.push(res);
         }
-
-        return {
-          id: item.id || `${item.timestamp}-${(item.title || '').slice(0, 15)}`,
-          title: displayTitle,
-          topic: item.topic || '',
-          channel: item.channel || 'ARD / ZDF',
-          duration: Math.round(item.duration / 60),
-          url_website: item.url_website,
-          posterUrl: poster,
-          thumbnailUrl: poster,
-          level: itemLevel,
-          date: new Date(item.timestamp * 1000).toLocaleDateString('de-DE'),
-        };
-      })
-    );
+      }
+    }
 
     const finalItems = shuffleArray(enriched);
 

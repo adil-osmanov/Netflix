@@ -1,18 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { 
   Loader2, 
-  Play, 
   Film, 
-  Tv, 
-  Compass, 
-  Lightbulb,
-  Bookmark, 
   RotateCw,
   AlertCircle
 } from "lucide-react";
 import { useYouTube } from "@/context/YouTubeContext";
+import { ChannelFilter } from "./ChannelFilter";
+import { MediathekCard } from "./MediathekCard";
+import { normalizeSender, filterValidMediathekVideos } from "@/lib/mediathekChannels";
 
 export interface MediathekMediaItem {
   id: string;
@@ -47,32 +45,13 @@ const LEVELS: { id: LevelType; label: string }[] = [
   { id: "C1", label: "C1" },
 ];
 
-function getFallbackPoster(channel: string, topic: string): string {
-  const ch = channel || "ARD / ZDF";
-  const bg = ch.toUpperCase().includes("ZDF")
-    ? "#e05a10"
-    : ch.toUpperCase().includes("ARTE")
-    ? "#c82828"
-    : "#003366";
-
-  const safeChannel = ch.replace(/[<>&"']/g, "");
-  const safeTopic = (topic || "Mediathek").slice(0, 35).replace(/[<>&"']/g, "");
-
-  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" fill="%2318181b"/><rect width="640" height="360" fill="${encodeURIComponent(
-    bg
-  )}" opacity="0.35"/><text x="40" y="80" fill="%23ffffff" font-family="sans-serif" font-weight="900" font-size="28">${encodeURIComponent(
-    safeChannel
-  )}</text><text x="40" y="140" fill="%23e4e4e7" font-family="sans-serif" font-weight="bold" font-size="22">${encodeURIComponent(
-    safeTopic
-  )}</text></svg>`;
-}
-
 export default function MediathekCatalog() {
   const { isFavorite, toggleFavorite } = useYouTube();
 
   const [items, setItems] = useState<MediathekMediaItem[]>([]);
   const [category, setCategory] = useState<CategoryType>("all");
   const [level, setLevel] = useState<LevelType>("ALL");
+  const [selectedChannel, setSelectedChannel] = useState<string>("all");
 
   const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
@@ -105,18 +84,21 @@ export default function MediathekCatalog() {
     async ({
       newCategory,
       newLevel,
+      newChannel,
       newQuery,
       newOffset = 0,
       append = false,
     }: {
       newCategory?: CategoryType;
       newLevel?: LevelType;
+      newChannel?: string;
       newQuery?: string;
       newOffset?: number;
       append?: boolean;
     } = {}) => {
       const catToUse = newCategory !== undefined ? newCategory : category;
       const lvlToUse = newLevel !== undefined ? newLevel : level;
+      const chanToUse = newChannel !== undefined ? newChannel : selectedChannel;
       const queryToUse = newQuery !== undefined ? newQuery : "";
 
       const requestId = ++activeRequestIdRef.current;
@@ -142,6 +124,7 @@ export default function MediathekCatalog() {
             size: 24,
             category: catToUse,
             level: lvlToUse,
+            channel: chanToUse,
             query: queryToUse,
             excludeIds,
             timestamp: Date.now(),
@@ -157,13 +140,15 @@ export default function MediathekCatalog() {
 
         const newItems: MediathekMediaItem[] = (data.items || []).map((it: MediathekMediaItem) => ({
           ...it,
-          posterUrl: it.posterUrl || it.thumbnailUrl || getFallbackPoster(it.channel, it.topic),
+          posterUrl: it.posterUrl || it.thumbnailUrl || "",
         }));
 
+        const validItems = filterValidMediathekVideos(newItems);
+
         if (!append) {
-          setItems(newItems);
+          setItems(validItems);
         } else {
-          handleAppend(newItems);
+          handleAppend(validItems);
         }
 
         setHasMore(Boolean(data.hasMore));
@@ -179,12 +164,12 @@ export default function MediathekCatalog() {
         }
       }
     },
-    [category, level, handleAppend]
+    [category, level, selectedChannel, handleAppend]
   );
 
   // Первоначальная загрузка
   useEffect(() => {
-    fetchMediaItems({ newCategory: "all", newLevel: "ALL", newOffset: 0, append: false });
+    fetchMediaItems({ newCategory: "all", newLevel: "ALL", newChannel: "all", newOffset: 0, append: false });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Мгновенная реакция при смене категории
@@ -207,6 +192,16 @@ export default function MediathekCatalog() {
     fetchMediaItems({ newLevel, newOffset: 0, append: false });
   };
 
+  // Мгновенная реакция при смене канала
+  const handleChannelChange = (newChan: string) => {
+    if (newChan === selectedChannel) return;
+    setSelectedChannel(newChan);
+    setItems([]);
+    setOffset(0);
+    setHasMore(true);
+    fetchMediaItems({ newChannel: newChan, newOffset: 0, append: false });
+  };
+
   // Принудительное обновление
   const handleRefresh = () => {
     setItems([]);
@@ -215,8 +210,6 @@ export default function MediathekCatalog() {
     fetchMediaItems({ newOffset: 0, append: false });
   };
 
-
-
   // Подгрузка следующей пачки
   const loadMoreVideos = useCallback(() => {
     if (isLoading || isFetchingMore || !hasMore) return;
@@ -224,6 +217,25 @@ export default function MediathekCatalog() {
     setOffset(nextOffset);
     fetchMediaItems({ newOffset: nextOffset, append: true });
   }, [isLoading, isFetchingMore, hasMore, offset, fetchMediaItems]);
+
+  // Двойная клиентская фильтрация по уровню и каналу + валидация обложек
+  const displayedVideos = useMemo(() => {
+    const valid = filterValidMediathekVideos(items);
+    return valid.filter((item) => {
+      if (selectedChannel && selectedChannel !== "all" && selectedChannel !== "ALL") {
+        const itemNorm = normalizeSender(item.channel || "");
+        if (itemNorm.toUpperCase() !== selectedChannel.toUpperCase()) {
+          return false;
+        }
+      }
+      if (level && level !== "ALL") {
+        if (item.level !== level) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [items, selectedChannel, level]);
 
   // Intersection Sentinel (rootMargin: 400px)
   useEffect(() => {
@@ -253,7 +265,7 @@ export default function MediathekCatalog() {
       title: item.title,
       channel: item.channel,
       level: item.level,
-      thumbnailUrl: item.posterUrl || item.thumbnailUrl || getFallbackPoster(item.channel, item.topic),
+      thumbnailUrl: item.posterUrl || item.thumbnailUrl || "",
       description: item.topic,
       durationText: `${item.duration} мин`,
     });
@@ -262,7 +274,7 @@ export default function MediathekCatalog() {
   return (
     <div className="w-full">
       {/* Панель управления в одну строку (One-Row Layout) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
         {/* Категории слева */}
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
           {[
@@ -323,6 +335,9 @@ export default function MediathekCatalog() {
         </div>
       </div>
 
+      {/* Премиальный фильтр каналов в стиле Netflix */}
+      <ChannelFilter selectedChannel={selectedChannel} onSelectChannel={handleChannelChange} />
+
       {/* Ошибка */}
       {error && (
         <div className="max-w-md mx-auto my-12 p-6 rounded-2xl bg-zinc-900/90 border border-red-500/30 text-center space-y-4">
@@ -352,112 +367,29 @@ export default function MediathekCatalog() {
       )}
 
       {/* Пустое состояние */}
-      {!isLoading && !error && items.length === 0 && (
+      {!isLoading && !error && displayedVideos.length === 0 && (
         <div className="max-w-md mx-auto my-16 text-center space-y-3">
           <Film className="w-10 h-10 text-zinc-600 mx-auto" />
           <h3 className="text-base font-bold text-white">Передачи не найдены</h3>
           <p className="text-xs text-zinc-400">
-            Попробуйте выбрать другой уровень или обновить ленту.
+            Попробуйте выбрать другой канал или уровень, либо обновите ленту.
           </p>
         </div>
       )}
 
-      {/* Сетка карточек медиатеки */}
-      {!isLoading && items.length > 0 && (
+      {/* Сетка карточек медиатеки с проверкой обложек и контрастными бейджами */}
+      {!isLoading && displayedVideos.length > 0 && (
         <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-          {items.map((item) => {
+          {displayedVideos.map((item) => {
             const isFav = isFavorite(item.url_website) || isFavorite(item.id);
-            const fallbackSvg = getFallbackPoster(item.channel, item.topic);
-
             return (
-              <div
+              <MediathekCard
                 key={item.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => handleCardClick(item.url_website)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleCardClick(item.url_website);
-                  }
-                }}
-                className="group relative flex flex-col cursor-pointer text-left select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
-              >
-                {/* 1. Превью 16:9 с наложением */}
-                <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800">
-                  <img
-                    src={item.posterUrl || item.thumbnailUrl || fallbackSvg}
-                    alt={item.title}
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      if (target.src !== fallbackSvg) {
-                        target.src = fallbackSvg;
-                      }
-                    }}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    loading="lazy"
-                  />
-
-                  {/* Непрозрачные контрастные бейджи канала и уровня */}
-                  <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5">
-                    {item.channel && (
-                      <span className="bg-zinc-900 border border-zinc-700 text-zinc-100 text-[11px] font-extrabold uppercase shadow-md px-2 py-0.5 rounded select-none">
-                        {item.channel}
-                      </span>
-                    )}
-                    <span
-                      className={`px-2 py-0.5 rounded text-[11px] font-extrabold uppercase shadow-md select-none ${
-                        item.level === "C1"
-                          ? "bg-red-600 text-white"
-                          : item.level === "B2"
-                          ? "bg-emerald-600 text-white"
-                          : item.level === "B1"
-                          ? "bg-cyan-600 text-white"
-                          : "bg-zinc-800 text-zinc-100"
-                      }`}
-                    >
-                      {item.level}
-                    </span>
-                  </div>
-
-                  {/* Кнопка «В избранное» */}
-                  <button
-                    type="button"
-                    onClick={(e) => handleToggleFavorite(e, item)}
-                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/90 text-white transition z-10 cursor-pointer backdrop-blur-md select-none outline-none focus:outline-none focus:ring-0 active:outline-none [-webkit-tap-highlight-color:transparent]"
-                    title={isFav ? "Удалить из избранного" : "Сохранить в избранное"}
-                  >
-                    <Bookmark
-                      size={15}
-                      className={
-                        isFav
-                          ? "fill-[#E50914] text-[#E50914] scale-110 transition-transform"
-                          : "text-zinc-400 hover:text-white transition-colors"
-                      }
-                    />
-                  </button>
-
-                  {/* Кнопка воспроизведения по центру при наведении */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-12 h-12 bg-red-600/90 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-lg translate-y-2 group-hover:translate-y-0">
-                      <Play className="w-5 h-5 fill-current ml-0.5" />
-                    </div>
-                  </div>
-
-                  {/* Длительность */}
-                  <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] text-white font-mono">
-                    {item.duration} Min.
-                  </span>
-                </div>
-
-                {/* 2. Чистое название ролика под постером */}
-                <h3 className="mt-2 text-sm font-medium text-zinc-100 line-clamp-2 group-hover:text-white transition-colors leading-snug">
-                  {item.title}
-                </h3>
-                <p className="text-xs text-zinc-500 mt-1 truncate">
-                  {item.channel} {item.topic ? `• ${item.topic}` : ""}
-                </p>
-              </div>
+                video={item}
+                isFav={isFav}
+                onToggleFavorite={handleToggleFavorite}
+                onClick={handleCardClick}
+              />
             );
           })}
         </div>
