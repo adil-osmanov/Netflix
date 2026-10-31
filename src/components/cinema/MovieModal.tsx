@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { STREAMING_SERVERS, StreamingServer } from '@/config/streamingServers';
-import { X, ExternalLink, RefreshCw, ChevronDown } from 'lucide-react';
+import { X, RefreshCw, ExternalLink, ChevronDown } from 'lucide-react';
 
 export interface CinemaItem {
   id: number | string;
@@ -48,60 +48,70 @@ export function MovieModal({ item, onClose }: MovieModalProps) {
       className="fixed inset-0 z-50 flex flex-col bg-black/95 backdrop-blur-xl animate-in fade-in duration-200"
       onClick={onClose}
     >
-      {/* Верхняя панель встроенного In-App браузера */}
+      {/* Верхняя навигационная панель */}
       <div
-        className="w-full h-14 bg-zinc-950 border-b border-zinc-800/80 px-4 flex items-center justify-between select-none z-20 shrink-0"
+        className="w-full h-14 bg-zinc-950/90 border-b border-zinc-800/80 px-4 flex items-center justify-between select-none z-20 shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Левая часть: название и метаданные */}
+        {/* Заголовок */}
         <div className="flex items-center gap-3 overflow-hidden">
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+            className="p-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
             title="Назад к каталогу"
           >
             <X className="w-5 h-5" />
           </button>
-
           <div className="flex items-center gap-2 truncate">
             <span className="font-bold text-sm text-white truncate max-w-[180px] sm:max-w-xs md:max-w-md">
               {item.title}
             </span>
             <span className="text-zinc-500 text-xs hidden sm:inline">({item.year})</span>
-            <span className="bg-zinc-800 text-zinc-300 text-[10px] font-black px-1.5 py-0.5 rounded uppercase hidden md:inline">
-              {item.media_type === 'tv' ? 'Сериал' : 'Фильм'}
-            </span>
           </div>
         </div>
 
-        {/* Правая часть: селектор серверов, сезонов и кнопки управления */}
+        {/* Управление: Сезоны, Серии, Серверы */}
         <div className="flex items-center gap-2">
-          {/* Селектор сезонов и серий для сериалов */}
+          {/* Премиальный выбор сезона и серии */}
           {item.media_type === 'tv' && (
-            <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-zinc-300">
-              <span className="text-zinc-500 font-semibold">S</span>
-              <input
-                type="number"
-                min={1}
-                max={40}
-                value={season}
-                onChange={(e) => setSeason(Math.max(1, Number(e.target.value)))}
-                className="w-8 bg-transparent text-center font-bold text-white focus:outline-none"
-              />
-              <span className="text-zinc-500 font-semibold">E</span>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={episode}
-                onChange={(e) => setEpisode(Math.max(1, Number(e.target.value)))}
-                className="w-8 bg-transparent text-center font-bold text-white focus:outline-none"
-              />
+            <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+              <div className="relative">
+                <select
+                  value={season}
+                  onChange={(e) => {
+                    setSeason(Number(e.target.value));
+                    setEpisode(1); // сброс серии при смене сезона
+                  }}
+                  className="appearance-none bg-black/50 text-white text-xs font-semibold px-2.5 py-1 pr-6 rounded border border-zinc-800 hover:border-zinc-700 cursor-pointer focus:outline-none"
+                >
+                  {Array.from({ length: 25 }, (_, i) => i + 1).map((s) => (
+                    <option key={s} value={s} className="bg-zinc-900 text-white">
+                      Сезон {s}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3 h-3 text-zinc-400 absolute right-1.5 top-2 pointer-events-none" />
+              </div>
+
+              <div className="relative">
+                <select
+                  value={episode}
+                  onChange={(e) => setEpisode(Number(e.target.value))}
+                  className="appearance-none bg-black/50 text-white text-xs font-semibold px-2.5 py-1 pr-6 rounded border border-zinc-800 hover:border-zinc-700 cursor-pointer focus:outline-none"
+                >
+                  {Array.from({ length: 30 }, (_, i) => i + 1).map((e) => (
+                    <option key={e} value={e} className="bg-zinc-900 text-white">
+                      Серия {e}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3 h-3 text-zinc-400 absolute right-1.5 top-2 pointer-events-none" />
+              </div>
             </div>
           )}
 
-          {/* Быстрый выбор сервера */}
-          <div className="relative group">
+          {/* Селектор сервера */}
+          <div className="relative">
             <select
               value={activeServer.id}
               onChange={(e) => {
@@ -119,16 +129,16 @@ export function MovieModal({ item, onClose }: MovieModalProps) {
             <ChevronDown className="w-3.5 h-3.5 text-zinc-400 absolute right-2 top-2.5 pointer-events-none" />
           </div>
 
-          {/* Перезагрузка плеера */}
+          {/* Обновить плеер */}
           <button
             onClick={() => setReloadKey((prev) => prev + 1)}
             className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-            title="Перезагрузить плеер"
+            title="Перезагрузить поток"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
 
-          {/* Аварийное открытие во внешнем браузере */}
+          {/* Открыть оригинал во внешнем браузере при необходимости */}
           <a
             href={embedUrl}
             target="_blank"
@@ -141,7 +151,7 @@ export function MovieModal({ item, onClose }: MovieModalProps) {
         </div>
       </div>
 
-      {/* Рабочая область встроенного браузера */}
+      {/* Сам полноэкранный плеер */}
       <div
         className="relative flex-1 w-full h-full bg-black flex items-center justify-center overflow-hidden"
         onClick={(e) => e.stopPropagation()}

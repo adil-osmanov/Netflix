@@ -70,72 +70,6 @@ const FALLBACK_ITEMS = [
     year: '2014',
     vote_average: '8.4',
     media_type: 'movie' as const,
-  },
-  {
-    id: 27205,
-    title: 'Inception',
-    original_title: 'Inception',
-    overview: 'Cobb, a skilled thief who commits corporate espionage by infiltrating the subconscious of his targets is offered a chance to regain his old life as payment for a task considered to be impossible: "inception".',
-    poster: 'https://image.tmdb.org/t/p/w500/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/8ZTVqvKDQ8emSGUEMjsS4yHAwrp.jpg',
-    year: '2010',
-    vote_average: '8.4',
-    media_type: 'movie' as const,
-  },
-  {
-    id: 66732,
-    title: 'Stranger Things',
-    original_title: 'Stranger Things',
-    overview: 'When a young boy vanishes, a small town uncovers a mystery involving secret experiments, terrifying supernatural forces and one strange little girl.',
-    poster: 'https://image.tmdb.org/t/p/w500/49WJfeN0moxb9IPfGn8AIqMGskD.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/56v2KjBlU4XaOv9rVYEQypROD7P.jpg',
-    year: '2016',
-    vote_average: '8.6',
-    media_type: 'tv' as const,
-  },
-  {
-    id: 533535,
-    title: 'Deadpool & Wolverine',
-    original_title: 'Deadpool & Wolverine',
-    overview: 'A listless Wade Wilson toils away in civilian life with his days as the morally flexible mercenary, Deadpool, behind him. But when his homeworld faces an existential threat, Wade must reluctantly suit-up again.',
-    poster: 'https://image.tmdb.org/t/p/w500/8cdWjvZQUExUUTzyp4t6EDMubfO.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/yDHYTjA3R0ne82IsN9CVv51g071.jpg',
-    year: '2024',
-    vote_average: '7.7',
-    media_type: 'movie' as const,
-  },
-  {
-    id: 119051,
-    title: 'Wednesday',
-    original_title: 'Wednesday',
-    overview: 'A sleuthing, supernaturally infused mystery charting Wednesday Addams\' years as a student at Nevermore Academy.',
-    poster: 'https://image.tmdb.org/t/p/w500/9PFonB99qQmA37a2s2NsSTezOoO.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/iHSwvRVsRyxKuOCzgEcBmILti4P.jpg',
-    year: '2022',
-    vote_average: '8.4',
-    media_type: 'tv' as const,
-  },
-  {
-    id: 558449,
-    title: 'Gladiator II',
-    original_title: 'Gladiator II',
-    overview: 'Years after witnessing the death of the revered hero Maximus at the hands of his uncle, Lucius must enter the Colosseum after his home is conquered by the tyrannical Emperors.',
-    poster: 'https://image.tmdb.org/t/p/w500/2cxhvwyEwRlysAmRH4iodkvo0z5.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/euYIwmwkmz95mnEx7vA4949Ro5H.jpg',
-    year: '2024',
-    vote_average: '7.0',
-    media_type: 'movie' as const,
-  },
-  {
-    id: 1022789,
-    title: 'Inside Out 2',
-    original_title: 'Inside Out 2',
-    overview: 'Teenager Riley\'s mind headquarters is undergoing a sudden demolition to make room for something entirely unexpected: new Emotions!',
-    poster: 'https://image.tmdb.org/t/p/w500/vpnVM9B6NMmQpWeZvzLvDESb2QY.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/stKGOmPAgAOxwpm5JglIqgZ4q57.jpg',
-    year: '2024',
-    vote_average: '7.6',
-    media_type: 'movie' as const,
   }
 ];
 
@@ -149,27 +83,31 @@ export async function GET(request: Request) {
     let endpoint = '';
 
     if (query && query.trim().length > 0) {
-      // Полнотекстовый поиск по ВСЕМ фильмам и сериалам мира
       endpoint = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(
         query.trim()
       )}&page=${page}&language=en-US&include_adult=false`;
     } else {
-      // Сортировка по категориям
       switch (category) {
         case 'series':
-          endpoint = `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_API_KEY}&sort_by=popularity.desc&page=${page}&language=en-US&with_original_language=en`;
+          endpoint = `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_API_KEY}&sort_by=popularity.desc&vote_count.gte=100&page=${page}&language=en-US&with_original_language=en`;
           break;
         case 'top_rated':
-          endpoint = `https://api.themoviedb.org/3/movie/top_rated?api_key=${TMDB_API_KEY}&page=${page}&language=en-US`;
+          endpoint = `https://api.themoviedb.org/3/movie/top_rated?api_key=${TMDB_API_KEY}&vote_count.gte=500&page=${page}&language=en-US`;
           break;
         case 'action':
-          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=28,878&sort_by=popularity.desc&page=${page}&language=en-US`;
+          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=28&sort_by=popularity.desc&vote_count.gte=150&page=${page}&language=en-US`;
+          break;
+        case 'scifi':
+          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=878,14&sort_by=popularity.desc&vote_count.gte=150&page=${page}&language=en-US`;
+          break;
+        case 'drama':
+          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=18,80&sort_by=popularity.desc&vote_count.gte=200&page=${page}&language=en-US`;
           break;
         case 'comedy':
-          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=35&sort_by=popularity.desc&page=${page}&language=en-US`;
+          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=35&sort_by=popularity.desc&vote_count.gte=150&page=${page}&language=en-US`;
           break;
         case 'animation':
-          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=16&sort_by=popularity.desc&page=${page}&language=en-US`;
+          endpoint = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=16&sort_by=popularity.desc&vote_count.gte=100&page=${page}&language=en-US`;
           break;
         case 'trending':
         default:
@@ -178,7 +116,7 @@ export async function GET(request: Request) {
       }
     }
 
-    const res = await fetch(endpoint, { next: { revalidate: 1800 } });
+    const res = await fetch(endpoint, { next: { revalidate: 3600 } });
     if (!res.ok) throw new Error('Ошибка запроса к TMDB');
 
     const data = await res.json();
@@ -218,6 +156,6 @@ export async function GET(request: Request) {
         totalPages: 10,
       });
     }
-    return NextResponse.json({ items: [], page: Number(page), totalPages: 1 }, { status: 500 });
+    return NextResponse.json({ items: [], page: 1, totalPages: 1 }, { status: 500 });
   }
 }
