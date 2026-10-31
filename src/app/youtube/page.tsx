@@ -24,7 +24,7 @@ import InfiniteVideoFeed, { appendUniqueVideos } from "@/components/youtube/Infi
 import ManageChannelsModal, { SubscribedChannel } from "@/components/youtube/ManageChannelsModal";
 import EasyGermanCatalog from "@/components/youtube/EasyGermanCatalog";
 import MediathekCatalog from "@/components/mediathek/MediathekCatalog";
-import CinemaCatalog from "@/components/cinema/CinemaCatalog";
+import CinemaFeed from "@/components/cinema/CinemaFeed";
 import englishVideosJson from "@/data/english_videos.json";
 import { shuffleArray } from "@/lib/youtube";
 
@@ -824,7 +824,7 @@ export default function YouTubeCatalogPage() {
           <MediathekCatalog />
         ) : activeCategory === "cinema" ? (
           <div className="max-w-7xl mx-auto">
-            <CinemaCatalog />
+            <CinemaFeed />
           </div>
         ) : (
           <>
