@@ -25,14 +25,15 @@ export async function GET(request: Request) {
   const minRating = searchParams.get('minRating') || '6.0';
 
   const pageNum = parseInt(page, 10) || 1;
-  const targetPage = isRefresh && pageNum === 1 ? Math.floor(Math.random() * 5) + 1 : pageNum;
+  const isSearch = Boolean(query && query.trim().length > 0);
+  const targetPage = !isSearch && isRefresh && pageNum === 1 ? Math.floor(Math.random() * 5) + 1 : pageNum;
 
   try {
     let endpoint = '';
 
-    if (query && query.trim().length > 0) {
+    if (isSearch) {
       endpoint = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(
-        query.trim()
+        query!.trim()
       )}&page=${targetPage}&language=ru-RU&include_adult=false`;
     } else {
       const base = `api_key=${TMDB_API_KEY}&language=ru-RU&page=${targetPage}&vote_average.gte=${minRating}&primary_release_date.gte=${yearGte}-01-01&primary_release_date.lte=${yearLte}-12-31`;
@@ -60,7 +61,7 @@ export async function GET(request: Request) {
     const data = await res.json();
     let rawResults = data.results || [];
 
-    if (isRefresh && rawResults.length > 0) {
+    if (!isSearch && isRefresh && rawResults.length > 0) {
       rawResults = shuffleArray(rawResults);
     }
 

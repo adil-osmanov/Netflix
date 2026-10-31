@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MovieCard } from './MovieCard';
 import { CinemaFilters } from './CinemaFilters';
 import { MovieModal } from './MovieModal';
-import { RotateCw } from 'lucide-react';
+import { RotateCw, Search } from 'lucide-react';
 
 const MAIN_TABS = [
   { id: 'trending', label: 'В тренде' },
@@ -41,9 +41,13 @@ export interface CinemaFeedProps {
   searchQuery?: string;
 }
 
-export function CinemaFeed({ searchQuery }: CinemaFeedProps) {
+export function CinemaFeed({ searchQuery: propSearchQuery }: CinemaFeedProps) {
   const [activeTab, setActiveTab] = useState('trending');
   const [activeGenre, setActiveGenre] = useState('all');
+
+  // Поиск
+  const [searchInput, setSearchInput] = useState(propSearchQuery || '');
+  const [activeQuery, setActiveQuery] = useState(propSearchQuery || '');
 
   const [items, setItems] = useState<any[]>([]);
   const [page, setPage] = useState(1);
@@ -61,18 +65,35 @@ export function CinemaFeed({ searchQuery }: CinemaFeedProps) {
 
   const observerTarget = useRef<HTMLDivElement>(null);
 
-  // Загрузка ленты (поддерживает refresh=true)
+  // Синхронизация внешнего prop
+  useEffect(() => {
+    if (propSearchQuery !== undefined) {
+      setSearchInput(propSearchQuery);
+      setActiveQuery(propSearchQuery);
+    }
+  }, [propSearchQuery]);
+
+  // Debounce для ввода в строку поиска
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setActiveQuery(searchInput.trim());
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Загрузка ленты (поддерживает refresh=true и поиск)
   const fetchMovies = useCallback(async (refresh = false) => {
     if (refresh) setIsRefreshing(true);
     else setIsInitialLoading(true);
 
     setPage(1);
     try {
-      const res = await fetch(
-        `/api/movies?tab=${activeTab}&genre=${activeGenre}&page=1&refresh=${refresh}&yearGte=${yearRange[0]}&yearLte=${yearRange[1]}&minRating=${minRating}&query=${encodeURIComponent(
-          searchQuery || ''
-        )}`
-      );
+      const q = activeQuery.trim();
+      const endpoint = q
+        ? `/api/movies?query=${encodeURIComponent(q)}&page=1`
+        : `/api/movies?tab=${activeTab}&genre=${activeGenre}&page=1&refresh=${refresh}&yearGte=${yearRange[0]}&yearLte=${yearRange[1]}&minRating=${minRating}`;
+
+      const res = await fetch(endpoint);
       const data = await res.json();
       setItems(data.items || []);
       setHasMore((data.page || 1) < (data.totalPages || 1));
@@ -83,7 +104,7 @@ export function CinemaFeed({ searchQuery }: CinemaFeedProps) {
       setIsInitialLoading(false);
       setIsRefreshing(false);
     }
-  }, [activeTab, activeGenre, yearRange, minRating, searchQuery]);
+  }, [activeTab, activeGenre, yearRange, minRating, activeQuery]);
 
   // Подгрузка следующих страниц (бесконечный скролл)
   const loadMoreMovies = useCallback(async () => {
@@ -92,11 +113,12 @@ export function CinemaFeed({ searchQuery }: CinemaFeedProps) {
     const nextPage = page + 1;
 
     try {
-      const res = await fetch(
-        `/api/movies?tab=${activeTab}&genre=${activeGenre}&page=${nextPage}&yearGte=${yearRange[0]}&yearLte=${yearRange[1]}&minRating=${minRating}&query=${encodeURIComponent(
-          searchQuery || ''
-        )}`
-      );
+      const q = activeQuery.trim();
+      const endpoint = q
+        ? `/api/movies?query=${encodeURIComponent(q)}&page=${nextPage}`
+        : `/api/movies?tab=${activeTab}&genre=${activeGenre}&page=${nextPage}&yearGte=${yearRange[0]}&yearLte=${yearRange[1]}&minRating=${minRating}`;
+
+      const res = await fetch(endpoint);
       const data = await res.json();
       if (data.items && data.items.length > 0) {
         setItems((prev) => {
@@ -115,7 +137,7 @@ export function CinemaFeed({ searchQuery }: CinemaFeedProps) {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [isLoadingMore, hasMore, isInitialLoading, isRefreshing, page, activeTab, activeGenre, yearRange, minRating, searchQuery]);
+  }, [isLoadingMore, hasMore, isInitialLoading, isRefreshing, page, activeTab, activeGenre, yearRange, minRating, activeQuery]);
 
   useEffect(() => {
     fetchMovies(false);
@@ -142,6 +164,20 @@ export function CinemaFeed({ searchQuery }: CinemaFeedProps) {
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
     setActiveGenre('all');
+    if (activeQuery || searchInput) {
+      setSearchInput('');
+      setActiveQuery('');
+    }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setActiveQuery(searchInput.trim());
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setActiveQuery('');
   };
 
   let currentGenres: { id: string; label: string }[] = [];
@@ -151,12 +187,12 @@ export function CinemaFeed({ searchQuery }: CinemaFeedProps) {
 
   return (
     <div className="w-full space-y-4 pb-12">
-      {/* Верхний бар: Вкладки + Кнопка обновления + Фильтры */}
-      <div className="flex items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+      {/* Верхний бар: Вкладки + Поиск + Кнопка обновления + Фильтры */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-3">
         {/* Вкладки категорий */}
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
           {MAIN_TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
+            const isActive = activeTab === tab.id && !activeQuery;
             return (
               <button
                 key={tab.id}
@@ -174,18 +210,41 @@ export function CinemaFeed({ searchQuery }: CinemaFeedProps) {
           })}
         </div>
 
-        {/* Правая часть: кнопка обновить + фильтры */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Правая часть: поиск + кнопка обновить + фильтры */}
+        <div className="flex items-center gap-2">
+          {/* Поле поиска фильмов и сериалов */}
+          <form onSubmit={handleSearchSubmit} className="relative w-36 sm:w-52 md:w-60">
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Поиск..."
+              className="w-full pl-8 pr-7 py-1.5 bg-zinc-900 border border-zinc-800 rounded-full text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-600 transition-colors"
+            />
+            <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-2 pointer-events-none" />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="absolute right-2.5 top-1.5 text-xs text-zinc-500 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
+          </form>
+
+          {/* Кнопка обновления */}
           <button
             type="button"
             onClick={() => fetchMovies(true)}
-            disabled={isRefreshing}
-            className="p-2 rounded-full bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-all disabled:opacity-50 cursor-pointer"
+            disabled={isRefreshing || Boolean(activeQuery)}
+            className="p-2 rounded-full bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-all disabled:opacity-40 cursor-pointer"
             title="Обновить рекомендации"
           >
             <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-white' : ''}`} />
           </button>
 
+          {/* Фильтры */}
           <CinemaFilters
             minRating={minRating}
             onRatingChange={setMinRating}
@@ -199,8 +258,8 @@ export function CinemaFeed({ searchQuery }: CinemaFeedProps) {
         </div>
       </div>
 
-      {/* Под-жанры */}
-      {currentGenres.length > 0 && (
+      {/* Под-жанры (скрываются во время активного поиска) */}
+      {!activeQuery && currentGenres.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
           {currentGenres.map((g) => {
             const isGenreActive = activeGenre === g.id;
@@ -252,7 +311,9 @@ export function CinemaFeed({ searchQuery }: CinemaFeedProps) {
         </>
       ) : (
         <div className="py-24 text-center text-xs text-zinc-500">
-          Контент по выбранным параметрам не найден.
+          {activeQuery
+            ? `По запросу «${activeQuery}» ничего не найдено.`
+            : 'Контент по выбранным параметрам не найден.'}
         </div>
       )}
 
